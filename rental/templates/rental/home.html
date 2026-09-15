@@ -1,0 +1,1263 @@
+<!DOCTYPE html>
+{% load static %}
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Royal Rental Suits | Premium Suit Rental</title>
+
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@600;700;800&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/aos@2.3.4/dist/aos.css" rel="stylesheet">
+
+    <style>
+        :root {
+            --gold: #c9a84c;
+            --gold-light: #e8c96a;
+            --gold-dim: rgba(201,168,76,0.12);
+            --gold-glow: rgba(201,168,76,0.28);
+            --bg: #0f0f1a;
+            --surface: rgba(255,255,255,0.04);
+            --border: rgba(255,255,255,0.07);
+            --text-main: #f0ede8;
+            --text-muted: rgba(240,237,232,0.5);
+            --success: #4caf82;
+            --danger: #e05c5c;
+            --warning: #e0a040;
+            --radius: 16px;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        html { scroll-behavior: smooth; }
+
+        body {
+            font-family: 'DM Sans', sans-serif;
+            background: var(--bg);
+            color: var(--text-main);
+            overflow-x: hidden;
+        }
+
+        /* ══ ANIMATED BACKGROUND ══ */
+        .bg-layer {
+            position: fixed;
+            inset: 0;
+            z-index: 0;
+            pointer-events: none;
+            overflow: hidden;
+        }
+
+        .bg-layer::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 120'%3E%3Cpath d='M30 10 L15 30 L25 30 L20 120 L80 120 L75 30 L85 30 L70 10 Q60 20 50 18 Q40 20 30 10Z' fill='none' stroke='rgba(201,168,76,0.055)' stroke-width='1.5'/%3E%3Cpath d='M35 10 Q50 28 65 10' fill='none' stroke='rgba(201,168,76,0.055)' stroke-width='1.5'/%3E%3C/svg%3E");
+            background-size: 110px 132px;
+            background-repeat: repeat;
+            animation: bgDrift 70s linear infinite;
+        }
+
+        @keyframes bgDrift {
+            from { background-position: 0 0; }
+            to   { background-position: 110px 132px; }
+        }
+
+        .bg-mesh {
+            position: absolute;
+            inset: 0;
+            background:
+                radial-gradient(ellipse 60% 40% at 20% 20%, rgba(201,168,76,0.08) 0%, transparent 60%),
+                radial-gradient(ellipse 50% 60% at 80% 70%, rgba(76,175,130,0.06) 0%, transparent 55%),
+                radial-gradient(ellipse 40% 50% at 55% 45%, rgba(201,168,76,0.04) 0%, transparent 50%);
+            animation: meshMorph 22s ease-in-out infinite alternate;
+        }
+
+        @keyframes meshMorph {
+            0%   { background-size: 100% 100%, 100% 100%, 100% 100%; }
+            25%  { background-size: 140% 110%, 85% 140%, 110% 75%; }
+            50%  { background-size: 80% 140%, 130% 85%, 90% 130%; }
+            75%  { background-size: 120% 80%, 95% 120%, 140% 95%; }
+            100% { background-size: 105% 120%, 120% 95%, 85% 110%; }
+        }
+
+        .aurora {
+            position: absolute;
+            width: 200%;
+            left: -50%;
+            border-radius: 50%;
+            filter: blur(60px);
+            opacity: 0;
+            animation: auroraFloat 16s ease-in-out infinite;
+        }
+
+        .aurora-1 {
+            height: 280px;
+            top: -80px;
+            background: linear-gradient(90deg, transparent 0%, rgba(201,168,76,0.06) 20%, rgba(201,168,76,0.12) 50%, rgba(201,168,76,0.06) 80%, transparent 100%);
+            animation-duration: 18s;
+        }
+
+        .aurora-2 {
+            height: 200px;
+            top: 30%;
+            background: linear-gradient(90deg, transparent 0%, rgba(76,175,130,0.04) 25%, rgba(76,175,130,0.09) 50%, rgba(76,175,130,0.04) 75%, transparent 100%);
+            animation-duration: 22s;
+            animation-delay: -8s;
+        }
+
+        .aurora-3 {
+            height: 240px;
+            bottom: 10%;
+            background: linear-gradient(90deg, transparent 0%, rgba(201,168,76,0.03) 20%, rgba(180,140,60,0.08) 50%, rgba(201,168,76,0.03) 80%, transparent 100%);
+            animation-duration: 26s;
+            animation-delay: -14s;
+        }
+
+        @keyframes auroraFloat {
+            0%   { transform: translateX(-10%) skewY(-1deg); opacity: 0; }
+            15%  { opacity: 1; }
+            50%  { transform: translateX(10%) skewY(1.5deg); opacity: 0.8; }
+            85%  { opacity: 1; }
+            100% { transform: translateX(-10%) skewY(-1deg); opacity: 0; }
+        }
+
+        .shimmer {
+            position: absolute;
+            left: -100%;
+            width: 300%;
+            background: linear-gradient(90deg, transparent 0%, rgba(201,168,76,0) 25%, rgba(201,168,76,0.18) 50%, rgba(201,168,76,0) 75%, transparent 100%);
+            animation: shimmerScan 11s ease-in-out infinite;
+        }
+
+        .shimmer-1 { height: 1px; top: 22%; animation-delay: 0s; }
+        .shimmer-2 { height: 1px; top: 55%; animation-delay: -4s; opacity: 0.6; }
+        .shimmer-3 { height: 1px; top: 78%; animation-delay: -8s; opacity: 0.35; }
+
+        @keyframes shimmerScan {
+            0%   { transform: translateX(0) skewX(-8deg); opacity: 0; }
+            8%   { opacity: 1; }
+            92%  { opacity: 1; }
+            100% { transform: translateX(33.33%) skewX(-8deg); opacity: 0; }
+        }
+
+        .orb {
+            position: absolute;
+            border-radius: 50%;
+            filter: blur(90px);
+        }
+
+        .orb-1 {
+            width: 600px; height: 600px;
+            background: radial-gradient(circle, rgba(201,168,76,0.10) 0%, transparent 70%);
+            top: -150px; right: 2%;
+            animation: orb1Float 18s ease-in-out infinite;
+        }
+
+        .orb-2 {
+            width: 450px; height: 450px;
+            background: radial-gradient(circle, rgba(76,175,130,0.08) 0%, transparent 70%);
+            bottom: 0; left: 10%;
+            animation: orb2Float 22s ease-in-out infinite;
+        }
+
+        .orb-3 {
+            width: 300px; height: 300px;
+            background: radial-gradient(circle, rgba(201,168,76,0.06) 0%, transparent 70%);
+            top: 40%; left: 40%;
+            animation: orb3Float 14s ease-in-out infinite;
+        }
+
+        .orb-4 {
+            width: 200px; height: 200px;
+            background: radial-gradient(circle, rgba(180,100,200,0.05) 0%, transparent 70%);
+            top: 60%; right: 20%;
+            animation: orb1Float 19s ease-in-out infinite reverse;
+        }
+
+        @keyframes orb1Float {
+            0%,100% { transform: translate(0,0) scale(1); }
+            33%     { transform: translate(-30px, 40px) scale(1.05); }
+            66%     { transform: translate(20px, -20px) scale(0.96); }
+        }
+
+        @keyframes orb2Float {
+            0%,100% { transform: translate(0,0) scale(1); }
+            40%     { transform: translate(40px, -50px) scale(1.08); }
+            70%     { transform: translate(-20px, 30px) scale(0.94); }
+        }
+
+        @keyframes orb3Float {
+            0%,100% { transform: translate(0,0) scale(1); }
+            50%     { transform: translate(-40px, -30px) scale(1.12); }
+        }
+
+        #particleCanvas {
+            position: absolute;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+        }
+
+        .bg-vignette {
+            position: absolute;
+            inset: 0;
+            background: radial-gradient(ellipse 85% 85% at 50% 50%, transparent 35%, rgba(8,8,18,0.7) 100%);
+        }
+
+        /* ══ NAVBAR ══ */
+        .navbar {
+            position: fixed;
+            top: 0; left: 0; right: 0;
+            z-index: 9999;
+            padding: 14px 0;
+            background: rgba(12,12,20,0.88);
+            backdrop-filter: blur(20px);
+            border-bottom: 1px solid var(--border);
+            transition: all 0.3s;
+        }
+
+        .navbar.scrolled {
+            padding: 10px 0;
+            background: rgba(12,12,20,0.97);
+        }
+
+        .navbar-brand {
+            display: flex;
+            align-items: center;
+            gap: 11px;
+            text-decoration: none;
+        }
+
+        .brand-icon {
+            width: 40px; height: 40px;
+            background: linear-gradient(135deg, var(--gold), var(--gold-light));
+            border-radius: 11px;
+            display: flex; align-items: center; justify-content: center;
+            color: #0c0c14;
+            font-size: 16px;
+            box-shadow: 0 4px 16px var(--gold-glow);
+            flex-shrink: 0;
+        }
+
+        .brand-name {
+            font-family: 'Cormorant Garamond', serif;
+            color: #fff;
+            font-size: 1.22rem;
+            font-weight: 700;
+            line-height: 1.1;
+        }
+
+        .brand-name span {
+            display: block;
+            color: var(--gold);
+            font-family: 'DM Sans', sans-serif;
+            font-size: 0.56rem;
+            letter-spacing: 3px;
+            text-transform: uppercase;
+            font-weight: 500;
+        }
+
+        .nav-link-custom {
+            color: var(--text-muted) !important;
+            font-size: 0.85rem;
+            font-weight: 500;
+            padding: 6px 14px !important;
+            border-radius: 8px;
+            transition: all 0.2s;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .nav-link-custom:hover { color: var(--gold-light) !important; background: var(--gold-dim); }
+        .nav-link-custom.active-link { color: var(--gold) !important; }
+
+        .btn-nav-login {
+            background: transparent;
+            border: 1px solid rgba(201,168,76,0.35);
+            color: var(--gold) !important;
+            font-size: 0.82rem;
+            font-weight: 600;
+            padding: 8px 18px;
+            border-radius: 50px;
+            transition: 0.22s;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 7px;
+        }
+
+        .btn-nav-login:hover {
+            background: var(--gold-dim);
+            border-color: var(--gold);
+            box-shadow: 0 0 14px var(--gold-glow);
+        }
+
+        .btn-nav-register {
+            background: linear-gradient(135deg, var(--gold), var(--gold-light));
+            color: #0c0c14 !important;
+            font-size: 0.82rem;
+            font-weight: 700;
+            padding: 8px 18px;
+            border-radius: 50px;
+            border: none;
+            transition: 0.22s;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 7px;
+        }
+
+        .btn-nav-register:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px var(--gold-glow);
+            color: #0c0c14 !important;
+        }
+
+        .navbar-toggler {
+            border: 1px solid rgba(201,168,76,0.3);
+            border-radius: 8px;
+            padding: 6px 10px;
+        }
+
+        .navbar-toggler-icon {
+            background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 30 30'%3e%3cpath stroke='rgba(201,168,76,0.8)' stroke-linecap='round' stroke-miterlimit='10' stroke-width='2' d='M4 7h22M4 15h22M4 23h22'/%3e%3c/svg%3e");
+        }
+
+        /* ══ HERO ══ */
+        .hero-section {
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            position: relative;
+            z-index: 1;
+            overflow: hidden;
+            padding-top: 80px;
+        }
+
+        .hero-section::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: url('https://images.unsplash.com/photo-1520975958225-5d685f90e4a4?q=80&w=2000&auto=format&fit=crop') center/cover;
+            opacity: 0.10;
+            z-index: -1;
+            animation: heroZoom 20s ease-in-out infinite alternate;
+        }
+
+        @keyframes heroZoom {
+            from { transform: scale(1); }
+            to   { transform: scale(1.06); }
+        }
+
+        .hero-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            background: var(--gold-dim);
+            border: 1px solid rgba(201,168,76,0.25);
+            color: var(--gold);
+            padding: 6px 16px;
+            border-radius: 50px;
+            font-size: 0.73rem;
+            font-weight: 700;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            margin-bottom: 22px;
+        }
+
+        .hero-badge .badge-dot {
+            width: 6px; height: 6px;
+            background: var(--gold);
+            border-radius: 50%;
+            animation: livePulse 2s ease-in-out infinite;
+        }
+
+        @keyframes livePulse {
+            0%,100% { box-shadow: 0 0 0 0 rgba(201,168,76,0.5); }
+            50%      { box-shadow: 0 0 0 5px rgba(201,168,76,0); }
+        }
+
+        .hero-title {
+            font-family: 'Cormorant Garamond', serif;
+            font-size: clamp(3rem, 7vw, 5.5rem);
+            font-weight: 800;
+            line-height: 1.05;
+            color: var(--text-main);
+        }
+
+        .hero-title .gold-text { color: var(--gold); }
+
+        .hero-subtitle {
+            font-size: 1rem;
+            color: var(--text-muted);
+            max-width: 560px;
+            line-height: 1.7;
+            margin: 20px 0 34px;
+        }
+
+        .btn-hero-primary {
+            background: linear-gradient(135deg, var(--gold), var(--gold-light));
+            color: #0c0c14;
+            font-weight: 700;
+            font-size: 0.9rem;
+            padding: 14px 30px;
+            border-radius: 50px;
+            border: none;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 9px;
+            transition: 0.25s;
+            box-shadow: 0 8px 28px var(--gold-glow);
+        }
+
+        .btn-hero-primary:hover {
+            color: #0c0c14;
+            transform: translateY(-3px);
+            box-shadow: 0 14px 38px var(--gold-glow);
+        }
+
+        .hero-stats {
+            display: flex;
+            gap: 36px;
+            margin-top: 44px;
+            flex-wrap: wrap;
+        }
+
+        .hero-stat-num {
+            font-family: 'Cormorant Garamond', serif;
+            font-size: 2.2rem;
+            color: var(--gold);
+            line-height: 1;
+        }
+
+        .hero-stat-label {
+            font-size: 0.72rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            margin-top: 3px;
+        }
+
+        .hero-divider {
+            width: 1px;
+            background: var(--border);
+            align-self: stretch;
+        }
+
+        .scroll-indicator {
+            position: absolute;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 6px;
+            color: var(--text-muted);
+            font-size: 0.7rem;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            animation: scrollBounce 2s ease-in-out infinite;
+        }
+
+        @keyframes scrollBounce {
+            0%,100% { transform: translateX(-50%) translateY(0); }
+            50%      { transform: translateX(-50%) translateY(8px); }
+        }
+
+        /* ══ SECTIONS ══ */
+        .section-wrap {
+            position: relative;
+            z-index: 1;
+            padding: 90px 0;
+        }
+
+        .section-tag {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            color: var(--gold);
+            font-size: 0.68rem;
+            letter-spacing: 3px;
+            text-transform: uppercase;
+            font-weight: 700;
+            margin-bottom: 12px;
+        }
+
+        .section-tag::before, .section-tag::after {
+            content: '';
+            width: 28px;
+            height: 1px;
+            background: var(--gold);
+            opacity: 0.5;
+        }
+
+        .section-title {
+            font-family: 'Cormorant Garamond', serif;
+            font-size: clamp(2rem, 4vw, 3rem);
+            color: var(--text-main);
+            line-height: 1.15;
+        }
+
+        .section-title .gold-text { color: var(--gold); }
+
+        /* ══ COLLECTIONS ══ */
+        .collection-section { background: rgba(0,0,0,0.15); }
+
+        .collection-block {
+            background: rgba(255,255,255,0.03);
+            border: 1px solid var(--border);
+            border-radius: 22px;
+            overflow: hidden;
+            transition: all 0.35s;
+        }
+
+        .collection-block:hover {
+            border-color: rgba(201,168,76,0.3);
+            box-shadow: 0 20px 56px rgba(0,0,0,0.4);
+            transform: translateY(-4px);
+        }
+
+        /* 🌟 CUSBOONAYSIINTA SAWIRADA: Si buuxda u muuqda oo aan la jarjarin */
+        .collection-img {
+            width: 100%;
+            height: auto;
+            aspect-ratio: 3 / 4; /* Cabirka ugu fiican sawirada suudhka (Portrait) */
+            object-fit: cover;
+            object-position: top center; /* Hubi in qaybta sare ee suudhku muuqato */
+            display: block;
+        }
+
+        .collection-body { padding: 32px; }
+
+        .collection-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 5px 14px;
+            border-radius: 50px;
+            font-size: 0.72rem;
+            font-weight: 700;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            margin-bottom: 14px;
+        }
+
+        .badge-luxury   { background: rgba(201,168,76,0.15); border: 1px solid rgba(201,168,76,0.3); color: var(--gold); }
+        .badge-standard { background: rgba(76,130,175,0.12); border: 1px solid rgba(76,130,175,0.3); color: #6ab0e8; }
+        .badge-budget   { background: rgba(76,175,130,0.12); border: 1px solid rgba(76,175,130,0.3); color: var(--success); }
+
+        .collection-body h3 {
+            font-family: 'Cormorant Garamond', serif;
+            font-size: 1.8rem;
+            color: var(--text-main);
+            margin-bottom: 12px;
+        }
+
+        .collection-body p {
+            color: var(--text-muted);
+            font-size: 0.86rem;
+            line-height: 1.7;
+            margin-bottom: 22px;
+        }
+
+        .collection-feature {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            color: var(--text-muted);
+            font-size: 0.82rem;
+            margin-bottom: 8px;
+        }
+
+        .collection-feature i { color: var(--gold); font-size: 10px; }
+
+        .btn-view-collection {
+            background: transparent;
+            border: 1px solid rgba(201,168,76,0.35);
+            color: var(--gold);
+            font-weight: 600;
+            font-size: 0.84rem;
+            padding: 10px 22px;
+            border-radius: 50px;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            transition: 0.22s;
+            margin-top: 12px;
+        }
+
+        .btn-view-collection:hover {
+            background: linear-gradient(135deg, var(--gold), var(--gold-light));
+            color: #0c0c14;
+            border-color: var(--gold);
+            box-shadow: 0 8px 22px var(--gold-glow);
+            transform: translateY(-2px);
+        }
+
+        .carousel-control-prev-icon,
+        .carousel-control-next-icon {
+            background-color: rgba(201,168,76,0.3);
+            border-radius: 50%;
+            padding: 18px;
+            background-size: 14px;
+        }
+
+        /* ══ FOOTER ══ */
+        footer {
+            background: #0a0a12;
+            border-top: 1px solid var(--border);
+            position: relative;
+            z-index: 1;
+            padding: 52px 0 24px;
+        }
+
+        .footer-brand-name {
+            font-family: 'Cormorant Garamond', serif;
+            font-size: 1.4rem;
+            color: #fff;
+        }
+
+        .footer-brand-name span { color: var(--gold); }
+
+        .footer-desc {
+            color: var(--text-muted);
+            font-size: 0.82rem;
+            line-height: 1.7;
+            margin-top: 10px;
+            max-width: 280px;
+        }
+
+        .footer-title {
+            font-size: 0.68rem;
+            letter-spacing: 2.5px;
+            text-transform: uppercase;
+            color: var(--gold);
+            font-weight: 700;
+            margin-bottom: 16px;
+        }
+
+        .footer-links { list-style: none; padding: 0; }
+        .footer-links li { margin-bottom: 10px; }
+        .footer-links a {
+            color: var(--text-muted);
+            text-decoration: none;
+            font-size: 0.84rem;
+            transition: 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 7px;
+        }
+        .footer-links a:hover { color: var(--gold); }
+
+        .footer-contact-item {
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
+            color: var(--text-muted);
+            font-size: 0.83rem;
+            margin-bottom: 12px;
+        }
+
+        .footer-contact-item i {
+            color: var(--gold);
+            font-size: 13px;
+            margin-top: 2px;
+            flex-shrink: 0;
+        }
+
+        .footer-divider { border-color: var(--border); margin: 28px 0 20px; }
+
+        .footer-bottom {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 12px;
+        }
+
+        .footer-bottom p { color: var(--text-muted); font-size: 0.79rem; margin: 0; }
+
+        .admin-corner-link {
+            width: 36px; height: 36px;
+            border-radius: 50%;
+            background: rgba(255,255,255,0.04);
+            border: 1px solid var(--border);
+            display: inline-flex; align-items: center; justify-content: center;
+            color: var(--text-muted);
+            transition: 0.2s;
+        }
+
+        .admin-corner-link:hover {
+            background: var(--gold-dim);
+            border-color: rgba(201,168,76,0.35);
+            color: var(--gold);
+        }
+
+        /* ══ ALERTS ══ */
+        .alerts-wrap { padding-top: 90px; }
+
+        .alert-custom {
+            background: rgba(201,168,76,0.08);
+            border: 1px solid rgba(201,168,76,0.25);
+            color: var(--gold-light);
+            border-radius: 12px;
+            padding: 14px 20px;
+            font-size: 0.86rem;
+            font-weight: 500;
+        }
+
+        /* ══ WHATSAPP ══ */
+        .whatsapp-btn {
+            position: fixed;
+            right: 22px; bottom: 22px;
+            z-index: 9999;
+            background: #25d366;
+            color: white !important;
+            border-radius: 50px;
+            padding: 12px 20px;
+            box-shadow: 0 8px 28px rgba(37,211,102,0.35);
+            font-weight: 700;
+            font-size: 0.88rem;
+            display: inline-flex;
+            align-items: center;
+            gap: 9px;
+            text-decoration: none;
+            transition: 0.25s;
+        }
+
+        .whatsapp-btn:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 14px 38px rgba(37,211,102,0.45);
+        }
+
+        ::-webkit-scrollbar { width: 4px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: rgba(201,168,76,0.2); border-radius: 4px; }
+
+        @media(max-width:768px) {
+            .hero-stats { gap: 20px; }
+            .collection-img { aspect-ratio: 4/5; } /* Mobile-ka oo yar ka dhig si fiican loo arko */
+            .cta-card { padding: 38px 22px; }
+        }
+    </style>
+</head>
+<body>
+
+<!-- ══ ANIMATED BACKGROUND ══ -->
+<div class="bg-layer">
+    <div class="bg-mesh"></div>
+    <div class="aurora aurora-1"></div>
+    <div class="aurora aurora-2"></div>
+    <div class="aurora aurora-3"></div>
+    <div class="shimmer shimmer-1"></div>
+    <div class="shimmer shimmer-2"></div>
+    <div class="shimmer shimmer-3"></div>
+    <div class="orb orb-1"></div>
+    <div class="orb orb-2"></div>
+    <div class="orb orb-3"></div>
+    <div class="orb orb-4"></div>
+    <canvas id="particleCanvas"></canvas>
+    <div class="bg-vignette"></div>
+</div>
+
+<!-- ══ NAVBAR ══ -->
+<nav class="navbar" id="mainNav">
+    <div class="container">
+        <a class="navbar-brand" href="#home">
+            <div class="brand-icon"><i class="fa-solid fa-crown"></i></div>
+            <div class="brand-name">Royal Rental <span>Suits</span></div>
+        </a>
+
+        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navContent">
+            <span class="navbar-toggler-icon"></span>
+        </button>
+
+        <div class="collapse navbar-collapse" id="navContent">
+            <ul class="navbar-nav mx-auto d-flex gap-1">
+                <li class="nav-item">
+                    <a class="nav-link-custom active-link" href="#home">
+                        <i class="fa-solid fa-house"></i> Home
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link-custom" href="{% url 'service_page' %}">
+                        <i class="fa-solid fa-star"></i> Services
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link-custom" href="#collection">
+                        <i class="fa-solid fa-shirt"></i> Collection
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link-custom" href="{% url 'about_page' %}">
+                        <i class="fa-solid fa-circle-info"></i> About
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link-custom" href="{% url 'contact_page' %}">
+                        <i class="fa-solid fa-phone"></i> Contact
+                    </a>
+                </li>
+                {% if user.is_authenticated and user.is_staff %}
+                <li class="nav-item">
+                    {% if user.profile.is_reception or user.profile.is_cashier %}
+                    <a class="nav-link-custom" href="{% url 'reception_inventory' %}">
+                        <i class="fa-solid fa-warehouse"></i> Inventory
+                    </a>
+                    {% else %}
+                    <a class="nav-link-custom" href="{% url 'inventory' %}">
+                        <i class="fa-solid fa-warehouse"></i> Inventory
+                    </a>
+                    {% endif %}
+                </li>
+                {% endif %}
+            </ul>
+
+            <div class="d-flex align-items-center gap-2 mt-3 mt-lg-0">
+                {% if user.is_authenticated and user.is_staff %}
+                    <a href="{% url 'dashboard' %}" class="btn-nav-login">
+                        <i class="fa-solid fa-gauge"></i> Dashboard
+                    </a>
+                    <a href="{% url 'logout' %}" class="btn-nav-register">
+                        <i class="fa-solid fa-right-from-bracket"></i> Logout
+                    </a>
+                {% elif user.is_authenticated %}
+                    <span style="color:var(--text-muted);font-size:0.83rem">
+                        <i class="fa-solid fa-user me-1" style="color:var(--gold)"></i>{{ user.username }}
+                    </span>
+                    <a href="{% url 'customer_logout' %}" class="btn-nav-login">
+                        <i class="fa-solid fa-right-from-bracket"></i> Logout
+                    </a>
+                {% else %}
+                    <a href="{% url 'customer_login' %}" class="btn-nav-login">
+                        <i class="fa-solid fa-right-to-bracket"></i> Login
+                    </a>
+                    <a href="{% url 'register' %}" class="btn-nav-register">
+                        <i class="fa-solid fa-user-plus"></i> Register
+                    </a>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</nav>
+
+<!-- ALERTS -->
+{% if messages %}
+<div class="alerts-wrap position-relative z-1">
+    <div class="container pt-3">
+        {% for message in messages %}
+        <div class="alert-custom mb-2">
+            <i class="fa-solid fa-circle-check me-2" style="color:var(--success)"></i>{{ message }}
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endif %}
+
+<!-- ══ HERO ══ -->
+<section class="hero-section" id="home">
+    <div class="container position-relative z-1">
+        <div class="row align-items-center">
+            <div class="col-lg-7">
+                <div class="hero-badge" data-aos="fade-down">
+                    <div class="badge-dot"></div>
+                    Premium Suit Rental — Hargeisa
+                </div>
+
+                <h1 class="hero-title" data-aos="fade-up" data-aos-delay="100">
+                    Dress Like <br>
+                    <span class="gold-text">Royalty</span> For <br>
+                    Every Occasion
+                </h1>
+
+                <p class="hero-subtitle" data-aos="fade-up" data-aos-delay="200">
+                    Royal Rental Suits offers premium suit rentals for weddings, business meetings,
+                    graduations, and every special moment. Elegance made accessible.
+                </p>
+
+                <div class="d-flex gap-3 flex-wrap" data-aos="fade-up" data-aos-delay="300">
+                    <a href="{% url 'all_suits' %}" class="btn-hero-primary">
+                        <i class="fa-solid fa-shirt"></i> Browse Collection
+                    </a>
+                </div>
+
+                <div class="hero-stats" data-aos="fade-up" data-aos-delay="400">
+                    <div class="hero-stat-item">
+                        <div class="hero-stat-num">{{ available_suits }}</div>
+                        <div class="hero-stat-label">Suits Available</div>
+                    </div>
+                    <div class="hero-divider"></div>
+                    <div class="hero-stat-item">
+                        <div class="hero-stat-num">{{ total_suits }}</div>
+                        <div class="hero-stat-label">Inventory Items</div>
+                    </div>
+                    <div class="hero-divider"></div>
+                    <div class="hero-stat-item">
+                        <div class="hero-stat-num">{{ luxury_count }} / {{ standard_count }} / {{ budget_count }}</div>
+                        <div class="hero-stat-label">Collections</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-lg-5 d-none d-lg-block text-center" data-aos="fade-left" data-aos-delay="200">
+                <div style="position:relative;display:inline-block; width: 100%; max-width: 450px;">
+                    <!-- 🌟 CUSBOONAYSIINTA: Width 100%, height auto, iyo aspect-ratio sax ah -->
+                    <img src="{% static 'luxury2.jpg' %}" class="collection-img" alt="Premium Suit"
+                         style="width: 100%; max-width: 450px; height: auto; aspect-ratio: 3/4; object-fit: cover; object-position: top center; border-radius: 22px; border: 1px solid var(--border); box-shadow: 0 20px 60px rgba(0,0,0,0.5);">
+                    
+                    <div style="position:absolute;top:22px;right:-18px;background:rgba(12,12,20,0.9);border:1px solid rgba(201,168,76,0.3);border-radius:14px;padding:14px 18px;backdrop-filter:blur(12px)">
+                        <div style="font-family:'Cormorant Garamond',serif;font-size:1.5rem;color:var(--gold);line-height:1">$15</div>
+                        <div style="font-size:0.66rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:1.5px">Per Day</div>
+                    </div>
+                    <div style="position:absolute;bottom:22px;left:-18px;background:rgba(12,12,20,0.9);border:1px solid rgba(76,175,130,0.3);border-radius:14px;padding:14px 18px;backdrop-filter:blur(12px);display:flex;align-items:center;gap:10px">
+                        <div style="width:8px;height:8px;background:var(--success);border-radius:50%;box-shadow:0 0 0 3px rgba(76,175,130,0.2)"></div>
+                        <div>
+                            <div style="font-size:0.78rem;font-weight:600">In Stock</div>
+                            <div style="font-size:0.66rem;color:var(--text-muted)">Ready to rent</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="scroll-indicator">
+        <span>Scroll</span>
+        <i class="fa-solid fa-chevron-down" style="font-size:10px"></i>
+    </div>
+</section>
+
+<!-- ══ COLLECTIONS ══ -->
+<section class="section-wrap collection-section" id="collection">
+    <div class="container">
+        <div class="text-center mb-5">
+            <div class="section-tag" data-aos="fade-up">Explore</div>
+            <h2 class="section-title" data-aos="fade-up" data-aos-delay="80">
+                Our Suit <span class="gold-text">Collections</span>
+            </h2>
+        </div>
+
+        <!-- LUXURY -->
+        <div class="row g-0 collection-block mb-4" data-aos="fade-up">
+            <div class="col-lg-5">
+                <!-- 🌟 CUSBOONAYSIINTA: Ka saaray h-100 si sawirku u helo cabirkiisa dabiiciga ah -->
+                <div id="luxuryCarousel" class="carousel slide" data-bs-ride="carousel">
+                    <div class="carousel-inner">
+                        <div class="carousel-item active">
+                            <img src="{% static 'luxury1.jpg' %}" class="collection-img" alt="Luxury Suit">
+                        </div>
+                        <div class="carousel-item">
+                            <img src="{% static 'luxury2.jpg' %}" class="collection-img" alt="Luxury Suit">
+                        </div>
+                        <div class="carousel-item">
+                            <img src="{% static 'luxury3.jpg' %}" class="collection-img" alt="Luxury Suit">
+                        </div>
+                    </div>
+                    <button class="carousel-control-prev" type="button" data-bs-target="#luxuryCarousel" data-bs-slide="prev">
+                        <span class="carousel-control-prev-icon"></span>
+                    </button>
+                    <button class="carousel-control-next" type="button" data-bs-target="#luxuryCarousel" data-bs-slide="next">
+                        <span class="carousel-control-next-icon"></span>
+                    </button>
+                </div>
+            </div>
+            <div class="col-lg-7 collection-body d-flex flex-column justify-content-center">
+                <span class="collection-badge badge-luxury">
+                    <i class="fa-solid fa-gem"></i> Luxury Collection
+                </span>
+                <h3>Premium Suits for Weddings & VIP Events</h3>
+                <p>Our Luxury collection is designed for customers who demand the finest. Premium fabric, modern cuts, and a royal finish that makes every moment unforgettable.</p>
+                <div>
+                    <div class="collection-feature"><i class="fa-solid fa-diamond"></i> Premium fabric & stitching</div>
+                    <div class="collection-feature"><i class="fa-solid fa-diamond"></i> Ideal for weddings & engagements</div>
+                    <div class="collection-feature"><i class="fa-solid fa-diamond"></i> Available in multiple colors</div>
+                </div>
+                <div>
+                    <a href="{% url 'all_suits' %}?collection=Luxury" class="btn-view-collection">
+                        <i class="fa-solid fa-shirt"></i> View Luxury Suits
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <!-- STANDARD COLLECTION -->
+        <div class="row g-0 collection-block mb-4 flex-lg-row-reverse" data-aos="fade-up">
+            <div class="col-lg-5">
+                <div id="standardCarousel" class="carousel slide" data-bs-ride="carousel">
+                    <div class="carousel-inner">
+                        <div class="carousel-item active">
+                            <img src="{% static 'suit1.jpg' %}" class="collection-img" alt="Standard Business Suit - View 1">
+                        </div>
+                        <div class="carousel-item">
+                            <img src="{% static 'suit2.jpg' %}" class="collection-img" alt="Standard Formal Suit - View 2">
+                        </div>
+                        <div class="carousel-item">
+                            <img src="{% static 'suit3.jpg' %}" class="collection-img" alt="Professional Suit - View 3">
+                        </div>
+                    </div>
+                    <button class="carousel-control-prev" type="button" data-bs-target="#standardCarousel" data-bs-slide="prev">
+                        <span class="carousel-control-prev-icon" aria-hidden="true"></span>
+                        <span class="visually-hidden">Previous</span>
+                    </button>
+                    <button class="carousel-control-next" type="button" data-bs-target="#standardCarousel" data-bs-slide="next">
+                        <span class="carousel-control-next-icon" aria-hidden="true"></span>
+                        <span class="visually-hidden">Next</span>
+                    </button>
+                </div>
+            </div>
+            <div class="col-lg-7 collection-body d-flex flex-column justify-content-center">
+                <span class="collection-badge badge-standard">
+                    <i class="fa-solid fa-star"></i> Standard Collection
+                </span>
+                <h3>Perfect for Business & Formal Occasions</h3>
+                <p>Sharp, modern, and professional. Our Standard collection delivers a polished look for offices, interviews, meetings, and formal events without breaking the budget.</p>
+                <div>
+                    <div class="collection-feature"><i class="fa-solid fa-diamond"></i> Ideal for business & formal events</div>
+                    <div class="collection-feature"><i class="fa-solid fa-diamond"></i> Modern cuts & professional finish</div>
+                    <div class="collection-feature"><i class="fa-solid fa-diamond"></i> Great quality at mid-range price</div>
+                </div>
+                <div>
+                    <a href="{% url 'all_suits' %}?collection=Standard" class="btn-view-collection">
+                        <i class="fa-solid fa-shirt"></i> View Standard Suits
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <!-- BUDGET COLLECTION -->
+        <div class="row g-0 collection-block" data-aos="fade-up">
+            <div class="col-lg-5">
+                <div id="budgetCarousel" class="carousel slide" data-bs-ride="carousel">
+                    <div class="carousel-inner">
+                        <div class="carousel-item active">
+                            <img src="{% static 'suit4.jpg' %}" class="collection-img" alt="Budget Suit 1">
+                        </div>
+                        <div class="carousel-item">
+                            <img src="{% static 'suit5.jpg' %}" class="collection-img" alt="Budget Suit 2">
+                        </div>
+                        <div class="carousel-item">
+                            <img src="{% static 'suit6.jpg' %}" class="collection-img" alt="Budget Suit 3">
+                        </div>
+                    </div>
+                    <button class="carousel-control-prev" type="button" data-bs-target="#budgetCarousel" data-bs-slide="prev">
+                        <span class="carousel-control-prev-icon"></span>
+                    </button>
+                    <button class="carousel-control-next" type="button" data-bs-target="#budgetCarousel" data-bs-slide="next">
+                        <span class="carousel-control-next-icon"></span>
+                    </button>
+                </div>
+            </div>
+            <div class="col-lg-7 collection-body d-flex flex-column justify-content-center">
+                <span class="collection-badge badge-budget">
+                    <i class="fa-solid fa-tag"></i> Budget Collection
+                </span>
+                <h3>Affordable Elegance for Graduations & More</h3>
+                <p>Clean, comfortable, and stylish at an accessible price. Perfect for students, graduations, and casual formal events where elegance meets affordability.</p>
+                <div>
+                    <div class="collection-feature"><i class="fa-solid fa-diamond"></i> Best value for money</div>
+                    <div class="collection-feature"><i class="fa-solid fa-diamond"></i> Perfect for graduations & students</div>
+                    <div class="collection-feature"><i class="fa-solid fa-diamond"></i> Clean, comfortable & well-maintained</div>
+                </div>
+                <div>
+                    <a href="{% url 'all_suits' %}?collection=Budget" class="btn-view-collection">
+                        <i class="fa-solid fa-shirt"></i> View Budget Suits
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Qaybta loo qorsheeyay sawirrada madaxda xafiiska -->
+<section class="section-wrap" id="office-leaders">
+    <div class="container text-center">
+        <h2 class="section-title mb-5">
+            System <span class="gold-text">Developer</span>
+        </h2>
+        <div class="row justify-content-center">
+            <div class="col-lg-4 col-md-6 mb-4">
+              <img src="{% static 'admin.jpeg' %}" 
+                   alt="Leader 1" 
+                   style="width: 150px; height: 150px; border-radius: 50%; object-fit: contain; background-color: var(--bg); border: 2px solid var(--border); padding: 4px;">
+                <h5 class="mt-2">Zakaria updirahman Muhumet</h5>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- ══ FOOTER ══ -->
+<footer>
+    <div class="container">
+        <div class="row g-4">
+            <div class="col-lg-4">
+                <div class="d-flex align-items-center gap-2 mb-3">
+                    <div class="brand-icon" style="width:38px;height:38px;font-size:15px">
+                        <i class="fa-solid fa-crown"></i>
+                    </div>
+                    <div class="footer-brand-name">Suit <span>Luxe</span></div>
+                </div>
+                <p class="footer-desc">
+                    Hargeisa's premier suit rental service. Premium quality, accessible pricing,
+                    and exceptional service for every occasion.
+                </p>
+            </div>
+            <div class="col-lg-2 col-md-4">
+                <div class="footer-title">Quick Links</div>
+                <ul class="footer-links">
+                    <li><a href="#home"><i class="fa-solid fa-chevron-right" style="font-size:9px"></i> Home</a></li>
+                    <li><a href="{% url 'all_suits' %}"><i class="fa-solid fa-chevron-right" style="font-size:9px"></i> Browse Suits</a></li>
+                </ul>
+            </div>
+            <div class="col-lg-2 col-md-4">
+                <div class="footer-title">Collections</div>
+                <ul class="footer-links">
+                    <li><a href="{% url 'all_suits' %}?collection=Luxury"><i class="fa-solid fa-gem" style="font-size:10px;color:var(--gold)"></i> Luxury</a></li>
+                    <li><a href="{% url 'all_suits' %}?collection=Standard"><i class="fa-solid fa-star" style="font-size:10px;color:#6ab0e8"></i> Standard</a></li>
+                    <li><a href="{% url 'all_suits' %}?collection=Budget"><i class="fa-solid fa-tag" style="font-size:10px;color:var(--success)"></i> Budget</a></li>
+                </ul>
+            </div>
+            <div class="col-lg-4 col-md-4">
+                <div class="footer-title">Contact</div>
+                <div class="footer-contact-item">
+                    <i class="fa-solid fa-location-dot"></i>
+                    <span>Hargeisa, Somaliland</span>
+                </div>
+                <div class="footer-contact-item">
+                    <i class="fa-solid fa-phone"></i>
+                    <span>+252 63 6346115</span>
+                </div>
+                <div class="footer-contact-item">
+                    <i class="fa-brands fa-whatsapp"></i>
+                    <span>+252 67 2047215</span>
+                </div>
+                <div class="footer-contact-item">
+                    <i class="fa-solid fa-clock"></i>
+                    <span id="footer-time">—</span>
+                </div>
+            </div>
+        </div>
+
+        <hr class="footer-divider">
+
+        <div class="footer-bottom">
+            <p>© 2026 Royal Rental Suits. All rights reserved.</p>
+            {% if not user.is_authenticated %}
+            <a href="{% url 'admin_login' %}" class="admin-corner-link" title="Admin Login">
+                <i class="fa-solid fa-user-lock" style="font-size:13px"></i>
+            </a>
+            {% endif %}
+        </div>
+    </div>
+</footer>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/aos@2.3.4/dist/aos.js"></script>
+
+<script>
+    AOS.init({ duration: 900, once: true, offset: 60 });
+
+    const nav = document.getElementById('mainNav');
+    window.addEventListener('scroll', () => {
+        nav.classList.toggle('scrolled', window.scrollY > 50);
+    });
+
+    const navLinks = document.querySelectorAll('.nav-link-custom');
+    const sections = document.querySelectorAll('section[id]');
+    window.addEventListener('scroll', () => {
+        let curr = '';
+        sections.forEach(s => {
+            if (window.scrollY >= s.offsetTop - 90) curr = s.id;
+        });
+        navLinks.forEach(a => {
+            a.classList.toggle('active-link', a.getAttribute('href') === '#' + curr);
+        });
+    });
+
+    function updateTime() {
+        const t = new Date().toLocaleString('en-US', {
+            timeZone: 'Africa/Mogadishu',
+            year: 'numeric', month: 'short', day: 'numeric',
+            hour: '2-digit', minute: '2-digit', second: '2-digit'
+        });
+        const el = document.getElementById('footer-time');
+        if (el) el.textContent = t;
+    }
+    updateTime();
+    setInterval(updateTime, 1000);
+
+    (function () {
+        const canvas = document.getElementById('particleCanvas');
+        if (!canvas) return;
+        const ctx = canvas.getContext('2d');
+        let W, H, particles = [];
+
+        function resize() {
+            W = canvas.width  = window.innerWidth;
+            H = canvas.height = window.innerHeight;
+        }
+        resize();
+        window.addEventListener('resize', resize);
+
+        const GOLD   = 'rgba(201,168,76,';
+        const GREEN  = 'rgba(76,175,130,';
+        const WHITE  = 'rgba(240,237,232,';
+
+        function randomColor() {
+            const palette = [GOLD, GREEN, WHITE];
+            return palette[Math.floor(Math.random() * palette.length)];
+        }
+
+        function createParticle() {
+            const size = Math.random() * 1.8 + 0.3;
+            return {
+                x:     Math.random() * W,
+                y:     Math.random() * H,
+                vx:    (Math.random() - 0.5) * 0.25,
+                vy:    -(Math.random() * 0.35 + 0.05),
+                size:  size,
+                alpha: Math.random() * 0.5 + 0.1,
+                fade:  Math.random() * 0.003 + 0.001,
+                color: randomColor(),
+                twinkleSpeed: Math.random() * 0.02 + 0.005,
+                twinklePhase: Math.random() * Math.PI * 2,
+            };
+        }
+
+        for (let i = 0; i < 90; i++) particles.push(createParticle());
+
+        function draw() {
+            ctx.clearRect(0, 0, W, H);
+
+            particles.forEach((p, i) => {
+                p.twinklePhase += p.twinkleSpeed;
+                const twinkle = 0.5 + 0.5 * Math.sin(p.twinklePhase);
+                const a = p.alpha * twinkle;
+
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+                ctx.fillStyle = p.color + a + ')';
+                ctx.fill();
+
+                p.x += p.vx;
+                p.y += p.vy;
+
+                if (p.y < -10 || p.x < -10 || p.x > W + 10) {
+                    particles[i] = createParticle();
+                    particles[i].y = H + 5;
+                }
+            });
+
+            requestAnimationFrame(draw);
+        }
+
+        draw();
+    })();
+</script>
+</body>
+</html>

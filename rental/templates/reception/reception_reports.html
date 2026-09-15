@@ -1,0 +1,605 @@
+{% extends "rental/base_admin.html" %}
+{% block title %}Business Reports | Suit Luxe{% endblock %}
+{% block page_title %}Business Reports{% endblock %}
+
+{% block content %}
+<style>
+    :root {
+        --gold: #c9a84c;
+        --gold-light: #e8c96a;
+        --gold-dim: rgba(201,168,76,0.1);
+        --gold-glow: rgba(201,168,76,0.2);
+        --bg: #080810; /* Darker background */
+        --surface: #11111a; /* Dark card surface */
+        --border: rgba(255,255,255,0.06);
+        --text-main: #e8e6e1;
+        --text-muted: rgba(232,230,225,0.5);
+        --success: #4caf82;
+        --danger: #e05c5c;
+        --warning: #e0a040;
+        --radius: 12px;
+    }
+
+    body {
+        background-color: var(--bg);
+        color: var(--text-main);
+    }
+
+    /* ══ ANIMATED BACKGROUND ══ */
+    .rep-bg {
+        position: fixed;
+        inset: 0;
+        z-index: 0;
+        pointer-events: none;
+        overflow: hidden;
+        background-color: var(--bg);
+    }
+
+    .rep-bg::before {
+        content: '';
+        position: absolute;
+        inset: 0;
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 120'%3E%3Cpath d='M30 10 L15 30 L25 30 L20 120 L80 120 L75 30 L85 30 L70 10 Q60 20 50 18 Q40 20 30 10Z' fill='none' stroke='rgba(201,168,76,0.04)' stroke-width='1.5'/%3E%3Cpath d='M35 10 Q50 28 65 10' fill='none' stroke='rgba(201,168,76,0.04)' stroke-width='1.5'/%3E%3C/svg%3E");
+        background-size: 110px 132px;
+        background-repeat: repeat;
+        animation: bgDrift 70s linear infinite;
+    }
+
+    @keyframes bgDrift {
+        from { background-position: 0 0; }
+        to   { background-position: 110px 132px; }
+    }
+
+    .rep-orb {
+        position: fixed;
+        border-radius: 50%;
+        filter: blur(80px);
+        pointer-events: none;
+        animation: orbFloat 14s ease-in-out infinite;
+        z-index: 0;
+    }
+
+    .rep-orb-1 {
+        width: 400px; height: 400px;
+        background: radial-gradient(circle, rgba(201,168,76,0.06) 0%, transparent 70%);
+        top: -100px; right: 5%;
+    }
+
+    .rep-orb-2 {
+        width: 300px; height: 300px;
+        background: radial-gradient(circle, rgba(76,175,130,0.05) 0%, transparent 70%);
+        bottom: 5%; left: 10%;
+        animation-delay: -7s;
+    }
+
+    @keyframes orbFloat {
+        0%,100% { transform: translateY(0) scale(1); }
+        50%      { transform: translateY(-20px) scale(1.02); }
+    }
+
+    /* ══ WRAP ══ */
+    .rep-wrap {
+        position: relative;
+        z-index: 1;
+        padding: 24px 0 40px;
+    }
+
+    /* ══ PAGE HEADER ══ */
+    .rep-page-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        flex-wrap: wrap;
+        gap: 12px;
+        margin-bottom: 24px;
+    }
+
+    .rep-page-header h2 {
+        font-family: 'Cormorant Garamond', serif;
+        font-size: 1.5rem; /* Smaller, cleaner */
+        color: var(--text-main);
+        margin: 0;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+
+    .rep-page-header h2 i { color: var(--gold); font-size: 1.3rem; }
+
+    .rep-page-header p {
+        color: var(--text-muted);
+        font-size: 0.78rem;
+        margin: 4px 0 0;
+    }
+
+    .date-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        background: var(--gold-dim);
+        border: 1px solid rgba(201,168,76,0.15);
+        color: var(--gold-light);
+        padding: 4px 12px;
+        border-radius: 20px;
+        font-size: 0.72rem;
+        font-weight: 600;
+        white-space: nowrap;
+    }
+
+    /* ══ SECTION LABEL ══ */
+    .section-label {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 0.65rem;
+        letter-spacing: 2px;
+        text-transform: uppercase;
+        color: var(--gold);
+        font-weight: 700;
+        margin-bottom: 14px;
+    }
+
+    .section-label::after {
+        content: '';
+        flex: 1;
+        height: 1px;
+        background: linear-gradient(90deg, rgba(201,168,76,0.25), transparent);
+    }
+
+    /* ══ STAT CARDS ══ */
+    .stat-card {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        padding: 18px;
+        position: relative;
+        overflow: hidden;
+        transition: all 0.3s ease;
+        backdrop-filter: blur(12px);
+        height: 100%;
+    }
+
+    .stat-card::before {
+        content: '';
+        position: absolute;
+        top: 0; left: 0; right: 0;
+        height: 2px;
+        background: var(--card-accent, var(--gold));
+        border-radius: var(--radius) var(--radius) 0 0;
+    }
+
+    .stat-card .bg-icon {
+        position: absolute;
+        right: -6px; bottom: -6px;
+        font-size: 4rem;
+        opacity: 0.03;
+        color: var(--card-accent, var(--gold));
+        pointer-events: none;
+    }
+
+    .stat-card:hover {
+        transform: translateY(-3px);
+        border-color: rgba(201,168,76,0.2);
+        box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+    }
+
+    .stat-icon {
+        width: 36px; height: 36px;
+        border-radius: 10px;
+        display: flex; align-items: center; justify-content: center;
+        font-size: 14px;
+        margin-bottom: 12px;
+        flex-shrink: 0;
+    }
+
+    .stat-label {
+        font-size: 0.65rem;
+        text-transform: uppercase;
+        letter-spacing: 1.5px;
+        color: var(--text-muted);
+        font-weight: 600;
+        margin-bottom: 4px;
+    }
+
+    .stat-value {
+        font-family: 'Cormorant Garamond', serif;
+        font-size: 2.2rem; /* Reduced from 2.6rem */
+        line-height: 1;
+        margin-bottom: 4px;
+    }
+
+    .stat-sub {
+        font-size: 0.7rem;
+        color: var(--text-muted);
+    }
+
+    /* Request stat mini cards */
+    .req-card {
+        background: rgba(255,255,255,0.02);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        padding: 14px 12px;
+        text-align: center;
+        transition: all 0.25s;
+        backdrop-filter: blur(12px);
+        height: 100%;
+        position: relative;
+        overflow: hidden;
+    }
+
+    .req-card::before {
+        content: '';
+        position: absolute;
+        bottom: 0; left: 0; right: 0;
+        height: 2px;
+        background: var(--req-color, var(--gold));
+        transform: scaleX(0);
+        transition: 0.3s;
+    }
+
+    .req-card:hover::before { transform: scaleX(1); }
+
+    .req-card:hover {
+        transform: translateY(-3px);
+        border-color: var(--req-color, var(--gold));
+        box-shadow: 0 8px 24px rgba(0,0,0,0.25);
+    }
+
+    .req-card .req-label {
+        font-size: 0.6rem;
+        text-transform: uppercase;
+        letter-spacing: 1.5px;
+        color: var(--text-muted);
+        font-weight: 700;
+        margin-bottom: 6px;
+    }
+
+    .req-card .req-num {
+        font-family: 'Cormorant Garamond', serif;
+        font-size: 2rem; /* Reduced from 2.4rem */
+        line-height: 1;
+        color: var(--req-color, var(--gold));
+    }
+
+    /* Revenue + Utilization */
+    .perf-card {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        padding: 20px;
+        transition: all 0.3s;
+        backdrop-filter: blur(12px);
+        height: 100%;
+        position: relative;
+        overflow: hidden;
+    }
+
+    .perf-card:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 10px 30px rgba(0,0,0,0.28);
+    }
+
+    .perf-card .perf-label {
+        font-size: 0.65rem;
+        text-transform: uppercase;
+        letter-spacing: 1.5px;
+        color: var(--text-muted);
+        font-weight: 700;
+        margin-bottom: 8px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .perf-card .perf-label i { font-size: 12px; }
+
+    .perf-card .perf-value {
+        font-family: 'Cormorant Garamond', serif;
+        font-size: 2.2rem; /* Reduced from 3rem */
+        line-height: 1;
+        margin-bottom: 4px;
+    }
+
+    .perf-card .perf-sub {
+        font-size: 0.72rem;
+        color: var(--text-muted);
+        margin-bottom: 14px;
+    }
+
+    /* ══ TABLE CARD ══ */
+    .table-card {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        overflow: hidden;
+        backdrop-filter: blur(12px);
+    }
+
+    .table-card-header {
+        padding: 16px 20px;
+        border-bottom: 1px solid var(--border);
+        background: rgba(0,0,0,0.2);
+    }
+
+    .table-card-header h4 {
+        font-family: 'Cormorant Garamond', serif;
+        font-size: 1.1rem; /* Reduced from 1.25rem */
+        color: var(--text-main);
+        margin: 0;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .table-card-header h4 i { color: var(--gold); }
+    .table-card-header p { color: var(--text-muted); font-size: 0.72rem; margin: 3px 0 0; }
+
+    .rep-table {
+        width: 100%;
+        border-collapse: separate;
+        border-spacing: 0 4px;
+        padding: 10px 14px 8px;
+    }
+
+    .rep-table thead th {
+        color: var(--text-muted);
+        font-size: 0.65rem; /* Reduced */
+        text-transform: uppercase;
+        letter-spacing: 1.2px;
+        font-weight: 600;
+        padding: 6px 12px;
+        background: transparent;
+        border: none;
+        white-space: nowrap;
+    }
+
+    .rep-table tbody tr {
+        background: rgba(255,255,255,0.015);
+        transition: all 0.2s;
+    }
+
+    .rep-table tbody tr:hover { background: var(--gold-dim); }
+
+    .rep-table tbody td {
+        padding: 10px 12px;
+        border: none;
+        color: var(--text-main);
+        font-size: 0.8rem; /* Reduced from 0.86rem */
+        vertical-align: middle;
+        white-space: nowrap;
+    }
+
+    .rep-table tbody td:first-child { border-radius: 8px 0 0 8px; }
+    .rep-table tbody td:last-child  { border-radius: 0 8px 8px 0; }
+
+    /* Status badges */
+    .badge-pending  { background:rgba(224,160,64,0.1); border:1px solid rgba(224,160,64,0.25); color:var(--warning); padding:3px 10px; border-radius:16px; font-size:0.68rem; font-weight:700; }
+    .badge-active   { background:rgba(76,130,175,0.1); border:1px solid rgba(76,130,175,0.25); color:#6ab0e8; padding:3px 10px; border-radius:16px; font-size:0.68rem; font-weight:700; }
+    .badge-returned { background:rgba(76,175,130,0.1); border:1px solid rgba(76,175,130,0.25); color:var(--success); padding:3px 10px; border-radius:16px; font-size:0.68rem; font-weight:700; }
+    .badge-rejected { background:rgba(224,92,92,0.1); border:1px solid rgba(224,92,92,0.25); color:var(--danger); padding:3px 10px; border-radius:16px; font-size:0.68rem; font-weight:700; }
+
+    .empty-state {
+        text-align: center;
+        padding: 40px 20px;
+        color: var(--text-muted);
+    }
+
+    .empty-state i {
+        font-size: 2.5rem;
+        color: rgba(201,168,76,0.1);
+        margin-bottom: 10px;
+        display: block;
+    }
+    
+    .empty-state p {
+        font-size: 0.78rem;
+        margin: 0;
+    }
+
+    ::-webkit-scrollbar { width: 4px; height: 4px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: rgba(201,168,76,0.2); border-radius: 4px; }
+</style>
+
+<!-- Background -->
+<div class="rep-bg"></div>
+<div class="rep-orb rep-orb-1"></div>
+<div class="rep-orb rep-orb-2"></div>
+
+<div class="rep-wrap">
+    <div class="container-fluid px-4">
+
+        <!-- ══ PAGE HEADER ══ -->
+        <div class="rep-page-header">
+            <div>
+                <h2>
+                    <i class="fa-solid fa-chart-bar"></i>
+                    Business Reports
+                </h2>
+                <p>Complete overview of inventory, financials, and operational performance</p>
+            </div>
+            <div style="text-align: right; display: flex; flex-direction: column; gap: 8px; align-items: flex-end;">
+                <div class="date-badge" style="display: flex; align-items: center; gap: 8px;">
+                    <i class="fa-regular fa-calendar"></i>
+                    <strong>{{ now|date:"M d, Y" }}</strong>
+                </div>
+                {% if selected_period != 'all' or month_range %}
+                <div style="font-size: 0.78rem; color: var(--text-muted); background: rgba(201,168,76,0.1); border: 1px solid rgba(201,168,76,0.3); border-radius: 6px; padding: 6px 12px;">
+                    <strong style="color: var(--gold);">Active Filter:</strong>
+                    {% if selected_period != 'all' %}{{ selected_period|upper }}{% endif %}
+                    {% if month_range %}<span style="margin-left: 8px;">12-25 ({{ month_range }})</span>{% endif %}
+                    <a href="{% url 'reception_reports' %}" style="margin-left: 10px; color: var(--gold); text-decoration: none; font-weight: 600;">✕</a>
+                </div>
+                {% else %}
+                <div style="font-size: 0.78rem; color: var(--text-muted);">
+                    <i class="fa-solid fa-check-circle" style="color: var(--success); margin-right: 4px;"></i>No filters applied
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- ══ DAILY RECEPTION REPORT ══ -->
+        <div class="section-label mt-2">
+            <i class="fa-solid fa-calendar-day" style="color:var(--gold)"></i>
+            Daily Reception Report
+        </div>
+
+        <div class="row g-3 mb-4">
+            <div class="col-xl-3 col-md-6">
+                <div class="stat-card" style="--card-accent:#c9a84c">
+                    <i class="fa-solid fa-calendar-day bg-icon"></i>
+                    <div class="stat-icon" style="background:rgba(201,168,76,0.1);color:var(--gold)"><i class="fa-solid fa-calendar-day"></i></div>
+                    <div class="stat-label">Today</div>
+                    <div class="stat-value" style="color:var(--gold)">{{ today|date:"d M Y" }}</div>
+                    <div class="stat-sub">Live reception overview</div>
+                </div>
+            </div>
+            <div class="col-xl-3 col-md-6">
+                <div class="stat-card" style="--card-accent:#6ab0e8">
+                    <i class="fa-solid fa-plus-circle bg-icon"></i>
+                    <div class="stat-icon" style="background:rgba(76,130,175,0.1);color:#6ab0e8"><i class="fa-solid fa-plus-circle"></i></div>
+                    <div class="stat-label">New Rentals</div>
+                    <div class="stat-value" style="color:#6ab0e8">{{ today_new_rentals|default:"0" }}</div>
+                    <div class="stat-sub">Requests created today</div>
+                </div>
+            </div>
+            <div class="col-xl-3 col-md-6">
+                <div class="stat-card" style="--card-accent:#4caf82">
+                    <i class="fa-solid fa-rotate-left bg-icon"></i>
+                    <div class="stat-icon" style="background:rgba(76,175,130,0.1);color:var(--success)"><i class="fa-solid fa-rotate-left"></i></div>
+                    <div class="stat-label">Returns</div>
+                    <div class="stat-value" style="color:var(--success)">{{ today_returns|default:"0" }}</div>
+                    <div class="stat-sub">Suit returns completed</div>
+                </div>
+            </div>
+            <div class="col-xl-3 col-md-6">
+                <div class="stat-card" style="--card-accent:#e05c5c">
+                    <i class="fa-solid fa-coins bg-icon"></i>
+                    <div class="stat-icon" style="background:rgba(224,92,92,0.1);color:var(--danger)"><i class="fa-solid fa-coins"></i></div>
+                    <div class="stat-label">Daily Net</div>
+                    <div class="stat-value" style="color:var(--danger)">${{ today_net|default:"0"|floatformat:2 }}</div>
+                    <div class="stat-sub">Revenue minus expenses</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row g-3 mb-4">
+            <div class="col-lg-8">
+                <div class="table-card">
+                    <div class="table-card-header" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;">
+                        <div>
+                            <h4><i class="fa-solid fa-list-check"></i> Today’s Reception Activity</h4>
+                            <p>Live database activity for the front desk team</p>
+                        </div>
+                        <span class="date-badge"><i class="fa-solid fa-database"></i> Live database</span>
+                    </div>
+                    {% if today_requests %}
+                    <div style="overflow-x:auto">
+                        <table class="rep-table">
+                            <thead>
+                                <tr>
+                                    <th>Customer</th>
+                                    <th>Suit</th>
+                                    <th>Status</th>
+                                    <th style="text-align:right">Amount</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for req in today_requests %}
+                                <tr>
+                                    <td>{{ req.name }}</td>
+                                    <td>{{ req.suit.suit_name|default:"-" }}</td>
+                                    <td><span class="badge-active">{{ req.status }}</span></td>
+                                    <td style="text-align:right; font-weight:600; color:var(--success);">${{ req.total_amount|floatformat:2 }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <div class="empty-state">
+                        <i class="fa-solid fa-calendar-xmark"></i>
+                        <p>No reception activity recorded today.</p>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+            <div class="col-lg-4">
+                <div class="perf-card" style="min-height:100%;">
+                    <div class="perf-label"><i class="fa-solid fa-chart-simple" style="color:var(--gold)"></i> Reception Snapshot</div>
+                    <div class="perf-sub">Quick operational glance for the front desk</div>
+                    <div class="req-card" style="--req-color:var(--gold); margin-bottom: 12px;">
+                        <div class="req-label">Today’s Revenue</div>
+                        <div class="req-num">${{ today_revenue|default:"0"|floatformat:2 }}</div>
+                    </div>
+                    <div class="req-card" style="--req-color:#6ab0e8; margin-bottom: 12px;">
+                        <div class="req-label">Active Rentals</div>
+                        <div class="req-num">{{ today_active_rentals|default:"0" }}</div>
+                    </div>
+                    <div class="req-card" style="--req-color:var(--danger);">
+                        <div class="req-label">Expenses</div>
+                        <div class="req-num">${{ today_expenses|default:"0"|floatformat:2 }}</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row g-3 mb-4">
+            <div class="col-lg-7">
+                <div class="table-card">
+                    <div class="table-card-header">
+                        <h4><i class="fa-solid fa-clock-rotate-left"></i> Recent Activity</h4>
+                        <p>Latest rentals, payments, and expenses from the database</p>
+                    </div>
+                    {% if recent_activity %}
+                    <div style="padding: 8px 14px 14px;">
+                        {% for item in recent_activity %}
+                        <div class="d-flex justify-content-between align-items-start gap-3 py-3 border-bottom" style="border-color: rgba(255,255,255,0.05);">
+                            <div>
+                                <div class="fw-semibold" style="color: var(--text-main); font-size: 0.82rem;">{{ item.title }}</div>
+                                <div class="small" style="color: var(--text-muted); font-size: 0.72rem;">{{ item.detail }}</div>
+                            </div>
+                            <div class="text-end">
+                                <div class="fw-semibold" style="color: var(--gold); font-size: 0.82rem;">${{ item.amount|floatformat:2 }}</div>
+                                <div class="small" style="color: var(--text-muted); font-size: 0.7rem;">{{ item.date|date:"M d, H:i" }}</div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% else %}
+                    <div class="empty-state">
+                        <i class="fa-solid fa-inbox"></i>
+                        <p>No recent activity recorded.</p>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+            <div class="col-lg-5">
+                <div class="perf-card" style="min-height:100%;">
+                    <div class="perf-label"><i class="fa-solid fa-triangle-exclamation" style="color:var(--warning)"></i> Pending Follow-up</div>
+                    <div class="perf-sub">Overdue rentals that need attention</div>
+                    {% if overdue_rentals %}
+                        {% for req in overdue_rentals %}
+                        <div class="d-flex justify-content-between align-items-center py-2 border-bottom" style="border-color: rgba(255,255,255,0.05);">
+                            <div>
+                                <div class="fw-semibold" style="color: var(--text-main); font-size: 0.82rem;">{{ req.name }}</div>
+                                <div class="small" style="color: var(--danger); font-size: 0.72rem;">Overdue by {{ req.days_overdue }} days</div>
+                            </div>
+                            <div class="text-end">
+                                <span class="badge-pending">Pending</span>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    {% else %}
+                        <div class="empty-state" style="padding: 20px 0;">
+                            <i class="fa-solid fa-circle-check" style="color: var(--success); font-size: 2rem;"></i>
+                            <p class="mt-2">All rentals are completely up to date!</p>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+    </div>
+</div>
+{% endblock %}

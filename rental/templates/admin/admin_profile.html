@@ -1,0 +1,227 @@
+{% extends "rental/base.html" %}
+
+{% block title %}Admin Profile{% endblock %}
+
+{% block content %}
+<style>
+    .card {
+        background: #1e293b !important;
+        border: 1px solid rgba(56, 189, 248, 0.1) !important;
+    }
+    
+    .card-header {
+        background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%) !important;
+        border-bottom: 1px solid rgba(56, 189, 248, 0.2) !important;
+    }
+    
+    .card-title {
+        color: #e2e8f0;
+    }
+    
+    .card-body {
+        color: #e2e8f0;
+    }
+    
+    h1 {
+        color: #e2e8f0;
+    }
+    
+    h6 {
+        color: #cbd5e1;
+    }
+    
+    .text-secondary {
+        color: #e2e8f0 !important;
+    }
+    
+    hr {
+        border-color: rgba(56, 189, 248, 0.1);
+    }
+    
+    .border-bottom {
+        border-color: rgba(56, 189, 248, 0.1) !important;
+    }
+
+    .profile-card {
+        text-align: center;
+        padding: 25px;
+        background: rgba(255,255,255,.04);
+        border-radius: 18px;
+        border: 1px solid rgba(255,255,255,.08);
+        backdrop-filter: blur(20px);
+        margin-bottom: 20px;
+    }
+
+    .profile-avatar {
+        width: 90px;
+        height: 90px;
+        margin: auto;
+        border-radius: 50%;
+        background: linear-gradient(135deg, #d4af37, #f4d76a);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 42px;
+        color: #111;
+        margin-bottom: 15px;
+    }
+
+    .role-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 8px 18px;
+        border-radius: 30px;
+        font-weight: 700;
+        box-shadow: 0 8px 20px rgba(0,0,0,.15);
+    }
+
+    .role-badge.admin {
+        background: linear-gradient(135deg, #d4af37, #f4d76a);
+        color: #111;
+    }
+
+    .role-badge.reception {
+        background: linear-gradient(135deg, #0ea5e9, #38bdf8);
+        color: #fff;
+    }
+
+    .role-badge.customer {
+        background: linear-gradient(135deg, #10b981, #34d399);
+        color: #fff;
+    }
+</style>
+
+<div class="container-fluid">
+    <div class="row">
+        <!-- Sidebar -->
+        <div class="col-md-3 col-lg-2 px-0">
+            <div class="sidebar">
+                <h4><i class="fa-solid fa-tie"></i> SUIT RENTAL</h4>
+                <hr class="mx-3 opacity-25">
+                <a href="{% url 'dashboard' %}"><i class="fa-solid fa-gauge"></i> Dashboard</a>
+                <a href="{% url 'requests' %}"><i class="fa-solid fa-hand-holding-dollar"></i> Requests</a>
+                <a href="{% url 'all_suits' %}"><i class="fa-solid fa-shirt"></i> View Suits</a>
+                <a href="{% url 'inventory' %}"><i class="fa-solid fa-boxes"></i> Inventory</a>
+                <a href="{% url 'admin_profile' %}"><i class="fa-solid fa-user"></i> Profile</a>
+                <a href="{% url 'home' %}"><i class="fa-solid fa-house"></i> Home</a>
+                <hr class="mx-3 opacity-25">
+                <a href="{% url 'logout' %}" class="text-danger"><i class="fa-solid fa-right-from-bracket"></i> Logout</a>
+            </div>
+        </div>
+
+        <!-- Main Content -->
+        <div class="col-md-9 col-lg-10 ms-sm-auto px-md-4">
+            <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+                <h1 class="h2">Admin Profile</h1>
+            </div>
+
+            <div class="row">
+                <div class="col-md-8">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5 class="card-title mb-0">Profile Information</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-sm-3">
+                                    <h6 class="mb-0">Username:</h6>
+                                </div>
+                                <div class="col-sm-9 text-secondary">
+                                    {{ user.username }}
+                                </div>
+                            </div>
+                            <hr>
+                            <div class="row">
+                                <div class="col-sm-3">
+                                    <h6 class="mb-0">Email:</h6>
+                                </div>
+                                <div class="col-sm-9 text-secondary">
+                                    {{ user.email|default:"Not provided" }}
+                                </div>
+                            </div>
+                            <hr>
+                            <div class="row">
+                                <div class="col-sm-3">
+                                    <h6 class="mb-0">First Name:</h6>
+                                </div>
+                                <div class="col-sm-9 text-secondary">
+                                    {{ user.first_name|default:"Not provided" }}
+                                </div>
+                            </div>
+                            <hr>
+                            <div class="row">
+                                <div class="col-sm-3">
+                                    <h6 class="mb-0">Last Name:</h6>
+                                </div>
+                                <div class="col-sm-9 text-secondary">
+                                    {{ user.last_name|default:"Not provided" }}
+                                </div>
+                            </div>
+                            <hr>
+                            <div class="row">
+                                <div class="col-sm-3">
+                                    <h6 class="mb-0">Date Joined:</h6>
+                                </div>
+                                <div class="col-sm-9 text-secondary">
+                                    {{ user.date_joined|date:"F j, Y" }}
+                                </div>
+                            </div>
+                            <hr>
+                            <div class="row">
+                                <div class="col-sm-3">
+                                    <h6 class="mb-0">Last Login:</h6>
+                                </div>
+                                <div class="col-sm-9 text-secondary">
+                                    {{ user.last_login|date:"F j, Y, g:i a"|default:"Never" }}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="profile-card">
+                        <div class="profile-avatar">
+                            <i class="fas fa-user-circle"></i>
+                        </div>
+                        <h5 class="mb-2">{{ request.user.get_full_name|default:request.user.username }}</h5>
+                        {% if request.user.is_superuser %}
+                            <span class="role-badge admin">
+                                <i class="fas fa-crown"></i> Administrator
+                            </span>
+                        {% elif request.user.groups.first.name == "Reception" %}
+                            <span class="role-badge reception">
+                                <i class="fas fa-user-tie"></i> Reception Officer
+                            </span>
+                        {% else %}
+                            <span class="role-badge customer">
+                                <i class="fas fa-user"></i> Customer
+                            </span>
+                        {% endif %}
+                    </div>
+
+                    <div class="card">
+                        <div class="card-header">
+                            <h5 class="card-title mb-0">Quick Actions</h5>
+                        </div>
+                        <div class="card-body">
+                            <a href="{% url 'dashboard' %}" class="btn btn-primary w-100 mb-2">
+                                <i class="fas fa-tachometer-alt"></i> Dashboard
+                            </a>
+                            <a href="{% url 'inventory' %}" class="btn btn-secondary w-100 mb-2">
+                                <i class="fas fa-boxes"></i> Inventory
+                            </a>
+                            <a href="{% url 'all_suits' %}" class="btn btn-info w-100 mb-2">
+                                <i class="fas fa-list"></i> All Suits
+                            </a>
+                            <a href="{% url 'logout' %}" class="btn btn-danger w-100">
+                                <i class="fas fa-sign-out-alt"></i> Logout
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

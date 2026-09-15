@@ -1,0 +1,845 @@
+{% extends "rental/base_admin.html" %}
+{% block page_title %}Approve Rental Request{% endblock %}
+
+{% block content %}
+<!-- APPROVAL PAGE UNIQUE PREMIUM DARK STYLING -->
+<style>
+    :root {
+        --royal-gold: #c9a227;
+        --royal-gold-light: #e8c96a;
+        --luxury-dark: #0f0c20;
+        --surface-dark: #000000;
+        --surface-darker: #000000;
+        --panel-bg: rgba(255, 255, 255, 0.03);
+        --panel-bg-hover: rgba(255, 255, 255, 0.06);
+        --border-color: rgba(255, 255, 255, 0.08);
+        --border-hover: rgba(201, 162, 39, 0.3);
+        --text-main: #f0ede8;
+        --text-muted: rgba(240, 237, 232, 0.6);
+        --text-dim: rgba(240, 237, 232, 0.4);
+        --success: #4caf82;
+        --danger: #e05c5c;
+        --warning: #e0a040;
+        --luxury-radius: 16px;
+    }
+
+    /* ══ MAIN CARD ══ */
+    .approval-card {
+        border-radius: var(--luxury-radius);
+        overflow: hidden;
+        box-shadow: 0 20px 45px rgba(0, 0, 0, 0.4);
+        border: 1px solid var(--border-color);
+        background: var(--surface-dark);
+        backdrop-filter: blur(12px);
+    }
+
+    .card-head-luxury {
+        background: linear-gradient(135deg, var(--luxury-dark) 0%, #15102a 100%);
+        color: var(--text-main);
+        padding: 1.5rem 2rem;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        border-bottom: 1px solid var(--border-color);
+    }
+
+    .card-head-luxury h4 {
+        color: var(--text-main);
+    }
+
+    /* ══ INFO PANELS ══ */
+    .info-panel {
+        background: var(--panel-bg);
+        border: 1px solid var(--border-color);
+        border-radius: 12px;
+        padding: 1.5rem;
+        height: 100%;
+        transition: all 0.2s ease;
+    }
+
+    .info-panel:hover {
+        transform: translateY(-2px);
+        border-color: var(--border-hover);
+        background: var(--panel-bg-hover);
+    }
+
+    .info-panel h5 {
+        color: var(--royal-gold-light);
+        font-weight: 700;
+        border-bottom: 2px solid rgba(201, 162, 39, 0.2);
+        padding-bottom: 0.5rem;
+        margin-bottom: 1rem;
+        font-size: 0.95rem;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+
+    .info-panel p {
+        margin-bottom: 0.5rem;
+        color: var(--text-main);
+        font-size: 0.9rem;
+    }
+
+    .info-panel .text-muted {
+        color: var(--text-muted) !important;
+    }
+
+    .info-panel .text-dark {
+        color: var(--text-main) !important;
+    }
+
+    .info-panel .fs-5 {
+        color: var(--text-main) !important;
+    }
+
+    /* ══ FORM ELEMENTS ══ */
+    .form-floating-luxury > .form-control,
+    .form-floating-luxury > .form-select {
+        background: rgba(255, 255, 255, 0.05);
+        border: 1px solid var(--border-color);
+        color: var(--text-main);
+        border-radius: 10px;
+        transition: all 0.2s ease;
+    }
+
+    .form-floating-luxury > .form-control:focus,
+    .form-floating-luxury > .form-select:focus {
+        background: rgba(255, 255, 255, 0.08);
+        border-color: var(--royal-gold);
+        box-shadow: 0 0 0 0.25rem rgba(201, 162, 39, 0.15);
+        color: var(--text-main);
+    }
+
+    .form-floating-luxury > label {
+        color: var(--text-muted);
+    }
+
+    .form-floating-luxury > .form-control::placeholder {
+        color: var(--text-dim);
+    }
+
+    .form-floating-luxury > .form-select option {
+        background: var(--surface-dark);
+        color: var(--text-main);
+    }
+
+    /* ══ LIVE AUDIT BADGE ══ */
+    .live-audit-badge {
+        background: rgba(224, 92, 92, 0.08);
+        border: 1px solid rgba(224, 92, 92, 0.2);
+        border-radius: 12px;
+        padding: 1.25rem;
+        margin-top: 1.5rem;
+        transition: all 0.3s ease;
+    }
+
+    .live-audit-badge h6 {
+        color: var(--danger);
+    }
+
+    .live-audit-badge small {
+        color: var(--text-muted);
+    }
+
+    .live-audit-badge.settled {
+        background: rgba(76, 175, 130, 0.08);
+        border-color: rgba(76, 175, 130, 0.2);
+    }
+
+    .live-audit-badge.settled h6 {
+        color: var(--success);
+    }
+
+    /* ══ BUTTONS ══ */
+    .btn-approve {
+        background: linear-gradient(135deg, var(--royal-gold), var(--royal-gold-light));
+        color: #0f0f1a;
+        font-weight: 700;
+        border: none;
+        padding: 0.85rem 2rem;
+        border-radius: 12px;
+        transition: all 0.2s ease;
+        box-shadow: 0 8px 20px rgba(201, 162, 39, 0.3);
+    }
+
+    .btn-approve:hover {
+        background: linear-gradient(135deg, var(--royal-gold-light), var(--royal-gold));
+        transform: translateY(-1px);
+        box-shadow: 0 12px 28px rgba(201, 162, 39, 0.4);
+    }
+
+    .btn-cancel-luxury {
+        border-radius: 12px;
+        padding: 0.85rem 1.5rem;
+        font-weight: 600;
+        color: var(--text-main);
+        background-color: rgba(255, 255, 255, 0.06);
+        border: 1px solid var(--border-color);
+        transition: all 0.2s ease;
+    }
+
+    .btn-cancel-luxury:hover {
+        background-color: rgba(255, 255, 255, 0.1);
+        border-color: var(--border-hover);
+        color: var(--text-main);
+    }
+
+    /* ══ ACCESSORY PREMIUM CARD STYLING ══ */
+    .accessory-wrapper {
+        border: 1px solid var(--border-color);
+        border-radius: 12px;
+        padding: 1rem;
+        background: var(--panel-bg);
+        transition: all 0.2s ease;
+        height: 100%;
+    }
+
+    .accessory-wrapper:hover {
+        border-color: var(--border-hover);
+    }
+
+    .accessory-box {
+        cursor: pointer;
+        padding: 10px;
+        border-radius: 8px;
+        background: rgba(255, 255, 255, 0.03);
+        border: 1px solid transparent;
+        transition: all 0.2s ease;
+    }
+
+    .accessory-box:hover {
+        border-color: var(--royal-gold);
+        background: rgba(201, 162, 39, 0.05);
+    }
+
+    .accessory-box .text-dark {
+        color: var(--text-main) !important;
+    }
+
+    .accessory-box .text-muted {
+        color: var(--text-muted) !important;
+    }
+
+    .accessory-box .text-success {
+        color: var(--success) !important;
+    }
+
+    /* Checked state */
+    .accessory-checkbox:checked + .accessory-wrapper {
+        border-color: var(--royal-gold);
+        background: rgba(201, 162, 39, 0.08);
+        box-shadow: 0 10px 25px rgba(201, 162, 39, 0.15);
+    }
+
+    .accessory-checkbox:checked + .accessory-wrapper .accessory-box {
+        background: rgba(201, 162, 39, 0.1);
+        border-color: var(--royal-gold);
+    }
+
+    /* Toggle visibility of inputs */
+    .accessory-variants {
+        display: none;
+        margin-top: 0.75rem;
+        padding-top: 0.75rem;
+        border-top: 1px dashed var(--border-color);
+    }
+
+    .accessory-checkbox:checked + .accessory-wrapper .accessory-variants {
+        display: block;
+    }
+
+    .fs-7 {
+        font-size: 0.8rem;
+    }
+
+    /* ══ DISCOUNT SECTION ══ */
+    .discount-section {
+        background: rgba(76, 175, 130, 0.06);
+        border: 1px solid rgba(76, 175, 130, 0.2);
+        border-radius: 12px;
+        padding: 1.25rem;
+        margin-top: 1.5rem;
+    }
+
+    .discount-section h6 {
+        color: var(--success);
+        font-weight: 700;
+        margin-bottom: 1rem;
+    }
+
+    .discount-input-wrapper {
+        position: relative;
+    }
+
+    .discount-input-wrapper input {
+        padding-right: 40px;
+    }
+
+    .discount-input-wrapper::after {
+        content: '%';
+        position: absolute;
+        right: 15px;
+        top: 50%;
+        transform: translateY(-50%);
+        color: var(--success);
+        font-weight: 700;
+        font-size: 1.1rem;
+    }
+
+    .discount-preview {
+        background: rgba(255, 255, 255, 0.04);
+        border: 1px solid rgba(76, 175, 130, 0.15);
+        border-radius: 8px;
+        padding: 0.75rem;
+        margin-top: 0.75rem;
+    }
+
+    .discount-preview-row {
+        display: flex;
+        justify-content: space-between;
+        padding: 0.25rem 0;
+        font-size: 0.85rem;
+        color: var(--text-muted);
+    }
+
+    .discount-preview-row span:first-child {
+        color: var(--text-muted);
+    }
+
+    .discount-preview-row.discount-amount {
+        color: var(--success);
+        font-weight: 700;
+        border-top: 1px solid rgba(76, 175, 130, 0.15);
+        margin-top: 0.5rem;
+        padding-top: 0.5rem;
+    }
+
+    /* ══ SECTION HEADINGS ══ */
+    .section-heading {
+        color: var(--text-main);
+        font-weight: 700;
+        font-size: 1.1rem;
+        letter-spacing: -0.3px;
+    }
+
+    .section-heading .text-muted {
+        color: var(--text-muted) !important;
+    }
+
+    /* ══ NOTES TEXTAREA ══ */
+    .form-control.bg-light {
+        background: rgba(255, 255, 255, 0.04) !important;
+        border: 1px solid var(--border-color);
+        color: var(--text-muted);
+    }
+
+    .form-control.bg-light:focus {
+        background: rgba(255, 255, 255, 0.06) !important;
+        color: var(--text-main);
+    }
+
+    .form-label {
+        color: var(--text-muted) !important;
+    }
+
+    .form-text {
+        color: var(--text-dim) !important;
+    }
+
+    .text-primary {
+        color: var(--royal-gold-light) !important;
+    }
+
+    .text-success {
+        color: var(--success) !important;
+    }
+
+    .text-danger {
+        color: var(--danger) !important;
+    }
+
+    .text-danger-emphasis {
+        color: var(--danger) !important;
+    }
+
+    .text-success-emphasis {
+        color: var(--success) !important;
+    }
+
+    /* ══ BADGE ══ */
+    .badge {
+        background: rgba(201, 162, 39, 0.15) !important;
+        color: var(--royal-gold-light) !important;
+        border: 1px solid rgba(201, 162, 39, 0.3);
+    }
+
+    /* ══ BORDER ══ */
+    .border-top {
+        border-top: 1px solid var(--border-color) !important;
+    }
+
+    /* ══ SCROLLBAR ══ */
+    ::-webkit-scrollbar {
+        width: 8px;
+        height: 8px;
+    }
+
+    ::-webkit-scrollbar-track {
+        background: var(--surface-darker);
+    }
+
+    ::-webkit-scrollbar-thumb {
+        background: rgba(201, 162, 39, 0.3);
+        border-radius: 4px;
+    }
+
+    ::-webkit-scrollbar-thumb:hover {
+        background: var(--royal-gold);
+    }
+</style>
+
+<div class="container-fluid px-0">
+  <div class="card approval-card" style="max-width:950px; margin:auto;">
+    
+    <!-- CARD HEADER -->
+    <div class="card-head-luxury">
+      <h4 class="mb-0 fw-bold"><i class="fas fa-shield-check me-2" style="color: var(--royal-gold);"></i> Audit & Approve Rental Request</h4>
+      <span class="badge rounded-pill px-3 py-2 fw-bold">
+        Pending Ref #{{ req.id }}
+      </span>
+    </div>
+
+    <div class="card-body p-4 p-lg-5">
+      
+      <!-- TOP INFORMATION SECTION -->
+      <div class="row g-4">
+        <!-- Customer Information -->
+        <div class="col-md-6">
+          <div class="info-panel">
+            <h5><i class="fas fa-user-tie me-2"></i> Customer Information</h5>
+            <p class="fs-5 fw-bold mb-3">{{ req.name }}</p>
+            <p><i class="fas fa-phone-alt me-2"></i> <strong>Phone:</strong> {{ req.phone }}</p>
+            {% if req.national_id %}
+                <p><i class="fas fa-id-card me-2"></i> <strong>National ID:</strong> {{ req.national_id }}</p>
+            {% endif %}
+            {% if req.present_address %}
+                <p><i class="fas fa-map-marker-alt me-2"></i> <strong>Address:</strong> {{ req.present_address }}</p>
+            {% endif %}
+          </div>
+        </div>
+        
+        <!-- Rental Details -->
+        <div class="col-md-6">
+          <div class="info-panel">
+            <h5><i class="fas fa-suit-case me-2"></i> Rental Specifications</h5>
+            <p class="fs-5 fw-bold mb-3" style="color: var(--royal-gold-light) !important;">{{ req.suit.suit_name }}</p>
+            <div class="row g-2 small">
+                <div class="col-6" style="color: var(--text-muted);">Quantity: <strong style="color: var(--text-main);" id="reqQty">{{ req.quantity_requested }}</strong></div>
+                <div class="col-6" style="color: var(--text-muted);">Duration: <strong style="color: var(--text-main);" id="reqDays" data-days="{{ req.days_requested }}">{{ req.days_requested }} Days</strong></div>
+                <div class="col-6" style="color: var(--text-muted);">Suit Base Rate: <strong style="color: var(--text-main);">${{ req.suit.price_per_day|floatformat:2 }} / day</strong></div>
+                <div class="col-6" style="color: var(--text-muted);">Suit Gross: <strong style="color: var(--text-main);">${{ total_amount|floatformat:2 }}</strong></div>
+            </div>
+            <div class="mt-3 pt-2 border-top d-flex justify-content-between align-items-center">
+                <span class="fw-bold text-uppercase small" style="color: var(--text-muted);">Total Amount Due:</span>
+                <span class="fs-4 fw-extrabold text-primary" id="grossTotalAmount" data-base="{{ total_amount }}">${{ total_amount|floatformat:2 }}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- MAIN CONFIGURATION FORM -->
+      <form method="POST" action="" style="margin-top:2.5rem;" id="approvalForm" novalidate>
+        {% csrf_token %}
+        
+        <!-- ================= OPTIONAL ACCESSORIES SECTION ================= -->
+        <h5 class="fw-bold mb-3 section-heading">
+          <i class="fas fa-plus-circle me-1"></i> Add Optional Accessories (Agab Dheeri ah)
+        </h5>
+        <div class="row g-3 mb-4">
+          
+          <!-- Shoes -->
+          <div class="col-md-3 col-sm-6">
+            <input type="checkbox" name="accessories" value="shoes" id="acc_shoes" class="form-check-input d-none accessory-checkbox" data-price="5.00">
+            <div class="accessory-wrapper">
+              <label class="d-block w-100 mb-0" for="acc_shoes">
+                <div class="accessory-box text-center">
+                  <i class="fas fa-shoe-prints d-block mb-1 fs-5" style="color: var(--text-muted);"></i>
+                  <span class="fw-bold d-block small" style="color: var(--text-main);">Shoes</span>
+                  <small class="fw-bold" style="color: var(--success);">+$5.00/day</small>
+                </div>
+              </label>
+              <div class="accessory-variants">
+                <div class="form-floating form-floating-luxury mb-2">
+                  <input type="text" name="shoes_size" class="form-control form-control-sm py-1 pt-4 fs-7" placeholder="e.g. 42">
+                  <label class="fs-7">Size (Qor)</label>
+                </div>
+                <div class="form-floating form-floating-luxury">
+                  <select name="shoes_color" class="form-select form-select-sm py-1 pt-3 fs-7">
+                    <option value="Black">Black</option>
+                    <option value="Brown">Brown</option>
+                    <option value="Tan">Tan</option>
+                  </select>
+                  <label class="fs-7">Color</label>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Tie -->
+          <div class="col-md-3 col-sm-6">
+            <input type="checkbox" name="accessories" value="tie" id="acc_tie" class="form-check-input d-none accessory-checkbox" data-price="1.50">
+            <div class="accessory-wrapper">
+              <label class="d-block w-100 mb-0" for="acc_tie">
+                <div class="accessory-box text-center">
+                  <i class="fas fa-user-tie d-block mb-1 fs-5" style="color: var(--text-muted);"></i>
+                  <span class="fw-bold d-block small" style="color: var(--text-main);">Tie</span>
+                  <small class="fw-bold" style="color: var(--success);">+$1.50/day</small>
+                </div>
+              </label>
+              <div class="accessory-variants">
+                <div class="form-floating form-floating-luxury mb-2">
+                  <input type="text" name="tie_size" class="form-control form-control-sm py-1 pt-4 fs-7" placeholder="e.g. Slim, Wide">
+                  <label class="fs-7">Type / Size</label>
+                </div>
+                <div class="form-floating form-floating-luxury">
+                  <select name="tie_color" class="form-select form-select-sm py-1 pt-3 fs-7">
+                    <option value="Red">Red</option><option value="Black">Black</option>
+                    <option value="Blue">Blue</option><option value="Gold">Gold</option>
+                  </select>
+                  <label class="fs-7">Color</label>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Shirt -->
+          <div class="col-md-3 col-sm-6">
+            <input type="checkbox" name="accessories" value="shirt" id="acc_shirt" class="form-check-input d-none accessory-checkbox" data-price="3.00">
+            <div class="accessory-wrapper">
+              <label class="d-block w-100 mb-0" for="acc_shirt">
+                <div class="accessory-box text-center">
+                  <i class="fas fa-tshirt d-block mb-1 fs-5" style="color: var(--text-muted);"></i>
+                  <span class="fw-bold d-block small" style="color: var(--text-main);">Shirt</span>
+                  <small class="fw-bold" style="color: var(--success);">+$3.00/day</small>
+                </div>
+              </label>
+              <div class="accessory-variants">
+                <div class="form-floating form-floating-luxury mb-2">
+                  <input type="text" name="shirt_size" class="form-control form-control-sm py-1 pt-4 fs-7" placeholder="e.g. XL, L, M">
+                  <label class="fs-7">Size (Qor)</label>
+                </div>
+                <div class="form-floating form-floating-luxury">
+                  <select name="shirt_color" class="form-select form-select-sm py-1 pt-3 fs-7">
+                    <option value="White" selected>White</option>
+                    <option value="Sky Blue">Sky Blue</option>
+                    <option value="Black">Black</option>
+                  </select>
+                  <label class="fs-7">Color</label>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Belt -->
+          <div class="col-md-3 col-sm-6">
+            <input type="checkbox" name="accessories" value="belt" id="acc_belt" class="form-check-input d-none accessory-checkbox" data-price="1.00">
+            <div class="accessory-wrapper">
+              <label class="d-block w-100 mb-0" for="acc_belt">
+                <div class="accessory-box text-center">
+                  <i class="fas fa-ring d-block mb-1 fs-5" style="color: var(--text-muted);"></i>
+                  <span class="fw-bold d-block small" style="color: var(--text-main);">Belt</span>
+                  <small class="fw-bold" style="color: var(--success);">+$1.00/day</small>
+                </div>
+              </label>
+              <div class="accessory-variants">
+                <div class="form-floating form-floating-luxury mb-2">
+                  <input type="text" name="belt_size" class="form-control form-control-sm py-1 pt-4 fs-7" placeholder="e.g. 38">
+                  <label class="fs-7">Size (Waist)</label>
+                </div>
+                <div class="form-floating form-floating-luxury">
+                  <select name="belt_color" class="form-select form-select-sm py-1 pt-3 fs-7">
+                    <option value="Black">Black</option>
+                    <option value="Brown">Brown</option>
+                  </select>
+                  <label class="fs-7">Color</label>
+                </div>
+              </div>
+            </div>
+          </div>
+
+        </div>
+        <!-- ================================================================ -->
+
+        <h5 class="fw-bold mb-3 section-heading">Operational & Payment Configurations</h5>
+        
+        <div class="row g-3">
+          <!-- Pickup / Reservation Mode -->
+          <div class="col-md-6">
+            <div class="form-floating form-floating-luxury">
+              <select name="action_mode" id="actionMode" class="form-select">
+                <option value="rent_now" {% if not action_mode_default or action_mode_default == 'rent_now' %}selected{% endif %}>Rent Now</option>
+                <option value="reserve" {% if action_mode_default == 'reserve' %}selected{% endif %}>Reserve for Pickup Later (Optional)</option>
+              </select>
+              <label for="actionMode">Action Mode</label>
+            </div>
+            <small class="form-text ms-2 d-block">
+               Choose whether to start rental today or hold the request as a pickup reservation.
+            </small>
+          </div>
+
+          <!-- Reserve Duration -->
+          <div class="col-md-3">
+            <div class="form-floating form-floating-luxury">
+              <select name="reserve_duration" class="form-select">
+                <option value="24" selected>24 Hours</option>
+                <option value="48">48 Hours</option>
+                <option value="72">72 Hours</option>
+                <option value="96">96 Hours</option>
+                <option value="168">7 Days</option>
+              </select>
+              <label>Reserve Hold Duration</label>
+            </div>
+          </div>
+
+          <!-- Custom Reserve Hours -->
+          <div class="col-md-3">
+            <div class="form-floating form-floating-luxury">
+              <input type="number" name="reserve_custom_hours" id="reserveCustomHours" class="form-control" min="1" placeholder="Optional">
+              <label for="reserveCustomHours">Manual Reserve Hours</label>
+            </div>
+          </div>
+
+          <!-- Start Date Input -->
+          <div class="col-md-6" id="startDateSection">
+            <div class="form-floating form-floating-luxury">
+              <input type="date" name="start_date" id="startDate" class="form-control" value="{{ req.request_date|date:'Y-m-d' }}">
+              <label for="startDate">Rental Release / Start Date</label>
+            </div>
+            <small class="form-text ms-2 d-block">
+               📅 Timeline Target: Expected Return Date: <strong id="expectedReturnDisplay" class="text-primary">--/--/----</strong>
+            </small>
+          </div>
+
+          <!-- ID Document Type -->
+          <div class="col-md-6">
+            <div class="form-floating form-floating-luxury">
+              <select name="id_document_type" id="idDocumentType" class="form-select">
+                <option value="National ID">National ID</option>
+                <option value="Passport">Passport</option>
+                <option value="Driver's License">Driver's License</option>
+              </select>
+              <label for="idDocumentType">Customer Document Type</label>
+            </div>
+          </div>
+
+          <!-- ID Document Number -->
+          <div class="col-md-6">
+            <div class="form-floating form-floating-luxury">
+              <input type="text" name="id_document_number" class="form-control" placeholder="Enter document number">
+              <label>ID Number / Passport / License #</label>
+            </div>
+          </div>
+
+          <!-- ══ ID VERIFICATION CHECKBOX ══ -->
+          <div class="col-12 mt-2">
+            <div class="d-flex align-items-start gap-3 p-3 rounded-3" style="background: rgba(201, 162, 39, 0.06); border: 1px solid rgba(201, 162, 39, 0.25); border-radius: 12px;">
+              <input class="form-check-input mt-1" type="checkbox" name="id_verified" id="idVerified" style="width: 1.3em; height: 1.3em; cursor: pointer; accent-color: var(--royal-gold);" required>
+              <label class="form-check-label" for="idVerified" style="color: var(--text-main); font-size: 0.88rem; line-height: 1.5; cursor: pointer;">
+                <i class="fas fa-shield-alt me-2" style="color: var(--royal-gold);"></i>
+                <strong>ID Verification:</strong> I confirm that the customer's ID document has been physically presented, verified, and matches the provided registration details.
+              </label>
+            </div>
+          </div>
+
+          <!-- Payment Method Dropdown -->
+          <div class="col-md-6">
+            <div class="form-floating form-floating-luxury">
+              <select name="payment_method" id="paymentMethod" class="form-select">
+                <option value="cash">💵 Cash Payment</option>
+                <option value="zaad">📱 Zaad Service</option>
+                <option value="sahal">📱 Edahab</option>
+                <option value="bank">🏦 Bank Transfer</option>
+              </select>
+              <label for="paymentMethod">Payment Method Gateway</label>
+            </div>
+          </div>
+
+          <!-- DISCOUNT PERCENTAGE INPUT -->
+          <div class="col-md-6">
+            <div class="discount-section">
+              <h6><i class="fas fa-percent me-2"></i> Apply Discount (Optional)</h6>
+              <div class="form-floating form-floating-luxury discount-input-wrapper">
+                <input type="number" name="discount_percentage" id="discountPercentage" class="form-control" min="0" max="100" step="0.01" value="0">
+                <label for="discountPercentage">Discount Percentage (%)</label>
+              </div>
+              <div class="discount-preview">
+                <div class="discount-preview-row">
+                  <span>Discount Amount:</span>
+                  <span id="discountAmountDisplay" class="fw-bold" style="color: var(--success);">$0.00</span>
+                </div>
+                <div class="discount-preview-row discount-amount">
+                  <span>Final Amount After Discount:</span>
+                  <span id="finalAmountDisplay" class="fw-bold text-primary">${{ total_amount|floatformat:2 }}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Amount Paid Input -->
+          <div class="col-md-6">
+            <div class="form-floating form-floating-luxury">
+              <input type="number" name="amount_paid" id="amountPaid" class="form-control" min="0" step="0.01" value="0">
+              <label for="amountPaid">Amount Collected Now ($)</label>
+            </div>
+            <small class="form-text ms-2">Enter payment received right now. Enter 0 if completely pending.</small>
+          </div>
+
+          <!-- Payment Reference Input -->
+          <div class="col-md-12">
+            <div class="form-floating form-floating-luxury">
+              <input type="text" name="payment_reference" id="paymentRef" class="form-control" placeholder="Transaction ID or bank reference">
+              <label for="paymentRef">Payment reference code / Transaction ID</label>
+            </div>
+          </div>
+        </div>
+
+        <!-- NOTES AREA -->
+        <div class="form-group mt-4">
+          <label class="form-label small fw-bold mb-2"><i class="fas fa-comment-alt me-1"></i> Customer's Original Request Notes</label>
+          <textarea name="notes" class="form-control" rows="3" style="border-radius: 12px; resize: none;" readonly placeholder="No notes submitted with this request.">{{ req.notes }}</textarea>
+        </div>
+
+        <!-- ACTION BUTTONS -->
+        <div class="d-flex gap-3 mt-4 pt-3 border-top justify-content-end">
+          <a href="{% if back_url %}{% url back_url %}{% else %}{% url 'reception_requests' %}{% endif %}" class="btn btn-cancel-luxury">
+            <i class="fas fa-arrow-left me-1"></i> Back to Requests
+          </a>
+          <button type="submit" class="btn btn-approve">
+            <i class="fas fa-check-double me-2"></i> Authorize & Dispatch Rental
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- LIVE MATHEMATICAL & DATE CALCULATIONS CONTROL -->
+<div id="pickupModeState" data-default="{{ pickup_mode_default|yesno:'true,false' }}" style="display:none;"></div>
+<script>
+document.addEventListener("DOMContentLoaded", function() {
+    const baseSuitTotal = parseFloat(document.getElementById('grossTotalAmount').dataset.base) || 0;
+    const rentalDays = parseInt(document.getElementById('reqDays').dataset.days) || 1;
+    const reqQty = parseInt(document.getElementById('reqQty').textContent) || 1;
+    
+    const grossTotalDisplay = document.getElementById('grossTotalAmount');
+    const amountPaidInput = document.getElementById('amountPaid');
+    const startDateInput = document.getElementById('startDate');
+    const expectedReturnDisplay = document.getElementById('expectedReturnDisplay');
+    const discountPercentageInput = document.getElementById('discountPercentage');
+    const discountAmountDisplay = document.getElementById('discountAmountDisplay');
+    const finalAmountDisplay = document.getElementById('finalAmountDisplay');
+    
+    const accessoryCheckboxes = document.querySelectorAll('.accessory-checkbox');
+    const pickupModeDefault = document.getElementById('pickupModeState')?.dataset.default === 'true';
+
+    // Dynamic Gross Total calculation based on selected accessories
+    function getCalculatedGrossTotal() {
+        let accessoryDailyCost = 0;
+        accessoryCheckboxes.forEach(checkbox => {
+            if (checkbox.checked) {
+                accessoryDailyCost += parseFloat(checkbox.dataset.price) || 0;
+            }
+        });
+        
+        let extraTotal = accessoryDailyCost * rentalDays * reqQty;
+        return baseSuitTotal + extraTotal;
+    }
+
+    // Live Ledger Calculation with Discount
+    function reCalculateLedger() {
+        const currentGrossTotal = getCalculatedGrossTotal();
+        grossTotalDisplay.textContent = '$' + currentGrossTotal.toFixed(2);
+        
+        // Calculate discount
+        const discountPercent = parseFloat(discountPercentageInput.value) || 0;
+        const discountAmount = (currentGrossTotal * discountPercent) / 100;
+        const finalAmountAfterDiscount = currentGrossTotal - discountAmount;
+        
+        // Update discount display
+        discountAmountDisplay.textContent = '-$' + discountAmount.toFixed(2);
+        finalAmountDisplay.textContent = '$' + finalAmountAfterDiscount.toFixed(2);
+        
+        amountPaidInput.max = finalAmountAfterDiscount.toFixed(2);
+
+        const paidNow = parseFloat(amountPaidInput.value) || 0;
+        let finalDebt = finalAmountAfterDiscount - paidNow;
+        
+        if(finalDebt < 0) finalDebt = 0; 
+
+        if (finalDebt === 0) {
+            amountPaidInput.max = finalAmountAfterDiscount.toFixed(2);
+        }
+    }
+
+    // Real-Time Expected Return Engine
+    function updateExpectedReturnDate() {
+        const startDateVal = startDateInput.value;
+        if (!startDateVal) {
+            expectedReturnDisplay.textContent = "--/--/----";
+            return;
+        }
+
+        const startDate = new Date(startDateVal);
+        startDate.setDate(startDate.getDate() + rentalDays);
+
+        const year = startDate.getFullYear();
+        const month = String(startDate.getMonth() + 1).padStart(2, '0');
+        const day = String(startDate.getDate()).padStart(2, '0');
+
+        expectedReturnDisplay.textContent = `${year}-${month}-${day}`;
+    }
+
+    // Event Watchers
+    amountPaidInput.addEventListener('input', reCalculateLedger);
+    startDateInput.addEventListener('input', updateExpectedReturnDate);
+    startDateInput.addEventListener('change', updateExpectedReturnDate);
+    discountPercentageInput.addEventListener('input', reCalculateLedger);
+    
+    const actionModeSelect = document.getElementById('actionMode');
+    const startDateSection = document.getElementById('startDateSection');
+
+    function updateActionModeUI() {
+        const isReserve = actionModeSelect.value === 'reserve';
+        if (pickupModeDefault) {
+            startDateSection.style.display = 'none';
+            startDateInput.value = '';
+            expectedReturnDisplay.textContent = 'Ready for pickup now.';
+            return;
+        }
+        if (isReserve) {
+            startDateSection.style.display = 'none';
+            startDateInput.value = '';
+            expectedReturnDisplay.textContent = 'Pickup reservation will be held.';
+        } else {
+            startDateSection.style.display = 'block';
+            updateExpectedReturnDate();
+        }
+    }
+
+    actionModeSelect.addEventListener('change', function() {
+        updateActionModeUI();
+    });
+
+    // Watch Accessory selection changes
+    accessoryCheckboxes.forEach(checkbox => {
+        checkbox.addEventListener('change', function() {
+            reCalculateLedger();
+        });
+    });
+    
+    // Core setup initialization
+    updateActionModeUI();
+    reCalculateLedger();
+});
+</script>
+{% endblock %}

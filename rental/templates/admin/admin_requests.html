@@ -1,0 +1,699 @@
+{% extends "rental/base.html" %}
+{% block title %}Reception Requests | Suit Rental{% endblock %}
+{% block page_title %}ADMIN Requests{% endblock %}
+
+{% block content %}
+<style>
+    /* Global Section Spacing */
+    .section-wrapper { margin-bottom: 30px; }
+    
+    /* Navigation / Filter Ribbon */
+    .filter-ribbon {
+        display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 20px;
+        background: rgba(255,255,255,0.02); padding: 10px; border-radius: 12px;
+        border: 1px solid rgba(255,255,255,0.05);
+    }
+    .filter-chip {
+        padding: 6px 16px; border-radius: 30px; font-size: 0.8rem; font-weight: 600;
+        color: rgba(240,237,232,0.6); background: rgba(255,255,255,0.03);
+        border: 1px solid rgba(255,255,255,0.05); text-decoration: none;
+        transition: all 0.2s ease; cursor: pointer;
+    }
+    .filter-chip:hover, .filter-chip.active {
+        color: #fff; background: rgba(201,168,76,0.15); border-color: var(--gold);
+    }
+    
+    /* Stat Cards Custom Styles */
+    .stat-card {
+        background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.07);
+        border-radius: 16px; padding: 24px; position: relative; overflow: hidden;
+        backdrop-filter: blur(12px);
+    }
+    .stat-card::before {
+        content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px;
+        background: var(--card-accent, var(--gold));
+    }
+    .stat-icon {
+        width: 44px; height: 44px; border-radius: 12px;
+        display: flex; align-items: center; justify-content: center;
+        font-size: 17px; margin-bottom: 16px;
+    }
+    .stat-label {
+        font-size: 0.67rem; text-transform: uppercase; letter-spacing: 1.8px;
+        color: rgba(240,237,232,0.5); font-weight: 600; margin-bottom: 4px;
+    }
+    .stat-value {
+        font-family: 'Cormorant Garamond', serif; font-size: 3rem; line-height: 1; margin-bottom: 6px;
+    }
+    .stat-sub { font-size: 0.75rem; color: rgba(240,237,232,0.5); }
+
+    /* Core Layout Panels */
+    .table-card {
+        background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.07);
+        border-radius: 16px; overflow: hidden; backdrop-filter: blur(12px);
+        box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.2);
+    }
+    .table-card-header {
+        padding: 20px 24px; border-bottom: 1px solid rgba(255,255,255,0.07);
+        background: rgba(0,0,0,0.2); display: flex; justify-content: space-between; align-items: center;
+    }
+    .table-card-header h4 {
+        font-family: 'Cormorant Garamond', serif; font-size: 1.25rem; color: #f0ede8;
+        margin: 0; display: flex; align-items: center; gap: 10px;
+    }
+    .table-card-header h4 i { color: var(--gold); }
+
+    /* RESERVATION MODAL ONLY (Guaranteed Centering) */
+    .modal-overlay-custom {
+        position: fixed;
+        top: 0; left: 0; width: 100vw; height: 100vh;
+        background: rgba(7, 7, 10, 0.85);
+        backdrop-filter: blur(8px);
+        display: none !important;
+        align-items: center !important;
+        justify-content: center !important;
+        z-index: 1050;
+        padding: 20px;
+        box-sizing: border-box;
+    }
+    .modal-overlay-custom.show {
+        display: flex !important;
+    }
+    .modal-box-custom {
+        background: #13131a;
+        border: 1px solid rgba(201,168,76,0.3);
+        border-radius: 16px;
+        width: 100%;
+        max-width: 800px;
+        max-height: 90vh;
+        display: flex;
+        flex-direction: column;
+        box-shadow: 0 20px 40px rgba(0,0,0,0.6);
+        animation: modalFadeIn 0.3s ease;
+        margin: auto !important;
+    }
+    @keyframes modalFadeIn {
+        from { transform: translateY(15px); opacity: 0; }
+        to { transform: translateY(0); opacity: 1; }
+    }
+    .modal-body-scroll { padding: 24px; overflow-y: auto; flex: 1; }
+
+    /* ✅ NEW: Inline return panel (Bannaan-yaal si toos ah u muuqda) */
+    .inline-panel-custom {
+        background: #13131a;
+        border: 1px solid rgba(201,168,76,0.3);
+        border-radius: 16px;
+        width: 100%;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.4);
+        margin-top: 30px;
+    }
+
+    .pay-grid-custom { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 15px; }
+    .pay-box-custom {
+        background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.05);
+        padding: 12px 15px; border-radius: 10px;
+    }
+    .form-input {
+        width: 100%; padding: 10px 12px; border-radius: 8px;
+        border: 1px solid rgba(255,255,255,0.1); background: rgba(255,255,255,0.03);
+        color: #f0ede8; font-size: 0.9rem; transition: all 0.2s;
+    }
+    .form-input:focus { border-color: var(--gold); outline: none; background: rgba(255,255,255,0.05); }
+    .form-label {
+        font-size: 0.75rem; color: rgba(240,237,232,0.6); text-transform: uppercase;
+        letter-spacing: 0.5px; font-weight: 600; margin-bottom: 6px; display: block;
+    }
+
+    /* Audit Checklist Grid */
+    .audit-checklist {
+        display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 10px;
+        background: rgba(255,255,255,0.02); padding: 16px; border-radius: 10px;
+        border: 1px solid rgba(255,255,255,0.05);
+    }
+    .checklist-item {
+        display: flex; align-items: center; gap: 8px; font-size: 0.85rem; color: #f0ede8;
+    }
+    .checklist-item input[type="checkbox"] { accent-color: var(--gold); width: 16px; height: 16px; cursor: pointer; }
+
+    /* Financial Breakdown */
+    .finance-row {
+        display: flex; justify-content: space-between; align-items: center;
+        padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,0.05);
+    }
+    .finance-row:last-child { border-bottom: none; }
+    .finance-label { font-size: 0.85rem; color: rgba(240,237,232,0.7); }
+    .finance-value { font-size: 0.95rem; font-weight: 600; color: #fff; }
+    .finance-value.danger { color: #e05c5c; }
+    .finance-value.success { color: #4caf82; }
+    .finance-total {
+        background: rgba(201,168,76,0.08); border: 1px solid rgba(201,168,76,0.2);
+        border-radius: 10px; padding: 16px; margin-top: 10px;
+    }
+    .finance-total .finance-label { color: var(--gold); font-size: 0.9rem; font-weight: 700; }
+    .finance-total .finance-value { color: var(--gold); font-size: 1.4rem; font-family: 'Cormorant Garamond', serif; }
+
+    /* Table Styles */
+    .rep-table { width: 100%; border-collapse: separate; border-spacing: 0 6px; padding: 0 16px 12px; }
+    .rep-table thead th {
+        color: rgba(240,237,232,0.5); font-size: 0.67rem; text-transform: uppercase;
+        letter-spacing: 1.5px; font-weight: 600; padding: 12px 14px; border: none; white-space: nowrap;
+    }
+    .rep-table tbody tr { background: rgba(255,255,255,0.015); transition: all 0.25s ease; }
+    .rep-table tbody tr:hover { background: rgba(201,168,76,0.08); transform: scale(1.002); }
+    .rep-table tbody td {
+        padding: 14px; border: none; color: #f0ede8; font-size: 0.86rem; vertical-align: middle;
+    }
+    .rep-table tbody td:first-child { border-radius: 10px 0 0 10px; }
+    .rep-table tbody td:last-child { border-radius: 0 10px 10px 0; }
+
+    /* Action Buttons & Badges */
+    .action-btn-success {
+        background: rgba(76,175,130,0.15); border: 1px solid rgba(76,175,130,0.35);
+        color: #4caf82; border-radius: 8px; padding: 6px 14px; font-size: 0.78rem;
+        font-weight: 700; cursor: pointer; display: inline-flex; align-items: center;
+        gap: 6px; text-decoration: none; transition: all 0.2rem;
+    }
+    .action-btn-success:hover { background: rgba(76,175,130,0.3); box-shadow: 0 0 10px rgba(76,175,130,0.2); }
+    .action-btn-warning {
+        background: rgba(255,193,7,0.12); border: 1px solid rgba(255,193,7,0.35);
+        color: #ffca28; border-radius: 8px; padding: 6px 14px; font-size: 0.78rem;
+        font-weight: 700; cursor: pointer; display: inline-flex; align-items: center;
+        gap: 6px; text-decoration: none; transition: all 0.2rem;
+    }
+    .action-btn-warning:hover { background: rgba(255,193,7,0.25); box-shadow: 0 0 10px rgba(255,193,7,0.2); }
+    .action-btn-danger {
+        background: rgba(224,92,92,0.12); border: 1px solid rgba(224,92,92,0.35);
+        color: #e05c5c; border-radius: 8px; padding: 6px 14px; font-size: 0.78rem;
+        font-weight: 700; cursor: pointer; display: inline-flex; align-items: center;
+        gap: 6px; text-decoration: none; transition: all 0.2rem;
+    }
+    .action-btn-danger:hover { background: rgba(224,92,92,0.25); box-shadow: 0 0 10px rgba(224,92,92,0.2); }
+    
+    .badge-pending { background: rgba(224,160,64,0.15); border: 1px solid rgba(224,160,64,0.3); color: var(--warning); padding: 4px 12px; border-radius: 20px; font-size: 0.72rem; font-weight: 700; }
+    .badge-reserved { background: rgba(255,193,7,0.15); border: 1px solid rgba(255,193,7,0.3); color: #ffca28; padding: 4px 12px; border-radius: 20px; font-size: 0.72rem; font-weight: 700; }
+    .badge-active { background: rgba(76,130,175,0.15); border: 1px solid rgba(76,130,175,0.3); color: #6ab0e8; padding: 4px 12px; border-radius: 20px; font-size: 0.72rem; font-weight: 700; }
+    .badge-returned { background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.15); color: #f0ede8; padding: 4px 12px; border-radius: 20px; font-size: 0.72rem; font-weight: 700; }
+    .badge-rejected { background: rgba(224,92,92,0.15); border: 1px solid rgba(224,92,92,0.3); color: var(--danger); padding: 4px 12px; border-radius: 20px; font-size: 0.72rem; font-weight: 700; }
+    .badge-expired { background: rgba(224,92,92,0.18); border: 1px solid rgba(224,92,92,0.35); color: #e05c5c; padding: 5px 12px; border-radius: 20px; font-size: 0.72rem; font-weight: 700; }
+    
+    .empty-state { text-align: center; padding: 44px 20px; color: rgba(240,237,232,0.5); }
+    .empty-state i { font-size: 3rem; color: rgba(201,168,76,0.1); margin-bottom: 12px; display: block; }
+</style>
+
+<div class="container-fluid px-0">
+    
+    <!-- Status Quick Navigation Ribbon -->
+    <div class="filter-ribbon">
+        <a href="?status=all" class="filter-chip {% if not request.GET.status or request.GET.status == 'all' %}active{% endif %}">All Registry</a>
+        <a href="?status=available" class="filter-chip {% if request.GET.status == 'available' %}active{% endif %}">Available</a>
+        <a href="?status=pending" class="filter-chip {% if request.GET.status == 'pending' %}active{% endif %}">Pending Request</a>
+        <a href="?status=reserved" class="filter-chip {% if request.GET.status == 'reserved' %}active{% endif %}">Reserved</a>
+        <a href="?status=active" class="filter-chip {% if request.GET.status == 'active' %}active{% endif %}">Rented (Active)</a>
+        <a href="?status=returned" class="filter-chip {% if request.GET.status == 'returned' %}active{% endif %}">Returned</a>
+        <a href="?status=dry-cleaning" class="filter-chip {% if request.GET.status == 'dry-cleaning' %}active{% endif %}"><i class="fa-solid fa-soap me-1"></i> Dry Cleaning</a>
+    </div>
+
+    <!-- Quick Insights Metrics Grid -->
+    <div class="row g-3 mb-4">
+        <div class="col-md-3">
+            <div class="stat-card" style="--card-accent:var(--warning)">
+                <div class="stat-icon" style="background:rgba(224,160,64,0.12);color:var(--warning)"><i class="fa-solid fa-hourglass-half"></i></div>
+                <div class="stat-label">Pending</div>
+                <div class="stat-value" style="color:var(--warning)">{{ pending_count }}</div>
+                <div class="stat-sub">Needs approval</div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="stat-card" style="--card-accent:#ffca28">
+                <div class="stat-icon" style="background:rgba(255,193,7,0.12);color:#ffca28"><i class="fa-solid fa-bookmark"></i></div>
+                <div class="stat-label">Reserved</div>
+                <div class="stat-value" style="color:#ffca28">{{ reserved_count }}</div>
+                <div class="stat-sub">On temporary hold</div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="stat-card" style="--card-accent:#6ab0e8">
+                <div class="stat-icon" style="background:rgba(76,130,175,0.12);color:#6ab0e8"><i class="fa-solid fa-shirt"></i></div>
+                <div class="stat-label">Active</div>
+                <div class="stat-value" style="color:#6ab0e8">{{ active_count }}</div>
+                <div class="stat-sub">Currently rented</div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="stat-card" style="--card-accent:var(--danger)">
+                <div class="stat-icon" style="background:rgba(224,92,92,0.12);color:var(--danger)"><i class="fa-solid fa-times-circle"></i></div>
+                <div class="stat-label">Rejected</div>
+                <div class="stat-value" style="color:var(--danger)">{{ rejected_count }}</div>
+                <div class="stat-sub">Declined requests</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Reservation Setup POP-UP MODAL -->
+    <div id="reserveModalOverlay" class="modal-overlay-custom">
+        <div class="modal-box-custom" style="max-width: 460px;">
+            <div class="table-card-header" style="background: rgba(255,193,7,0.05);">
+                <h4><i class="fas fa-clock"></i> Specify Reservation Hold</h4>
+                <button type="button" onclick="closeReservePanel()" style="background:transparent; border:none; color:rgba(255,255,255,0.6); cursor:pointer; font-size:1.75rem; line-height:1;">&times;</button>
+            </div>
+            <div class="modal-body-scroll" style="padding: 24px;">
+                <form method="POST" action="{% url 'process_reservation' %}" id="reserveSuitForm">
+                    {% csrf_token %}
+                    <input type="hidden" name="rental_id" id="reserveRentalId">
+                    <div style="background: rgba(255,193,7,0.05); padding: 12px 16px; border-radius: 10px; margin-bottom: 20px; border-left: 4px solid #ffca28;">
+                        <span style="font-size: 0.72rem; color: rgba(240,237,232,0.5); display: block; text-transform: uppercase; letter-spacing: 0.5px;">Customer Hold</span>
+                        <strong id="reserveCustomerName" style="color: #fff; font-size: 1.05rem;">--</strong>
+                    </div>
+                    <div class="form-group" style="margin-bottom: 20px;">
+                        <label class="form-label" style="font-size: 0.85rem; color: #f0ede8; margin-bottom: 8px; display: block; font-weight: 600;">Hold Duration Limit</label>
+                        <select name="duration_hours" class="form-input" required style="color: #000000; background-color: #ffffff; font-weight: 600;">
+                            <option value="2">2 Hours</option>
+                            <option value="6">6 Hours</option>
+                            <option value="12">12 Hours</option>
+                            <option value="24" selected>24 Hours (1 Day)</option>
+                            <option value="48">48 Hours (2 Days)</option>
+                            <option value="72">72 Hours (3 Days)</option>
+                        </select>
+                        <small style="color: rgba(240,237,232,0.4); display:block; margin-top:6px; line-height: 1.4;">
+                            Upon reaching the time limit, the hold expires and the stock returns to the available asset registry pool automatically.
+                        </small>
+                    </div>
+                    <div style="display:flex; gap:12px; justify-content: flex-end; margin-top:24px;">
+                        <button type="button" class="action-btn-danger" style="background: transparent; padding: 8px 20px;" onclick="closeReservePanel()">Cancel</button>
+                        <button type="submit" class="action-btn-warning" style="background: #ffca28; color: #000; font-weight: 800; border:none; padding: 8px 24px;">Confirm Hold</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Registry Data Table -->
+    <div class="table-card section-wrapper">
+        <div class="table-card-header">
+            <h4><i class="fa-solid fa-list-check"></i> Active Rental & Requests Registry</h4>
+        </div>
+        {% if requests %}
+        <div style="overflow-x:auto">
+            <table class="rep-table">
+                <thead>
+                    <tr>
+                        <th style="width: 60px;">#ID</th>
+                        <th>Customer / Contact</th>
+                        <th>Suit Model</th>
+                        <th style="text-align: center;">Qty</th>
+                        <th>Status</th>
+                        <th>Requested Date</th>
+                        <th style="text-align:right; padding-right: 24px;">Action Workflow</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for req in requests %}
+                    <tr>
+                        <td style="font-weight: 700; color: rgba(255,255,255,0.3);">#{{ req.id }}</td>
+                        <td>
+                            <a href="{% url 'customer_detail' req.name %}" style="text-decoration:none; cursor:pointer; display: block;">
+                                <div style="font-weight:600; color:#f0ede8; transition:all 0.2s;">{{ req.name }}</div>
+                                <div style="font-size:0.76rem; color:rgba(240,237,232,0.4); margin-top: 2px;">{{ req.phone }}</div>
+                            </a>
+                        </td>
+                        <td style="font-weight: 500;">{{ req.suit.suit_name }}</td>
+                        <td style="text-align: center;">
+                            <span style="background:rgba(201,168,76,0.12); border:1px solid rgba(201,168,76,0.2); color:var(--gold); padding:3px 10px; border-radius:20px; font-size:0.74rem; font-weight:700;">
+                                {{ req.quantity_requested }}
+                            </span>
+                        </td>
+                        <td>
+                            {% if req.status == "Pending" %}<span class="badge-pending">{{ req.status }}</span>
+                            {% elif req.status == "Reserved" %}<span class="badge-reserved">{{ req.status }}</span>
+                            {% elif req.status == "Active" %}<span class="badge-active">{{ req.status }}</span>
+                            {% elif req.status == "Returned" %}<span class="badge-returned">{{ req.status }}</span>
+                            {% elif req.status == "Rejected" %}<span class="badge-rejected">{{ req.status }}</span>
+                            {% elif req.status == "Expired" %}<span class="badge-expired">Expired</span>
+                            {% else %}{{ req.status }}{% endif %}
+                        </td>
+                        <td style="color: rgba(240,237,232,0.6);">{{ req.request_date|date:"M d, Y" }}</td>
+                        <td style="text-align: right; white-space: nowrap; padding-right: 24px;">
+                            {% if req.status == 'Pending' %}
+                                <a href="{% url 'approve_and_rent' req.id %}?mode=pickup" class="action-btn-success" title="Collect items & initiate active tracking period">
+                                    <i class="fas fa-shopping-bag"></i> Pick up & Rent
+                                </a>
+                                <button type="button" class="action-btn-warning" onclick="triggerReserveModal('{{ req.id }}', '{{ req.name }}')" title="Reserve Item" style="margin-left: 6px;">
+                                    <i class="fas fa-bookmark"></i> Reserve
+                                </button>
+                                <form method="post" action="{% url 'reject_request' req.id %}" style="display:inline; margin-left:8px;">
+                                    {% csrf_token %}
+                                    <button type="submit" class="action-btn-danger" onclick="return confirm('Reject this request?');" title="Reject request">
+                                        <i class="fas fa-times"></i> Reject
+                                    </button>
+                                </form>
+                            {% elif req.status == 'Reserved' %}
+                                <a href="{% url 'approve_and_rent' req.id %}?mode=pickup" class="action-btn-success" title="Collect items & initiate active tracking period">
+                                    <i class="fas fa-shopping-bag"></i> Pick up & Rent
+                                </a>
+                                <a href="{% url 'receipt' req.id %}" class="action-btn-success" title="View receipt" style="margin-left: 6px;"><i class="fas fa-receipt"></i> Receipt</a>
+                            {% elif req.status == 'Active' %}
+                                <button type="button" class="action-btn-success" onclick="focusReturnSection('{{ req.id }}')" title="Process Return">
+                                    <i class="fas fa-undo-alt"></i> Receive Return
+                                </button>
+                                <a href="{% url 'receipt' req.id %}" class="action-btn-success" title="View receipt" style="margin-left: 6px;"><i class="fas fa-receipt"></i> Receipt</a>
+                            {% elif req.status == 'Returned' %}
+                                <a href="{% url 'receipt' req.id %}" class="action-btn-success" title="View receipt">
+                                    <i class="fas fa-receipt"></i> Receipt
+                                </a>
+                            {% elif req.status == 'Rejected' %}
+                                <span class="action-btn-danger" style="cursor: default;"><i class="fas fa-ban"></i> Rejected</span>
+                            {% elif req.status == 'Expired' %}
+                                <span class="action-btn-warning" style="cursor: default;"><i class="fas fa-calendar-times"></i> Expired</span>
+                            {% else %}
+                                <span class="action-btn-success" style="cursor: default; background: rgba(76,175,130,0.1); border-color: rgba(76,175,130,0.3);">
+                                    <i class="fas fa-check-double"></i> Processed
+                                </span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="empty-state">
+            <i class="fa-solid fa-inbox"></i>
+            <p style="font-weight:600; margin-bottom:4px; color:#f0ede8">No requests found</p>
+            <p style="font-size:0.82rem">All customer requests have been handled or none are available.</p>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- ================= ✅ INLINE RETURN PROCESSING PANEL (Bannaan-yaal si toos ah u muuqda) ================= -->
+    <div id="returnPanelSection" class="inline-panel-custom section-wrapper">
+        <div class="table-card-header" style="background: rgba(201,168,76,0.05);">
+            <h4><i class="fas fa-clipboard-check"></i> Professional Return Audit & Settlement</h4>
+        </div>
+        
+        <div style="padding: 24px;">
+            <form method="POST" action="{% url 'process_return' %}" id="returnSuitForm">
+                {% csrf_token %}
+                
+                <!-- Qaybta Doorashada Rental ID oo muuqata si gacantana looga dooran karo -->
+                <div class="form-group" style="margin-bottom: 20px;">
+                    <label class="form-label">Select Active Rental to Return</label>
+                    <select name="rental_id" id="returnRentalSelect" class="form-input" required onchange="populateReturnDetails()">
+                        <option value="">-- select active rental customer --</option>
+                        {% for req in active_requests %}
+                        <option value="{{ req.id }}"
+                                data-customer="{{ req.name }}"
+                                data-suit="{{ req.suit.suit_name }}"
+                                data-price="{{ req.suit.price_per_day }}"
+                                data-qty="{{ req.quantity_requested|default:1 }}"
+                                data-return-items="{{ req.returnable_items|join:'||' }}"
+                                data-expected-end="{{ req.end_time|date:'Y-m-d' }}"
+                                data-start-date="{{ req.start_time|date:'Y-m-d' }}"
+                                data-pending-balance="{{ req.balance_due|floatformat:2 }}">
+                            ID #{{ req.id }} - {{ req.name }} ({{ req.suit.suit_name }})
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <!-- Section 1: Identification -->
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 20px;">
+                    <div style="background: rgba(201,168,76,0.05); padding: 14px 18px; border-radius: 10px; border-left: 4px solid var(--gold);">
+                        <span class="form-label">Customer</span>
+                        <strong id="focusedCustomerName" style="color: #fff; font-size: 1.1rem;">--</strong>
+                    </div>
+                    <div style="background: rgba(201,168,76,0.05); padding: 14px 18px; border-radius: 10px; border-left: 4px solid var(--gold);">
+                        <span class="form-label">Primary Model</span>
+                        <strong id="focusedSuitName" style="color: var(--gold); font-size: 1.1rem;">--</strong>
+                    </div>
+                </div>
+
+                <!-- Section 2: Item Condition Audit -->
+                <div style="margin-bottom: 20px;">
+                    <label class="form-label" style="color: var(--gold); margin-bottom: 10px;"><i class="fas fa-search me-1"></i> Physical Condition Audit</label>
+                    <div class="audit-checklist">
+                        <label class="checklist-item"><input type="checkbox" name="condition_excellent" value="1"> Excellent Condition</label>
+                        <label class="checklist-item"><input type="checkbox" name="condition_stains" value="1"> Minor Stains</label>
+                        <label class="checklist-item"><input type="checkbox" name="condition_tears" value="1"> Lundary</label>
+                        <label class="checklist-item"><input type="checkbox" name="condition_missing" value="1"> Missing Accessories</label>
+                        <label class="checklist-item" style="grid-column: 1 / -1; margin-top: 8px; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 8px;">
+                            <input type="checkbox" name="requires_laundry" id="requiresLaundryCheck" value="1" onchange="toggleLaundryFee()"> damage (+$<input type="number" name="laundry_fee" id="laundryFeeInput" value="0" min="0" step="0.01" style="width: 60px; background: transparent; border: 1px solid rgba(255,255,255,0.2); border-radius: 4px; color: #fff; padding: 2px 4px; margin-left: 5px;" oninput="recalculateReturnFinance()">)
+                        </label>
+                    </div>
+                </div>
+
+                <!-- Section 3: Financial Breakdown -->
+                <div style="background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.06); border-radius: 12px; padding: 20px; margin-bottom: 20px;">
+                    <label class="form-label" style="color: var(--gold); margin-bottom: 12px;"><i class="fas fa-calculator me-1"></i> Financial Settlement</label>
+                    
+                    <div class="finance-row">
+                        <span class="finance-label">Original Remaining Balance</span>
+                        <span class="finance-value" id="auditOrigBalance">$0.00</span>
+                    </div>
+                    <div class="finance-row">
+                        <span class="finance-label">Expected Return: <span id="auditExpectedDate" style="color:#fff;">--/--/----</span></span>
+                        <input type="date" name="actual_return_date" id="actualReturnDate" class="form-input" style="width: 160px; padding: 4px 8px; font-size: 0.8rem;" onchange="validateReturnDate(this); recalculateReturnFinance()" onblur="validateReturnDate(this)" required>
+                        <small id="dateWarning" style="display:none; color:#e05c5c; font-size:0.7rem; margin-left:8px;"><i class="fas fa-exclamation-triangle"></i> Future date not allowed</small>
+                    </div>
+                    <div class="finance-row">
+                        <span class="finance-label">Late Fee (<span id="overdueMinutesDisplay">0</span> min overdue)</span>
+                        <span class="finance-value danger" id="penaltyFineDisplay">$0.00</span>
+                    </div>
+                    <div class="finance-row">
+                        <span class="finance-label">Damage Fees</span>
+                        <span class="finance-value danger" id="laundryDamageDisplay">$0.00</span>
+                    </div>
+                    <div class="finance-row" style="border-top: 1px dashed rgba(255,255,255,0.1); margin-top: 8px; padding-top: 12px;">
+                        <span class="finance-label">Discount Applied</span>
+                        <input type="number" name="return_discount" id="returnDiscount" class="form-input" min="0" value="0" step="0.01" style="width: 100px; text-align: right;" oninput="recalculateReturnFinance()">
+                    </div>
+                    
+                    <div class="finance-total">
+                        <div class="finance-row" style="border: none; padding: 0;">
+                            <span class="finance-label">Final Total Due</span>
+                            <span class="finance-value" id="finalTotalDue">$0.00</span>
+                        </div>
+                    </div>
+
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 16px;">
+                        <div>
+                            <label class="form-label">Amount Paid Now</label>
+                            <input type="number" name="return_amount_paid" id="returnAmountPaid" class="form-input" min="0" value="0" step="0.01" style="border-color: rgba(76,175,130,0.4);" oninput="recalculateReturnFinance()">
+                        </div>
+                        <div>
+                            <label class="form-label">Remaining Debt</label>
+                            <strong id="finalNetBalance" style="font-size: 1.3rem; color: #4cd137; display: block; margin-top: 6px;">$0.00</strong>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Section 4: Payment & Staff Details -->
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 20px;">
+                    <div>
+                        <label class="form-label">Payment Method</label>
+                        <select name="payment_method" class="form-input">
+                            <option value="cash">Cash</option>
+                            <option value="evc">EVC Plus</option>
+                            <option value="zaad">Zaad Service</option>
+                            <option value="edahab">eDahab</option>
+                            <option value="card">Credit/Debit Card</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="form-label">Transaction Ref (Optional)</label>
+                        <input type="text" name="transaction_ref" class="form-input" placeholder="e.g., TXN-88392">
+                    </div>
+                </div>
+
+                <!-- Section 5: Notes -->
+                <div class="form-group" style="margin-bottom: 20px;">
+                    <label class="form-label">Detailed Audit Notes *</label>
+                    <textarea name="return_notes" class="form-input" rows="2" placeholder="E.g., Excellent condition, minor stain on left lapel, requires standard laundry..." required></textarea>
+                </div>
+
+                <!-- Actions -->
+                <div style="display:flex; gap:12px; justify-content: flex-end; margin-top:20px; border-top: 1px solid rgba(255,255,255,0.05); padding-top: 20px;">
+                    <button type="button" class="action-btn-danger" style="padding: 10px 24px;" onclick="resetReturnForm()">Reset Form</button>
+                    <button type="submit" class="action-btn-success" style="padding: 10px 30px; background: #4caf82; color: #000; font-weight: 800; border:none;">
+                        <i class="fas fa-check-circle me-1"></i> Complete Return
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+/* Reservation Modal Automation controls */
+function triggerReserveModal(rentalId, customerName) {
+    const modal = document.getElementById('reserveModalOverlay');
+    if (modal) {
+        document.getElementById('reserveRentalId').value = rentalId;
+        document.getElementById('reserveCustomerName').textContent = customerName;
+        modal.classList.add('show');
+    }
+}
+
+function closeReservePanel() {
+    const modal = document.getElementById('reserveModalOverlay');
+    if (modal) {
+        document.getElementById('reserveSuitForm').reset();
+        modal.classList.remove('show');
+    }
+}
+
+/* ================= INLINE RETURN PANEL OPERATIONS ================= */
+// Markaynu riixno 'Receive Return' ee shaxda sare, boggu wuxuu si toos ah hoos ugu dego panel-ka return-ka isagoo dooranaya macmiilkaas.
+function focusReturnSection(rentalId) {
+    const selectEl = document.getElementById('returnRentalSelect');
+    const returnPanel = document.getElementById('returnPanelSection');
+    
+    if (!selectEl || !returnPanel) return;
+
+    selectEl.value = rentalId;
+    populateReturnDetails();
+
+    // Scroll si habsmooth ah ugu dega qaybta return-ka
+    returnPanel.scrollIntoView({ behavior: 'smooth' });
+}
+
+function populateReturnDetails() {
+    const sel = document.getElementById('returnRentalSelect');
+    if (!sel || !sel.value) {
+        resetReturnDetails();
+        return;
+    }
+
+    const opt = sel.options[sel.selectedIndex];
+    document.getElementById('focusedCustomerName').textContent = opt.dataset.customer || '--';
+    document.getElementById('focusedSuitName').textContent = opt.dataset.suit || '--';
+    
+    const dateInput = document.getElementById('actualReturnDate');
+    dateInput.disabled = false;
+    
+    // Set max date to today (prevents future dates)
+    const today = new Date();
+    const todayStr = today.toISOString().split('T')[0];
+    dateInput.max = todayStr;
+    dateInput.value = todayStr;
+    
+    if (opt.dataset.startDate) {
+        dateInput.min = opt.dataset.startDate;
+    }
+    
+    document.getElementById('auditExpectedDate').textContent = opt.dataset.expectedEnd || '--/--/----';
+    document.getElementById('dateWarning').style.display = 'none';
+    
+    const origBalance = parseFloat(opt.dataset.pendingBalance) || 0;
+    document.getElementById('auditOrigBalance').textContent = '$' + origBalance.toFixed(2);
+    
+    // Reset fees
+    document.getElementById('requiresLaundryCheck').checked = false;
+    document.getElementById('laundryFeeInput').value = 0;
+    document.getElementById('returnDiscount').value = 0;
+    document.getElementById('returnAmountPaid').value = 0;
+    
+    recalculateReturnFinance();
+}
+
+function validateReturnDate(input) {
+    const warning = document.getElementById('dateWarning');
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    const selectedDate = new Date(input.value);
+    selectedDate.setHours(0, 0, 0, 0);
+    
+    if (selectedDate > today) {
+        warning.style.display = 'inline-block';
+        input.value = today.toISOString().split('T')[0];
+        input.style.borderColor = '#e05c5c';
+        setTimeout(() => { input.style.borderColor = ''; }, 2000);
+        return false;
+    } else {
+        warning.style.display = 'none';
+        input.style.borderColor = '';
+        return true;
+    }
+}
+
+function toggleLaundryFee() {
+    const checkbox = document.getElementById('requiresLaundryCheck');
+    const input = document.getElementById('laundryFeeInput');
+    if (!checkbox.checked) {
+        input.value = 0;
+    } else if (parseFloat(input.value) === 0) {
+        input.value = 5.00; // Default laundry fee
+    }
+    recalculateReturnFinance();
+}
+
+function recalculateReturnFinance() {
+    const sel = document.getElementById('returnRentalSelect');
+    if (!sel || !sel.value) return;
+
+    const dateInput = document.getElementById('actualReturnDate');
+    if (!validateReturnDate(dateInput)) return;
+
+    const opt = sel.options[sel.selectedIndex];
+    const expectedDateStr = opt.dataset.expectedEnd;
+    const actualDateStr = dateInput.value;
+    const originalBalance = parseFloat(opt.dataset.pendingBalance) || 0;
+
+    let overdueMinutes = 0;
+    let penaltyFine = 0;
+    
+    if (expectedDateStr && actualDateStr) {
+        const expected = new Date(expectedDateStr);
+        const actual = new Date(actualDateStr);
+        const diffMs = actual - expected;
+        const diffMinutes = Math.floor(diffMs / (1000 * 60));
+        if (diffMinutes > 0) {
+            overdueMinutes = diffMinutes;
+            penaltyFine = diffMinutes;
+        }
+    }
+
+    document.getElementById('overdueMinutesDisplay').textContent = overdueMinutes;
+    document.getElementById('penaltyFineDisplay').textContent = '$' + penaltyFine.toFixed(2);
+    
+    const laundryFee = parseFloat(document.getElementById('laundryFeeInput').value) || 0;
+    document.getElementById('laundryDamageDisplay').textContent = '$' + laundryFee.toFixed(2);
+    
+    const finalTotalDue = originalBalance + penaltyFine + laundryFee;
+    document.getElementById('finalTotalDue').textContent = '$' + finalTotalDue.toFixed(2);
+    
+    const discount = parseFloat(document.getElementById('returnDiscount').value) || 0;
+    const amountPaid = parseFloat(document.getElementById('returnAmountPaid').value) || 0;
+    
+    let netRemainingBalance = finalTotalDue - discount - amountPaid;
+    if (netRemainingBalance < 0) netRemainingBalance = 0;
+    
+    const balanceDisplay = document.getElementById('finalNetBalance');
+    balanceDisplay.textContent = '$' + netRemainingBalance.toFixed(2);
+    balanceDisplay.style.color = netRemainingBalance > 0 ? '#e05c5c' : '#4cd137';
+}
+
+function resetReturnDetails() {
+    document.getElementById('focusedCustomerName').textContent = '--';
+    document.getElementById('focusedSuitName').textContent = '--';
+    document.getElementById('auditExpectedDate').textContent = '--/--/----';
+    document.getElementById('auditOrigBalance').textContent = '$0.00';
+    document.getElementById('overdueMinutesDisplay').textContent = '0';
+    document.getElementById('penaltyFineDisplay').textContent = '$0.00';
+    document.getElementById('laundryDamageDisplay').textContent = '$0.00';
+    document.getElementById('finalTotalDue').textContent = '$0.00';
+    document.getElementById('finalNetBalance').textContent = '$0.00';
+    document.getElementById('finalNetBalance').style.color = '#4cd137';
+}
+
+function resetReturnForm() {
+    const form = document.getElementById('returnSuitForm');
+    if (form) form.reset();
+    
+    const selectEl = document.getElementById('returnRentalSelect');
+    if (selectEl) selectEl.value = "";
+    
+    resetReturnDetails();
+}
+</script>
+{% endblock %}

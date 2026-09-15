@@ -1,0 +1,341 @@
+{% extends "rental/base.html" %}
+{% block title %}Customer Detail | Suit Rental{% endblock %}
+{% block page_title %}Customer Information{% endblock %}
+
+{% block content %}
+<style>
+    .back-btn {
+        background:rgba(201,168,76,0.1);
+        border:1px solid rgba(201,168,76,0.2);
+        color:var(--gold);
+        border-radius:10px;
+        padding:8px 16px;
+        font-size:0.85rem;
+        font-weight:700;
+        text-decoration:none;
+        transition:all 0.2s;
+        display:inline-flex;
+        align-items:center;
+        gap:8px;
+        margin-bottom:20px;
+    }
+    .back-btn:hover {
+        background:rgba(201,168,76,0.15);
+        transform:translateY(-1px);
+    }
+    .customer-card {
+        background:rgba(255,255,255,0.03);
+        border:1px solid rgba(255,255,255,0.07);
+        border-radius:16px;
+        overflow:hidden;
+        backdrop-filter:blur(12px);
+        padding:24px;
+        margin-bottom:24px;
+        display:grid;
+        grid-template-columns:auto 1fr;
+        gap:24px;
+        align-items:start;
+    }
+    .customer-image {
+        width:120px;
+        height:120px;
+        border-radius:12px;
+        overflow:hidden;
+        border:2px solid rgba(201,168,76,0.2);
+        background:rgba(0,0,0,0.2);
+        display:flex;
+        align-items:center;
+        justify-content:center;
+    }
+    .customer-image img {
+        width:100%;
+        height:100%;
+        object-fit:cover;
+    }
+    .customer-info {
+        display:flex;
+        flex-direction:column;
+        gap:12px;
+    }
+    .customer-name {
+        font-family:'Cormorant Garamond',serif;
+        font-size:2rem;
+        color:#f0ede8;
+        margin:0;
+    }
+    .customer-detail-row {
+        display:flex;
+        gap:16px;
+        align-items:center;
+        padding:8px 0;
+    }
+    .customer-detail-row label {
+        font-size:0.75rem;
+        text-transform:uppercase;
+        letter-spacing:1.2px;
+        color:rgba(240,237,232,0.5);
+        font-weight:600;
+        min-width:80px;
+    }
+    .customer-detail-row value {
+        color:#f0ede8;
+        font-weight:500;
+    }
+    .stats-grid {
+        display:grid;
+        grid-template-columns:repeat(auto-fit, minmax(180px, 1fr));
+        gap:12px;
+        margin-bottom:24px;
+    }
+    .stat-card {
+        background:rgba(255,255,255,0.03);
+        border:1px solid rgba(255,255,255,0.07);
+        border-radius:12px;
+        padding:16px;
+        position:relative;
+        overflow:hidden;
+        backdrop-filter:blur(12px);
+        text-align:center;
+    }
+    .stat-card::before {
+        content:'';
+        position:absolute;
+        top:0;left:0;right:0;
+        height:2px;
+        background:var(--card-accent,var(--gold));
+    }
+    .stat-label {
+        font-size:0.65rem;
+        text-transform:uppercase;
+        letter-spacing:1.5px;
+        color:rgba(240,237,232,0.5);
+        font-weight:600;
+        margin-bottom:6px;
+    }
+    .stat-value {
+        font-family:'Cormorant Garamond',serif;
+        font-size:2rem;
+        line-height:1;
+        color:var(--card-accent,var(--gold));
+    }
+    .history-card {
+        background:rgba(255,255,255,0.03);
+        border:1px solid rgba(255,255,255,0.07);
+        border-radius:16px;
+        overflow:hidden;
+        backdrop-filter:blur(12px);
+    }
+    .history-header {
+        padding:20px 24px;
+        border-bottom:1px solid rgba(255,255,255,0.07);
+        background:rgba(0,0,0,0.2);
+    }
+    .history-header h4 {
+        font-family:'Cormorant Garamond',serif;
+        font-size:1.2rem;
+        color:#f0ede8;
+        margin:0;
+        display:flex;
+        align-items:center;
+        gap:10px;
+    }
+    .history-header h4 i {
+        color:var(--gold);
+    }
+    .rep-table {
+        width:100%;
+        border-collapse:separate;
+        border-spacing:0 5px;
+        padding:12px 14px 10px;
+    }
+    .rep-table thead th {
+        color:rgba(240,237,232,0.5);
+        font-size:0.67rem;
+        text-transform:uppercase;
+        letter-spacing:1.5px;
+        font-weight:600;
+        padding:7px 14px;
+        background:transparent;
+        border:none;
+        white-space:nowrap;
+    }
+    .rep-table tbody tr {
+        background:rgba(255,255,255,0.025);
+        transition:all 0.2s;
+    }
+    .rep-table tbody tr:hover {
+        background:rgba(201,168,76,0.12);
+    }
+    .rep-table tbody td {
+        padding:13px 14px;
+        border:none;
+        color:#f0ede8;
+        font-size:0.86rem;
+        vertical-align:middle;
+    }
+    .rep-table tbody td:first-child {
+        border-radius:10px 0 0 10px;
+    }
+    .rep-table tbody td:last-child {
+        border-radius:0 10px 10px 0;
+    }
+    .status-badge {
+        background:rgba(201,168,76,0.12);
+        border:1px solid rgba(201,168,76,0.2);
+        color:var(--gold);
+        padding:3px 10px;
+        border-radius:20px;
+        font-size:0.74rem;
+        font-weight:700;
+    }
+    .status-badge.active {
+        background:rgba(76,175,130,0.12);
+        border-color:rgba(76,175,130,0.2);
+        color:var(--success);
+    }
+    .status-badge.returned {
+        background:rgba(76,130,175,0.12);
+        border-color:rgba(76,130,175,0.2);
+        color:#6ab0e8;
+    }
+    .status-badge.pending {
+        background:rgba(224,160,64,0.12);
+        border-color:rgba(224,160,64,0.2);
+        color:var(--warning);
+    }
+    .status-badge.rejected {
+        background:rgba(224,92,92,0.12);
+        border-color:rgba(224,92,92,0.2);
+        color:var(--danger);
+    }
+    .empty-state {
+        text-align:center;
+        padding:44px 20px;
+        color:rgba(240,237,232,0.5);
+    }
+    .empty-state i {
+        font-size:3rem;
+        color:rgba(201,168,76,0.1);
+        margin-bottom:12px;
+        display:block;
+    }
+</style>
+
+<div class="container-fluid px-0">
+    <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:20px;">
+        <a href="{% if request.user.profile.is_reception or request.user.profile.is_cashier %}{% url 'reception_requests' %}{% else %}{% url 'requests' %}{% endif %}" class="back-btn"><i class="fa-solid fa-arrow-left"></i>Back to Requests</a>
+        {% if customer_user %}
+        <a href="{% url 'new_rent_for_customer' customer_user.id %}" class="back-btn" style="background:rgba(76,175,130,0.12);border-color:rgba(76,175,130,0.22);color:var(--success)"><i class="fa-solid fa-plus-circle"></i>New Rent</a>
+        {% endif %}
+    </div>
+
+    <div class="customer-card">
+        <div class="customer-image">
+            {% if customer_image %}
+                <img src="{{ customer_image.url }}" alt="Customer">
+            {% else %}
+                <i class="fa-solid fa-user" style="font-size:3rem;color:rgba(201,168,76,0.3)"></i>
+            {% endif %}
+        </div>
+        <div class="customer-info">
+            <h2 class="customer-name">{{ customer_name }}</h2>
+            <div class="customer-detail-row">
+                <label><i class="fa-solid fa-phone me-2" style="color:var(--gold)"></i>Phone</label>
+                <value>{{ customer_phone }}</value>
+            </div>
+            <div class="customer-detail-row">
+                <label><i class="fa-solid fa-id-card me-2" style="color:var(--gold)"></i>ID</label>
+                <value>{{ customer_id|default:"Not provided" }}</value>
+            </div>
+        </div>
+    </div>
+
+    <div class="stats-grid">
+        <div class="stat-card" style="--card-accent:var(--gold)">
+            <div class="stat-label">Total Rentals</div>
+            <div class="stat-value">{{ total_rentals }}</div>
+        </div>
+        <div class="stat-card" style="--card-accent:var(--success)">
+            <div class="stat-label">Active Rentals</div>
+            <div class="stat-value">{{ active_rentals }}</div>
+        </div>
+        <div class="stat-card" style="--card-accent:#6ab0e8">
+            <div class="stat-label">Returned</div>
+            <div class="stat-value">{{ returned_rentals }}</div>
+        </div>
+        <div class="stat-card" style="--card-accent:var(--warning)">
+            <div class="stat-label">Pending</div>
+            <div class="stat-value">{{ pending_rentals }}</div>
+        </div>
+        <div class="stat-card" style="--card-accent:#4caf82">
+            <div class="stat-label">Total Spent</div>
+            <div class="stat-value">${{ total_spent|floatformat:2 }}</div>
+        </div>
+    </div>
+
+    <div class="history-card">
+        <div class="history-header">
+            <h4><i class="fa-solid fa-clock-rotate-left"></i> Rental History</h4>
+        </div>
+        {% if requests %}
+        <div style="overflow-x:auto">
+            <table class="rep-table">
+                <thead>
+                    <tr>
+                        <th>#</th>
+                        <th>Suit</th>
+                        <th>Qty</th>
+                        <th>Days</th>
+                        <th>Status</th>
+                        <th>Date</th>
+                        <th>Amount</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for req in requests %}
+                    <tr>
+                        <td>{{ req.id }}</td>
+                        <td style="font-weight:600">{{ req.suit.suit_name }}</td>
+                        <td><span class="status-badge">{{ req.quantity_requested }}</span></td>
+                        <td>{{ req.days_requested }} days</td>
+                        <td>
+                            <span class="status-badge {% if req.status == 'Active' %}active{% elif req.status == 'Returned' %}returned{% elif req.status == 'Pending' %}pending{% elif req.status == 'Rejected' %}rejected{% endif %}">
+                                {{ req.status }}
+                            </span>
+                        </td>
+                        <td>{{ req.request_date|date:"M d, Y" }}</td>
+                        <td style="color:var(--success);font-weight:700">${{ req.total_amount|floatformat:2 }}</td>
+                        <td>
+                            {% if req.status == 'Active' %}
+                            <div style="display:flex;gap:8px;flex-wrap:wrap">
+                                <a href="{% url 'send_return_reminder' req.id %}" class="btn btn-sm btn-warning" title="Send email reminder" style="background:rgba(33,150,243,0.15);color:#2196F3;border:1px solid rgba(33,150,243,0.3);padding:6px 10px;border-radius:6px;font-size:0.75rem;text-decoration:none;display:inline-flex;align-items:center;gap:4px">
+                                    <i class="fa-solid fa-envelope"></i> Email
+                                </a>
+                                <a href="{% url 'reception_send_sms' req.id %}" class="btn btn-sm btn-info" title="Send SMS reminder" style="background:rgba(76,175,80,0.15);color:#4CAF50;border:1px solid rgba(76,175,80,0.3);padding:6px 10px;border-radius:6px;font-size:0.75rem;text-decoration:none;display:inline-flex;align-items:center;gap:4px">
+                                    <i class="fa-solid fa-message"></i> SMS
+                                </a>
+                            </div>
+                            {% elif req.status == 'Pending' %}
+                            <span style="color:rgba(240,237,232,0.6);font-size:0.75rem">Awaiting approval</span>
+                            {% elif req.status == 'Returned' %}
+                            <span style="color:rgba(76,175,80,0.7);font-size:0.75rem">✓ Completed</span>
+                            {% else %}
+                            <span style="color:rgba(240,237,232,0.6);font-size:0.75rem">—</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="empty-state">
+            <i class="fa-solid fa-inbox"></i>
+            <p style="font-weight:600;margin-bottom:4px;color:#f0ede8">No rental history</p>
+            <p style="font-size:0.82rem">This customer has no rentals yet.</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

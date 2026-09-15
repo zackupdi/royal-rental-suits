@@ -1,0 +1,98 @@
+{% extends "rental/base.html" %}
+{% block title %}Notifications{% endblock %}
+
+{% block content %}
+<style>
+    .card {
+        background: #1e293b !important;
+        border: 1px solid rgba(56, 189, 248, 0.1) !important;
+        color: #e2e8f0;
+    }
+    
+    .card-body {
+        color: #e2e8f0;
+    }
+    
+    .text-muted {
+        color: #cbd5e1 !important;
+    }
+    
+    h3 {
+        color: #e2e8f0;
+    }
+    
+    .btn-outline-dark {
+        color: #e2e8f0;
+        border-color: #475569;
+    }
+    
+    .btn-outline-dark:hover {
+        background: #475569;
+        border-color: #475569;
+    }
+</style>
+
+<div class="container py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h3 class="fw-bold mb-0">Notifications</h3>
+        <a href="{% url 'home' %}" class="btn btn-outline-dark">Back to Home</a>
+    </div>
+
+    {% if notifications %}
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <div>
+                <p class="mb-0 text-muted small">Showing {{ notifications|length }} notifications.</p>
+            </div>
+            {% if unread_count > 0 %}
+            <a href="{% url 'mark_all_notifications_read' %}" class="btn btn-sm btn-outline-info">
+                <i class="fa-solid fa-check-double me-1"></i> Mark all read
+            </a>
+            {% endif %}
+        </div>
+
+        <div class="table-responsive">
+            <table class="table table-dark table-hover align-middle">
+                <thead>
+                    <tr>
+                        <th scope="col">Status</th>
+                        <th scope="col">Message</th>
+                        <th scope="col">Received</th>
+                        <th scope="col" class="text-end">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for notification in notifications %}
+                    <tr class="{% if not notification.is_read %}table-primary{% endif %}">
+                        <td>
+                            {% if notification.is_read %}
+                                <span class="badge bg-success">Read</span>
+                            {% else %}
+                                <span class="badge bg-info text-dark">Unread</span>
+                            {% endif %}
+                        </td>
+                        <td>{{ notification.message }}</td>
+                        <td><small class="text-muted">{{ notification.created_at|date:'d M Y, H:i' }}</small></td>
+                        <td class="text-end">
+                            {% if not notification.is_read %}
+                                <a href="{% url 'mark_notification_as_read' notification.id %}" class="btn btn-sm btn-outline-light me-2">
+                                    <i class="fa-solid fa-check"></i> Mark read
+                                </a>
+                            {% endif %}
+                            <a href="{% url 'delete_notification' notification.id %}" class="btn btn-sm btn-outline-danger">
+                                <i class="fa-solid fa-trash"></i>
+                            </a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    {% else %}
+        <div class="text-center py-5">
+            <i class="fa-solid fa-bell-slash fa-3x text-muted mb-3"></i>
+            <h5 class="text-muted">No notifications</h5>
+            <p class="text-muted small">You have no active alerts at the moment.</p>
+        </div>
+    {% endif %}
+</div>
+{% endblock %}

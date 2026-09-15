@@ -216,3 +216,9 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Django generated files
+staticfiles/
+
+# Customer uploaded files - DO NOT COMMIT
+media/customers/

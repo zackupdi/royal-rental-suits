@@ -1,0 +1,171 @@
+{% extends "rental/base_admin.html" %}
+{% block title %}Send Email Reminder | Suit Rental{% endblock %}
+{% block page_title %}Send Return Reminder Email{% endblock %}
+
+{% block content %}
+<style>
+    .reminder-card {
+        background: rgba(255,255,255,0.03);
+        border: 1px solid rgba(255,255,255,0.07);
+        border-radius: 16px;
+        overflow: hidden;
+        backdrop-filter: blur(12px);
+        padding: 30px;
+        max-width: 600px;
+        margin: 0 auto;
+    }
+    .warning-box {
+        background: rgba(255, 193, 7, 0.15);
+        border-left: 4px solid #ffc107;
+        padding: 15px;
+        border-radius: 8px;
+        margin-bottom: 25px;
+    }
+    .form-label {
+        color: rgba(240,237,232,0.8);
+        font-weight: 600;
+        margin-bottom: 10px;
+    }
+    .form-control {
+        background: rgba(255,255,255,0.05);
+        border: 1px solid rgba(255,255,255,0.1);
+        color: #f0ede8;
+        border-radius: 8px;
+        padding: 12px 15px;
+    }
+    .form-control:focus {
+        background: rgba(255,255,255,0.08);
+        border-color: rgba(201,168,76,0.5);
+        box-shadow: 0 0 0 3px rgba(201,168,76,0.1);
+        color: #f0ede8;
+    }
+    .suit-info {
+        background: rgba(201,168,76,0.1);
+        border-left: 4px solid rgba(201,168,76,0.5);
+        padding: 15px;
+        border-radius: 8px;
+        margin-bottom: 25px;
+    }
+    .info-row {
+        display: flex;
+        justify-content: space-between;
+        padding: 8px 0;
+        border-bottom: 1px solid rgba(255,255,255,0.05);
+    }
+    .info-row:last-child {
+        border-bottom: none;
+    }
+    .info-label {
+        color: rgba(240,237,232,0.6);
+        font-weight: 600;
+    }
+    .info-value {
+        color: #f0ede8;
+        font-weight: 500;
+    }
+    .button-group {
+        display: flex;
+        gap: 12px;
+        margin-top: 25px;
+    }
+    .btn-send {
+        background: linear-gradient(135deg, #4CAF50 0%, #45a049 100%);
+        color: white;
+        border: none;
+        padding: 12px 30px;
+        border-radius: 8px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.3s;
+        flex: 1;
+    }
+    .btn-send:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 5px 15px rgba(76,175,80,0.3);
+    }
+    .btn-cancel {
+        background: rgba(255,255,255,0.1);
+        color: #f0ede8;
+        border: 1px solid rgba(255,255,255,0.2);
+        padding: 12px 30px;
+        border-radius: 8px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.3s;
+        flex: 1;
+    }
+    .btn-cancel:hover {
+        background: rgba(255,255,255,0.15);
+    }
+</style>
+
+<div class="container py-4">
+    <a href="{% url 'customer_detail' req.name %}" class="btn btn-sm" style="background:rgba(201,168,76,0.1);color:var(--gold);border:1px solid rgba(201,168,76,0.2);border-radius:8px;padding:8px 16px;text-decoration:none;margin-bottom:20px">
+        <i class="fa-solid fa-arrow-left"></i> Back
+    </a>
+
+    <div class="reminder-card">
+        <h2 style="color:#f0ede8;margin-bottom:25px;font-family:'Cormorant Garamond',serif;font-size:2rem">
+            📧 Send Return Reminder
+        </h2>
+
+        <div class="warning-box">
+            <strong>⏰ Note:</strong> This will send an email reminder to the customer about returning their suit before the deadline.
+        </div>
+
+        <div class="suit-info">
+            <div class="info-row">
+                <span class="info-label">Customer:</span>
+                <span class="info-value">{{ req.name }}</span>
+            </div>
+            <div class="info-row">
+                <span class="info-label">Suit:</span>
+                <span class="info-value">{{ suit.suit_name }}</span>
+            </div>
+            <div class="info-row">
+                <span class="info-label">Quantity:</span>
+                <span class="info-value">{{ req.quantity_requested }}</span>
+            </div>
+            <div class="info-row">
+                <span class="info-label">Return Date:</span>
+                <span class="info-value">{{ req.end_time|date:"d M Y, H:i" }}</span>
+            </div>
+            {% if req.is_overdue %}
+            <div class="info-row">
+                <span class="info-label">Status:</span>
+                <span class="info-value" style="color:#ff6b6b"><strong>⚠️ OVERDUE</strong></span>
+            </div>
+            {% endif %}
+        </div>
+
+        <form method="POST">
+            {% csrf_token %}
+
+            <div class="mb-3">
+                <label for="customer_email" class="form-label">
+                    <i class="fa-solid fa-envelope"></i> Customer Email Address
+                </label>
+                <input type="email" 
+                       class="form-control" 
+                       id="customer_email" 
+                       name="customer_email" 
+                       value="{{ req.customer_email }}" 
+                       placeholder="customer@example.com"
+                       required>
+                <small style="color:rgba(240,237,232,0.6);margin-top:5px;display:block">
+                    Email will be sent to this address. Update if needed.
+                </small>
+            </div>
+
+            <div class="button-group">
+                <button type="submit" class="btn-send">
+                    <i class="fa-solid fa-paper-plane"></i> Send Email
+                </button>
+                <a href="{% url 'customer_detail' req.name %}" class="btn-cancel" style="text-decoration:none;display:flex;align-items:center;justify-content:center">
+                    <i class="fa-solid fa-times"></i> Cancel
+                </a>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

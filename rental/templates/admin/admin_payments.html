@@ -1,0 +1,956 @@
+{% extends "rental/base.html" %}
+{% block title %}Payments | Suit Rental{% endblock %}
+{% block page_title %}Payments{% endblock %}
+
+{% block content %}
+<style>
+  /* ══ Payment Page Styles ══ */
+  .payments-container { padding: 0; }
+  
+  .stat-card {
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.07);
+    border-radius: 16px;
+    padding: 22px;
+    position: relative;
+    overflow: hidden;
+    transition: all 0.3s ease;
+    backdrop-filter: blur(12px);
+  }
+  
+  .stat-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 2px;
+    background: var(--card-accent, #c9a84c);
+    border-radius: 16px 16px 0 0;
+  }
+  
+  .stat-card:hover {
+    transform: translateY(-3px);
+    border-color: var(--card-accent, #c9a84c);
+    box-shadow: 0 10px 30px rgba(0,0,0,0.25);
+  }
+  
+  .stat-label {
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    color: rgba(240,237,232,0.45);
+    font-weight: 600;
+    margin-bottom: 8px;
+  }
+  
+  .stat-value {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 2.2rem;
+    font-weight: 700;
+    line-height: 1;
+    margin-bottom: 6px;
+    color: var(--text-main, #f0ede8);
+  }
+  
+  .stat-sub {
+    font-size: 0.76rem;
+    color: rgba(240,237,232,0.45);
+  }
+  
+  .table-card {
+    background: rgba(255,255,255,0.03);
+    border: 1px solid rgba(255,255,255,0.07);
+    border-radius: 16px;
+    padding: 26px;
+    backdrop-filter: blur(12px);
+    margin-bottom: 2rem;
+  }
+  
+  .table-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 22px;
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+  
+  .table-card-header h4 {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 1.25rem;
+    color: var(--text-main, #f0ede8);
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  
+  .table-card-header h4 i { color: #c9a84c; }
+  
+  .table-card-header p {
+    color: rgba(240,237,232,0.45);
+    font-size: 0.79rem;
+    margin: 2px 0 0;
+  }
+  
+  /* ══ Filter Bar ══ */
+  .filter-bar {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 20px;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+  
+  .filter-input {
+    background: rgba(255,255,255,0.05);
+    border: 1px solid rgba(255,255,255,0.07);
+    color: var(--text-main, #f0ede8);
+    padding: 8px 14px;
+    border-radius: 8px;
+    font-size: 0.85rem;
+    min-width: 150px;
+  }
+  
+  .filter-input:focus {
+    outline: none;
+    border-color: #c9a84c;
+  }
+
+  .filter-label {
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    color: rgba(240,237,232,0.45);
+    font-weight: 600;
+    margin-bottom: 8px;
+    display: block;
+    font-family: 'DM Sans', sans-serif;
+  }
+
+  /* ══ Dropdown Styles (Text Black) ══ */
+  select.filter-input, 
+  select.form-select,
+  select.filter-input option,
+  select.form-select option {
+    color: #000000 !important;
+  }
+  
+  .btn-filter {
+    background: rgba(201,168,76,0.15);
+    border: 1px solid rgba(201,168,76,0.3);
+    color: #c9a84c;
+    padding: 8px 16px;
+    border-radius: 8px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+  
+  .btn-filter:hover {
+    background: rgba(201,168,76,0.25);
+  }
+  
+  .btn-export {
+    background: linear-gradient(135deg, #c9a84c, #e8c96a);
+    color: #0c0c14;
+    border: none;
+    padding: 8px 18px;
+    border-radius: 8px;
+    font-size: 0.85rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    text-decoration: none;
+  }
+  
+  .btn-export:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 18px rgba(201,168,76,0.3);
+  }
+  
+  /* ══ Table ══ */
+  .rep-table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0 6px;
+  }
+  
+  .rep-table thead th {
+    color: rgba(240,237,232,0.45);
+    font-size: 0.68rem;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    font-weight: 600;
+    padding: 7px 14px;
+    border: none;
+    background: transparent;
+    text-align: left;
+  }
+  
+  .rep-table tbody tr {
+    background: rgba(255,255,255,0.025);
+    transition: all 0.2s ease;
+  }
+  
+  .rep-table tbody tr:hover {
+    background: rgba(201,168,76,0.08);
+  }
+  
+  .rep-table tbody td {
+    padding: 13px 14px;
+    border: none;
+    color: var(--text-main, #f0ede8);
+    font-size: 0.87rem;
+    vertical-align: middle;
+  }
+  
+  .rep-table tbody td:first-child {
+    border-radius: 10px 0 0 10px;
+  }
+  
+  .rep-table tbody td:last-child {
+    border-radius: 0 10px 10px 0;
+  }
+  
+  /* ══ Badges ══ */
+  .payment-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 4px 11px;
+    border-radius: 20px;
+    font-size: 0.73rem;
+    font-weight: 700;
+  }
+  
+  .badge-paid {
+    background: rgba(76,175,130,0.15);
+    color: #4caf82;
+    border: 1px solid rgba(76,175,130,0.3);
+  }
+  
+  .badge-unpaid {
+    background: rgba(224,92,92,0.15);
+    color: #e05c5c;
+    border: 1px solid rgba(224,92,92,0.3);
+  }
+  
+  .badge-partial {
+    background: rgba(224,160,64,0.15);
+    color: #e0a040;
+    border: 1px solid rgba(224,160,64,0.3);
+  }
+  
+  .method-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 4px 11px;
+    border-radius: 20px;
+    font-size: 0.73rem;
+    font-weight: 700;
+  }
+  
+  .method-cash {
+    background: rgba(76,175,130,0.12);
+    color: #4caf82;
+  }
+  
+  .method-zaad {
+    background: rgba(106,176,232,0.12);
+    color: #6ab0e8;
+  }
+  
+  .method-sahal {
+    background: rgba(156,106,200,0.12);
+    color: #9c6ac8;
+  }
+  
+  .method-bank {
+    background: rgba(224,160,64,0.12);
+    color: #e0a040;
+  }
+  
+  .receipt-id {
+    background: rgba(201,168,76,0.1);
+    color: #c9a84c;
+    padding: 3px 10px;
+    border-radius: 6px;
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+  }
+  
+  .amount-cell {
+    font-weight: 700;
+    color: #4caf82;
+  }
+  
+  .customer-cell {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+  
+  .customer-name {
+    font-weight: 600;
+    color: var(--text-main, #f0ede8);
+  }
+  
+  .customer-phone {
+    font-size: 0.75rem;
+    color: rgba(240,237,232,0.45);
+  }
+  
+  /* ══ Action Buttons ══ */
+  .btn-act {
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    border: 1px solid rgba(255,255,255,0.07);
+    background: transparent;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    cursor: pointer;
+    transition: all 0.2s;
+    text-decoration: none;
+    color: rgba(240,237,232,0.45);
+  }
+  
+  .btn-view:hover {
+    background: rgba(201,168,76,0.1);
+    color: #c9a84c;
+    border-color: rgba(201,168,76,0.3);
+  }
+  
+  .btn-print:hover {
+    background: rgba(106,176,232,0.1);
+    color: #6ab0e8;
+    border-color: rgba(106,176,232,0.3);
+  }
+  
+  .btn-approve {
+    background: rgba(76,175,130,0.15);
+    border: 1px solid rgba(76,175,130,0.3);
+    color: #4caf82;
+    padding: 6px 14px;
+    border-radius: 8px;
+    font-size: 0.78rem;
+    font-weight: 600;
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    transition: all 0.2s;
+  }
+  
+  .btn-approve:hover {
+    background: rgba(76,175,130,0.25);
+    transform: translateY(-1px);
+  }
+  
+  .action-group {
+    display: flex;
+    gap: 5px;
+    justify-content: flex-end;
+  }
+
+  /* Pagination Styling */
+  .custom-pagination {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 8px;
+    margin-top: 15px;
+  }
+
+  .pagination-btn {
+    background: rgba(255,255,255,0.05);
+    border: 1px solid rgba(255,255,255,0.1);
+    color: #f0ede8;
+    padding: 5px 12px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.8rem;
+    transition: all 0.2s;
+  }
+
+  .pagination-btn:hover:not(:disabled) {
+    background: rgba(201,168,76,0.2);
+    border-color: #c9a84c;
+    color: #c9a84c;
+  }
+
+  .pagination-btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
+
+  .pagination-info {
+    font-size: 0.8rem;
+    color: rgba(240,237,232,0.6);
+  }
+  
+  /* ══ Empty State ══ */
+  .empty-state {
+    text-align: center;
+    padding: 52px 20px;
+    color: rgba(240,237,232,0.45);
+  }
+  
+  .empty-state i {
+    font-size: 3.5rem;
+    color: rgba(201,168,76,0.12);
+    margin-bottom: 12px;
+    display: block;
+  }
+  
+  .empty-state p {
+    margin: 0;
+  }
+  
+  /* ══ Responsive ══ */
+  @media (max-width: 768px) {
+    .filter-bar {
+      flex-direction: column;
+      align-items: stretch;
+    }
+    
+    .filter-input {
+      width: 100%;
+    }
+    
+    .stat-value {
+      font-size: 1.8rem;
+    }
+  }
+</style>
+
+<div class="container-fluid payments-container">
+  
+  <!-- ══ Stats Overview ══ -->
+  <div class="row g-3 mb-4">
+    <div class="col-md-3">
+      <div class="stat-card" style="--card-accent:#c9a84c">
+        <div class="stat-label">Total Payments</div>
+        <div class="stat-value" style="color:#c9a84c">{{ payment_count }}</div>
+        <div class="stat-sub">Total payment records</div>
+      </div>
+    </div>
+    <div class="col-md-3">
+      <div class="stat-card" style="--card-accent:#4caf82">
+        <div class="stat-label">Revenue</div>
+        <div class="stat-value" style="color:#4caf82">${{ total_revenue|floatformat:2 }}</div>
+        <div class="stat-sub">Collected from cashier payments</div>
+      </div>
+    </div>
+    <div class="col-md-3">
+      <div class="stat-card" style="--card-accent:#6ab0e8">
+        <div class="stat-label">Expenses</div>
+        <div class="stat-value" style="color:#6ab0e8">${{ total_expenses|floatformat:2 }}</div>
+        <div class="stat-sub">Outgoing costs recorded</div>
+      </div>
+    </div>
+    <div class="col-md-3">
+      <div class="stat-card" style="--card-accent:#e05c5c">
+        <div class="stat-label">Net Revenue</div>
+        <div class="stat-value" style="color:#e05c5c">${{ net_revenue|floatformat:2 }}</div>
+        <div class="stat-sub">Revenue minus expenses</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="row g-3 mb-4">
+    <div class="col-md-3">
+      <div class="stat-card" style="--card-accent:#d9a31d">
+        <div class="stat-label">Active Rentals</div>
+        <div class="stat-value" style="color:#d9a31d">{{ active_count }}</div>
+        <div class="stat-sub">Currently rented suits</div>
+      </div>
+    </div>
+    <div class="col-md-3">
+      <div class="stat-card" style="--card-accent:#9c6ac8">
+        <div class="stat-label">Returned</div>
+        <div class="stat-value" style="color:#9c6ac8">{{ returned_count }}</div>
+        <div class="stat-sub">Completed rental payments</div>
+      </div>
+    </div>
+    <div class="col-md-3">
+      <div class="stat-card" style="--card-accent:#33a1ff">
+        <div class="stat-label">Expense Records</div>
+        <div class="stat-value" style="color:#33a1ff">{{ expense_count }}</div>
+        <div class="stat-sub">Costs logged by staff</div>
+      </div>
+    </div>
+    <div class="col-md-3">
+      <div class="stat-card" style="--card-accent:#4caf50">
+        <div class="stat-label">Cashier Payments</div>
+        <div class="stat-value" style="color:#4caf50">{{ payment_count }}</div>
+        <div class="stat-sub">Payments logged by cashiers</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ Payment History Table ══ -->
+  <div class="table-card">
+    <div class="table-card-header">
+      <div>
+        <h4><i class="fa-solid fa-receipt"></i> Payment History</h4>
+        <p>All payments from active and returned rentals.</p>
+      </div>
+      <a href="{% url 'export_payments' %}" class="btn-export">
+        <i class="fa-solid fa-download"></i> Export
+      </a>
+    </div>
+
+    <!-- Filter Bar -->
+    <div class="table-card mb-4" style="padding: 22px 26px;">
+        <form method="get" id="dateFilterPaymentForm" style="display:flex; gap:18px; flex-wrap:wrap; align-items:flex-end;">
+            <div>
+                <label class="filter-label" for="dateFromPayment"><i class="fa-solid fa-calendar-day"></i> From Date</label>
+                <input type="date" name="from_date" id="dateFromPayment" class="filter-input"
+                       value="{{ from_date|default:'' }}">
+            </div>
+            <div>
+                <label class="filter-label" for="dateToPayment"><i class="fa-solid fa-calendar-day"></i> To Date</label>
+                <input type="date" name="to_date" id="dateToPayment" class="filter-input"
+                       value="{{ to_date|default:'' }}">
+            </div>
+            <button type="submit" class="btn-filter" style="background: rgba(201,168,76,0.15); border-color: rgba(201,168,76,0.3); color: #c9a84c; padding: 9px 18px;">
+                <i class="fa-solid fa-filter"></i> Filter
+            </button>
+            <a href="{% url 'admin_payments' %}" class="btn-filter" style="text-decoration:none; background: rgba(76,175,130,0.15); border-color: rgba(76,175,130,0.3); color: #4caf82; padding: 9px 18px;">
+                <i class="fa-solid fa-arrows-rotate"></i> Reset
+            </a>
+        </form>
+
+        <div id="dateFilterPaymentError" style="display:none; margin-top:14px; padding:10px 14px; background: rgba(224,92,92,0.1); border:1px solid rgba(224,92,92,0.3); border-radius:8px; color: #e05c5c; font-size:0.85rem;">
+            <i class="fa-solid fa-triangle-exclamation me-2"></i><span id="dateFilterPaymentErrorText"></span>
+        </div>
+
+        {% if date_range_error %}
+        <div style="margin-top:14px; padding:10px 14px; background: rgba(224,92,92,0.1); border:1px solid rgba(224,92,92,0.3); border-radius:8px; color: #e05c5c; font-size:0.85rem;">
+            <i class="fa-solid fa-triangle-exclamation me-2"></i>{{ date_range_error }}
+        </div>
+        {% endif %}
+
+        {% if from_date or to_date %}
+        <div style="margin-top:16px; padding-top:16px; border-top:1px solid rgba(255,255,255,0.07);">
+            <div style="font-size:0.82rem; color:rgba(240,237,232,0.5);">
+                <strong style="color:#c9a84c;">Active Filter:</strong>
+                {% if from_date %}<strong>{{ from_date }}</strong>{% endif %}
+                {% if from_date and to_date %}→{% endif %}
+                {% if to_date %}<strong>{{ to_date }}</strong>{% endif %}
+                <a href="{% url 'admin_payments' %}" style="margin-left:12px; color:#c9a84c; text-decoration:none;">Clear</a>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+
+    {% if payments %}
+    <div style="overflow-x:auto">
+      <table class="rep-table" id="paymentsTable">
+        <thead>
+          <tr>
+            <th>Receipt #</th>
+            <th>Customer</th>
+            <th>Suit</th>
+            <th>Cashier</th>
+            <th>Status</th>
+            <th>Amount</th>
+            <th>Method</th>
+            <th>Date</th>
+            <th class="text-end">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for payment in payments %}
+          <tr data-status="{{ payment.status|lower }}" data-method="{{ payment.payment_method|lower }}" data-date="{{ payment.payment_date|date:'Y-m-d' }}">
+            <td><span class="receipt-id">#{{ payment.receipt_number|default:payment.id }}</span></td>
+            <td>
+              <div class="customer-cell">
+                <span class="customer-name">{{ payment.customer_name }}</span>
+                {% if payment.phone %}
+                <span class="customer-phone">{{ payment.phone }}</span>
+                {% endif %}
+              </div>
+            </td>
+            <td>{{ payment.suit_name }}</td>
+            <td>{{ payment.cashier.username|default:'-' }}</td>
+            <td>
+              {% if payment.status|lower == 'paid' %}
+                <span class="payment-badge badge-paid"><i class="fa-solid fa-check"></i> Paid</span>
+              {% elif payment.status|lower == 'unpaid' %}
+                <span class="payment-badge badge-unpaid"><i class="fa-solid fa-times"></i> Unpaid</span>
+              {% elif payment.status|lower == 'partial' %}
+                <span class="payment-badge badge-partial"><i class="fa-solid fa-hourglass-half"></i> Partial</span>
+              {% else %}
+                <span class="payment-badge">{{ payment.status|title }}</span>
+              {% endif %}
+            </td>
+            <td><span class="amount-cell">${{ payment.amount_paid|floatformat:2 }}</span></td>
+            <td>
+              {% if payment.payment_method|lower == 'cash' %}
+                <span class="method-badge method-cash"><i class="fa-solid fa-money-bill"></i> Cash</span>
+              {% elif payment.payment_method|lower == 'zaad' %}
+                <span class="method-badge method-zaad"><i class="fa-solid fa-mobile-screen"></i> Zaad</span>
+              {% elif payment.payment_method|lower == 'sahal' %}
+                <span class="method-badge method-sahal"><i class="fa-solid fa-sim-card"></i> Sahal</span>
+              {% elif payment.payment_method|lower == 'bank' %}
+                <span class="method-badge method-bank"><i class="fa-solid fa-building-columns"></i> Bank</span>
+              {% else %}
+                <span class="method-badge">{{ payment.payment_method|default:'N/A' }}</span>
+              {% endif %}
+            </td>
+            <td style="display: none;">{{ payment.payment_date|date:"M d, Y H:i" }}</td>
+            <td>
+              <div class="action-group">
+                <a href="{% url 'payment_receipt' payment.id %}" class="btn-act btn-view" title="View Receipt">
+                  <i class="fa-solid fa-eye"></i>
+                </a>
+                <button class="btn-act btn-print" onclick="printReceipt('{{ payment.id }}')" title="Print Receipt">
+                  <i class="fa-solid fa-print"></i>
+                </button>
+                  {% if payment.status|lower != 'paid' %}
+                  <button type="button" class="btn-approve" onclick="openMarkPaidModal('{{ payment.id }}','{{ payment.balance_due }}')" title="Mark Paid">
+                    <i class="fa-solid fa-check"></i>
+                    <span style="margin-left:6px;">Mark Paid</span>
+                  </button>
+                  {% endif %}
+              </div>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    <!-- JS Pagination Controls -->
+    <div class="custom-pagination" id="paymentPagination">
+      <button class="pagination-btn" id="prevBtn" onclick="changePage(-1)"><i class="fa-solid fa-chevron-left"></i> Previous</button>
+      <span class="pagination-info" id="pageInfo">Page 1 of 1</span>
+      <button class="pagination-btn" id="nextBtn" onclick="changePage(1)">Next <i class="fa-solid fa-chevron-right"></i></button>
+    </div>
+
+    {% else %}
+    <div class="empty-state">
+      <i class="fa-solid fa-wallet"></i>
+      <p style="font-weight:600;margin-bottom:4px;color:var(--text-main)">No payments found</p>
+      <p style="font-size:0.82rem">There are no active or returned payment records yet.</p>
+    </div>
+    {% endif %}
+  </div>
+
+  
+<!-- ══ Collect Remaining Payment Modal (Bootstrap) ══ -->
+<div class="modal fade custom-modal" id="collectPaymentModal" tabindex="-1" aria-labelledby="collectPaymentModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="collectPaymentModalLabel"><i class="fa-solid fa-cash-register text-successme"></i> Collect Remaining Payment</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <form id="collectPaymentForm" method="POST" action="">
+        {% csrf_token %}
+        <div class="modal-body">
+          <p class="text-muted small">Verify customer details before confirming.</p>
+          <div class="mb-3">
+            <label class="form-label text-secondary small">Customer Name</label>
+            <input type="text" class="form-control" id="modalCustomerName" readonly style="background: rgba(255,255,255,0.02); color: #aaa;">
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label text-secondary small">Amount Already Paid</label>
+            <div class="input-group">
+              <span class="input-group-text bg-dark border-secondary text-white">$</span>
+              <input type="text" class="form-control" id="modalAmountPaid" readonly style="background: rgba(255,255,255,0.02); color: #aaa;">
+            </div>
+          </div>
+
+          <div class="mb-3">
+            <label for="modalPaymentMethod" class="form-label small">New Payment Method</label>
+            <select class="form-select" id="modalPaymentMethod" name="payment_method" required>
+              <option value="cash">Cash</option>
+              <option value="zaad">Zaad</option>
+              <option value="sahal">Sahal</option>
+              <option value="bank">Bank</option>
+            </select>
+          </div>
+          
+          <div class="mb-3">
+            <label class="form-label small">Amount To Collect</label>
+            <input type="number" step="0.01" class="form-control" id="modalCollectAmount" name="amount" required>
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label small">Payment Date</label>
+            <input type="date" class="form-control" id="modalCollectDate" name="payment_date" required>
+          </div>
+          
+          <div class="mb-2 text-warning small">
+            <i class="fa-solid fa-triangle-exclamation"></i> When you confirm, this payment will be marked <strong>Paid</strong> if it clears the balance.
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+          <button type="submit" class="btn btn-success px-3"><i class="fa-solid fa-check-double"></i> Confirm Payment</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<script>
+// ══ NEW DATE FILTER VALIDATION (allows any date) ══
+(function () {
+    var dateFromPayment = document.getElementById('dateFromPayment');
+    var dateToPayment = document.getElementById('dateToPayment');
+    var form = document.getElementById('dateFilterPaymentForm');
+    var errorBox = document.getElementById('dateFilterPaymentError');
+    var errorText = document.getElementById('dateFilterPaymentErrorText');
+
+    function showError(msg) {
+        if (errorText) errorText.textContent = msg;
+        if (errorBox) errorBox.style.display = 'block';
+    }
+
+    function hideError() {
+        if (errorBox) errorBox.style.display = 'none';
+    }
+
+    if (form) {
+        form.addEventListener('submit', function (e) {
+            hideError();
+            var fromVal = dateFromPayment ? dateFromPayment.value : '';
+            var toVal = dateToPayment ? dateToPayment.value : '';
+
+            if (fromVal && toVal && fromVal > toVal) {
+                e.preventDefault();
+                showError('From date must be earlier than or equal to To date.');
+                return;
+            }
+        });
+    }
+})();
+
+// Global Pagination and Filter State
+let currentPage = 1;
+const rowsPerPage = 15;
+let filteredRows = [];
+
+// Filter payments table & apply 15 rows pagination
+function filterPayments() {
+  const search = document.getElementById('searchPayment') ? document.getElementById('searchPayment').value.toLowerCase() : '';
+  const status = document.getElementById('filterStatus') ? document.getElementById('filterStatus').value : '';
+  const method = document.getElementById('filterMethod') ? document.getElementById('filterMethod').value : '';
+  const date = document.getElementById('filterDate') ? document.getElementById('filterDate').value : '';
+  const month = document.getElementById('filterMonth') ? document.getElementById('filterMonth').value : '';
+  
+  const allRows = Array.from(document.querySelectorAll('#paymentsTable tbody tr'));
+  filteredRows = [];
+
+  allRows.forEach(row => {
+    const customer = row.cells[1].textContent.toLowerCase();
+    const rowStatus = row.dataset.status;
+    const rowMethod = row.dataset.method;
+    const rowDate = row.dataset.date;
+    
+    let show = true;
+    
+    if (search && !customer.includes(search)) show = false;
+    if (status && rowStatus !== status) show = false;
+    if (method && rowMethod !== method) show = false;
+    if (date && rowDate !== date) show = false;
+    if (month && !rowDate.startsWith(month)) show = false;
+    
+    if (show) {
+      filteredRows.push(row);
+    } else {
+      row.style.display = 'none';
+    }
+  });
+
+  currentPage = 1;
+  renderPagination();
+}
+
+// Render pagination
+function renderPagination() {
+  const totalRows = filteredRows.length;
+  const totalPages = Math.ceil(totalRows / rowsPerPage) || 1;
+  
+  if (currentPage > totalPages) currentPage = totalPages;
+
+  const start = (currentPage - 1) * rowsPerPage;
+  const end = start + rowsPerPage;
+
+  // Qari dhammaan xariiqaha ka dibna muuji kaliya 15-ka boggan ku aaddan
+  const allRows = document.querySelectorAll('#paymentsTable tbody tr');
+  allRows.forEach(row => row.style.display = 'none');
+
+  filteredRows.slice(start, end).forEach(row => {
+    row.style.display = '';
+  });
+
+  // Cusboonaysii badhamada
+  document.getElementById('prevBtn').disabled = currentPage === 1;
+  document.getElementById('nextBtn').disabled = currentPage === totalPages;
+  document.getElementById('pageInfo').textContent = `Page ${currentPage} of ${totalPages}`;
+  
+  // Qari badhanka pagination-ka haddii safarku ka yaryahay 15
+  const pagDiv = document.getElementById('paymentPagination');
+  if (pagDiv) {
+    pagDiv.style.display = totalRows <= rowsPerPage ? 'none' : 'flex';
+  }
+}
+
+function changePage(direction) {
+  currentPage += direction;
+  renderPagination();
+}
+
+// Reset filters
+function resetFilters() {
+  document.getElementById('searchPayment').value = '';
+  document.getElementById('filterStatus').value = '';
+  document.getElementById('filterMethod').value = '';
+  document.getElementById('filterDate').value = '';
+  if (document.getElementById('filterMonth')) document.getElementById('filterMonth').value = '';
+  if (document.getElementById('filterRecentMonth')) document.getElementById('filterRecentMonth').value = '';
+  filterPayments();
+}
+
+// Print receipt
+function printReceipt(paymentId) {
+  window.open(`/payments/receipt/${paymentId}/print/`, '_blank');
+}
+
+// Open Mark Paid modal (admin)
+function openMarkPaidModal(paymentId, balanceDue) {
+  const modal = document.getElementById('markPaidModal');
+  const form = document.getElementById('markPaidForm');
+  form.action = `/payments/${paymentId}/mark-paid/`;
+  const amountInp = document.getElementById('markPaidAmount');
+  amountInp.value = balanceDue || '';
+  amountInp.max = balanceDue || '';
+  const dateInp = document.getElementById('markPaidDate');
+  const today = new Date().toISOString().slice(0,10);
+  dateInp.value = today;
+  dateInp.min = today; // Limit to today and future
+  modal.style.display = 'flex';
+  modal.setAttribute('aria-hidden','false');
+  setTimeout(()=> amountInp.focus(),50);
+}
+
+function closeMarkPaidModal(){
+  const modal = document.getElementById('markPaidModal');
+  modal.style.display = 'none';
+  modal.setAttribute('aria-hidden','true');
+}
+
+// Populate recent months dropdown (last 24 months)
+function populateRecentMonths(id){
+  const sel = document.getElementById(id);
+  if(!sel) return;
+  const now = new Date();
+  for(let i=0;i<24;i++){
+    const d = new Date(now.getFullYear(), now.getMonth()-i, 1);
+    const val = d.toISOString().slice(0,7);
+    const label = d.toLocaleString(undefined, { month: 'short', year: 'numeric' });
+    const opt = document.createElement('option'); opt.value = val; opt.text = label; sel.appendChild(opt);
+  }
+}
+
+function onRecentMonthChange(){
+  const v = document.getElementById('filterRecentMonth').value;
+  if(document.getElementById('filterMonth')) document.getElementById('filterMonth').value = v;
+  filterPayments();
+}
+
+// Initialize on load
+document.addEventListener('DOMContentLoaded', function(){ 
+  populateRecentMonths('filterRecentMonth'); 
+  
+  // Restrict all date inputs on the page to today and future dates
+  const today = new Date().toISOString().slice(0,10);
+  document.querySelectorAll('input[type="date"]').forEach(input => {
+    input.min = today;
+  });
+
+  // Kici filter-ka markii ugu horreysay si pagination-ka 15 u shaqeeyo
+  filterPayments();
+});
+
+// Admin modal submits via AJAX for popup feedback
+document.getElementById('markPaidForm').addEventListener('submit', async function(e){
+  e.preventDefault();
+  const form = e.target;
+  const url = form.action;
+  const fd = new FormData(form);
+  try{
+    const resp = await fetch(url, {method:'POST', body: fd, headers: {'X-Requested-With':'XMLHttpRequest'}});
+    const data = await resp.json();
+    if(!resp.ok){
+      alert(data.message || 'Failed to record payment');
+      return;
+    }
+    closeMarkPaidModal();
+    alert(data.message || 'Payment recorded');
+    window.location.reload();
+  }catch(err){
+    alert('Network error saving payment');
+    console.error(err);
+  }
+});
+
+// Open collect modal and populate fields
+function openCollectPaymentModal(id, name, amountPaid){
+  document.getElementById('modalCustomerName').value = name || '';
+  document.getElementById('modalAmountPaid').value = amountPaid || '';
+  const form = document.getElementById('collectPaymentForm');
+  form.action = `/payments/${id}/mark-paid/`;
+  const today = new Date().toISOString().slice(0,10);
+  
+  const collectDate = document.getElementById('modalCollectDate');
+  collectDate.value = today;
+  collectDate.min = today; // Limit to today and future
+  
+  const modal = new bootstrap.Modal(document.getElementById('collectPaymentModal'));
+  modal.show();
+}
+
+// AJAX submit collect form
+document.getElementById('collectPaymentForm').addEventListener('submit', async function(e){
+  e.preventDefault();
+  const form = e.target;
+  const url = form.action;
+  const fd = new FormData(form);
+  try{
+    const resp = await fetch(url, {method:'POST', body: fd, headers: {'X-Requested-With':'XMLHttpRequest'}});
+    const data = await resp.json();
+    if(!resp.ok){
+      alert(data.message || 'Failed to record payment');
+      return;
+    }
+    const modalEl = document.getElementById('collectPaymentModal');
+    const bs = bootstrap.Modal.getInstance(modalEl);
+    if(bs) bs.hide();
+    alert(data.message || 'Payment recorded');
+    window.location.reload();
+  }catch(err){
+    alert('Network error saving payment');
+    console.error(err);
+  }
+});
+</script>
+
+{% endblock %}

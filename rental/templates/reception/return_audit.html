@@ -1,0 +1,67 @@
+{% extends "rental/base_admin.html" %}
+{% block title %}Return Audit | Suit Rental{% endblock %}
+{% block page_title %}Return Audit{% endblock %}
+
+{% block content %}
+<style>
+    .audit-card {
+        background: rgba(255,255,255,0.04);
+        border: 1px solid rgba(255,255,255,0.08);
+        border-radius: 16px;
+        padding: 24px;
+        color: #f0ede8;
+        max-width: 720px;
+        margin: 0 auto;
+    }
+    .audit-row {
+        display: flex;
+        justify-content: space-between;
+        padding: 10px 0;
+        border-bottom: 1px solid rgba(255,255,255,0.08);
+    }
+    .audit-actions {
+        display: flex;
+        gap: 10px;
+        justify-content: flex-end;
+        margin-top: 20px;
+    }
+</style>
+
+<div class="audit-card">
+    <h4 style="margin-bottom: 16px;">Return Review</h4>
+    <p style="color: rgba(240,237,232,0.6); margin-bottom: 18px;">Confirm the returned rental before it is sent to the next stage.</p>
+
+    <div class="audit-row">
+        <span>Customer</span>
+        <strong>{{ req.name }}</strong>
+    </div>
+    <div class="audit-row">
+        <span>Suit</span>
+        <strong>{{ req.suit.suit_name }}</strong>
+    </div>
+    <div class="audit-row">
+        <span>Quantity</span>
+        <strong>{{ req.quantity_requested }}</strong>
+    </div>
+    <div class="audit-row">
+        <span>Total Amount</span>
+        <strong>${{ total_amount|floatformat:2 }}</strong>
+    </div>
+    <div class="audit-row">
+        <span>Amount Paid</span>
+        <strong>${{ amount_paid|floatformat:2 }}</strong>
+    </div>
+    <div class="audit-row">
+        <span>Remaining Debt</span>
+        <strong>${{ remaining_debt|floatformat:2 }}</strong>
+    </div>
+
+    <div class="audit-actions">
+        <a href="{% url 'reception_requests' %}" class="action-btn-warning" style="text-decoration:none;">Cancel</a>
+        <form method="post">
+            {% csrf_token %}
+            <button type="submit" class="action-btn-success">Process Return</button>
+        </form>
+    </div>
+</div>
+{% endblock %}

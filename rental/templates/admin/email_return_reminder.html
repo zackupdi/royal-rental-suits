@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+        }
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f9f9f9;
+        }
+        .header {
+            background: linear-gradient(135deg, #c9a84c 0%, #8b7520 100%);
+            color: white;
+            padding: 30px 20px;
+            text-align: center;
+            border-radius: 8px 8px 0 0;
+        }
+        .header h1 {
+            margin: 0;
+            font-size: 28px;
+            font-family: 'Cormorant Garamond', serif;
+        }
+        .content {
+            background: white;
+            padding: 30px;
+            border: 1px solid #e0e0e0;
+            border-top: none;
+        }
+        .greeting {
+            margin-bottom: 20px;
+            font-size: 16px;
+        }
+        .alert {
+            padding: 15px;
+            margin: 20px 0;
+            border-left: 4px solid;
+            border-radius: 4px;
+        }
+        .alert.warning {
+            background-color: #fff3cd;
+            border-color: #ffc107;
+            color: #856404;
+        }
+        .alert.danger {
+            background-color: #f8d7da;
+            border-color: #f5c6cb;
+            color: #721c24;
+        }
+        .suit-details {
+            background: #f5f5f5;
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 4px;
+            border-left: 4px solid #c9a84c;
+        }
+        .detail-item {
+            display: flex;
+            justify-content: space-between;
+            margin: 8px 0;
+            padding: 5px 0;
+        }
+        .detail-label {
+            font-weight: 600;
+            color: #666;
+        }
+        .detail-value {
+            color: #333;
+        }
+        .footer {
+            background: #f5f5f5;
+            padding: 20px;
+            text-align: center;
+            font-size: 12px;
+            color: #999;
+            border-top: 1px solid #e0e0e0;
+            border-radius: 0 0 8px 8px;
+        }
+        .cta-button {
+            display: inline-block;
+            background: #c9a84c;
+            color: white;
+            padding: 12px 30px;
+            text-decoration: none;
+            border-radius: 4px;
+            margin-top: 20px;
+        }
+        .cta-button:hover {
+            background: #8b7520;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🎩 Suit Rental</h1>
+            <p style="margin: 10px 0 0 0;">Return Reminder</p>
+        </div>
+        
+        <div class="content">
+            <div class="greeting">
+                Dear <strong>{{ customer_name }}</strong>,
+            </div>
+            
+            {% if is_overdue %}
+            <div class="alert danger">
+                <strong>⚠️ URGENT:</strong> Your rental period has expired!
+            </div>
+            {% else %}
+            <div class="alert warning">
+                <strong>📋 Reminder:</strong> Your rental period is approaching the end date.
+            </div>
+            {% endif %}
+            
+            <p>{{ status_message }}</p>
+            
+            <div class="suit-details">
+                <div class="detail-item">
+                    <span class="detail-label">Suit:</span>
+                    <span class="detail-value">{{ suit_name }}</span>
+                </div>
+                <div class="detail-item">
+                    <span class="detail-label">Quantity:</span>
+                    <span class="detail-value">{{ quantity }}</span>
+                </div>
+                <div class="detail-item">
+                    <span class="detail-label">Contact:</span>
+                    <span class="detail-value">{{ phone }}</span>
+                </div>
+            </div>
+            
+            <p style="color: #d32f2f; font-weight: 600;">{{ fee_message }}</p>
+            
+            <p>To ensure a smooth process, please arrange for the suit's return at your earliest convenience.</p>
+            
+            <a href="http://localhost:8000" class="cta-button">Contact Us</a>
+            
+            <p style="margin-top: 30px; color: #999; font-size: 13px;">
+                If you have any questions or need assistance with the return process, please don't hesitate to reach out to us.
+            </p>
+        </div>
+        
+        <div class="footer">
+            <p>© 2024 Suit Rental Management System. All rights reserved.</p>
+            <p>For urgent matters, contact us at <strong>{{ settings.EMAIL_HOST_USER }}</strong></p>
+        </div>
+    </div>
+</body>
+</html>

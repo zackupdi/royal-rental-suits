@@ -1,0 +1,344 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Join Us - Suit Rental</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --gold: #c9a84c;
+            --gold-light: #e8c96a;
+            --gold-dim: rgba(201,168,76,0.12);
+            --gold-glow: rgba(201,168,76,0.28);
+            --bg: #0f0f1a;
+            --surface: rgba(255,255,255,0.04);
+            --border: rgba(255,255,255,0.07);
+            --text-main: #f0ede8;
+            --text-muted: rgba(240,237,232,0.5);
+            --success: #4caf82;
+            --danger: #e05c5c;
+            --warning: #e0a040;
+            --radius: 16px;
+        }
+        body {
+            margin: 0;
+            padding: 0;
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background: linear-gradient(180deg, var(--bg) 0%, #1a1a2e 100%);
+            font-family: 'Poppins', sans-serif;
+            overflow: scroll;
+            color: var(--text-main);
+        }
+        body::before {
+            content: "";
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            background: radial-gradient(circle at top left, rgba(201,168,76,0.14), transparent 22%),
+                        radial-gradient(circle at bottom right, rgba(201,168,76,0.1), transparent 24%);
+            z-index: 0;
+        }
+        .container-box {
+            position: relative;
+            width: 92%;
+            max-width: 920px;
+            height: 560px;
+            border-radius: 28px;
+            overflow: scroll;
+            background: var(--surface);
+            box-shadow: 0px 35px 90px rgba(0,0,0,0.3);
+            display: flex;
+            z-index: 1;
+            border: 1px solid var(--border);
+            backdrop-filter: blur(12px);
+        }
+        .split-left, .split-right {
+            position: absolute;
+            top: 0;
+            width: 50%;
+            height: 100%;
+            z-index: 1;
+            transition: 1s cubic-bezier(0.7, 0, 0.3, 1);
+        }
+        .split-left {
+            left: 0;
+            background: linear-gradient(135deg, rgba(201,168,76,0.12), rgba(26,26,46,0.7));
+            transform: translateX(-100%);
+        }
+        .split-right {
+            right: 0;
+            background: linear-gradient(135deg, rgba(201,168,76,0.18), rgba(15,15,26,0.8));
+            transform: translateX(100%);
+        }
+        .container-box.loaded .split-left,
+        .container-box.loaded .split-right {
+            transform: translateX(0%);
+        }
+        .welcome-side {
+            flex: 1;
+            z-index: 3;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+            padding: 40px;
+            color: var(--text-main);
+            background: var(--bg);
+        }
+        .welcome-side h1 {
+            font-weight: 800;
+            font-size: 3rem;
+            margin-bottom: 10px;
+            letter-spacing: -0.04em;
+            color: var(--gold);
+        }
+        .welcome-side p {
+            opacity: 0.9;
+            max-width: 320px;
+            font-size: 1rem;
+            color: var(--text-muted);
+        }
+        .form-side {
+            flex: 1.2;
+            background: var(--surface);
+            padding: 40px 58px;
+            z-index: 3;
+            color: var(--text-main);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            border-left: 1px solid var(--border);
+        }
+        .form-side h2 {
+            font-weight: 700;
+            margin-bottom: 24px;
+            font-size: 2rem;
+            color: var(--text-main);
+        }
+        .input-box {
+            position: relative;
+            margin-bottom: 16px;
+        }
+        .input-box input {
+            width: 100%;
+            padding: 14px 16px 14px 45px;
+            background: rgba(255,255,255,0.05);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            color: var(--text-main);
+            outline: none;
+            transition: 0.3s ease;
+        }
+        .input-box input:focus {
+            background: rgba(255,255,255,0.08);
+            border-color: var(--gold);
+            box-shadow: 0 0 20px var(--gold-glow);
+        }
+        .input-box i {
+            position: absolute;
+            left: 16px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: var(--text-muted);
+        }
+        .btn-register {
+            width: 100%;
+            padding: 14px;
+            border-radius: 18px;
+            border: none;
+            background: var(--gold);
+            color: #0f0f1a;
+            font-weight: 700;
+            margin-top: 18px;
+            transition: 0.35s ease;
+            box-shadow: 0 18px 45px var(--gold-glow);
+        }
+        .btn-register:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 24px 50px var(--gold-glow);
+            background: var(--gold-light);
+        }
+        .login-link {
+            text-align: center;
+            margin-top: 22px;
+            font-size: 0.92rem;
+            color: var(--text-muted);
+        }
+        .login-link a {
+            color: var(--gold);
+            text-decoration: none;
+            font-weight: 700;
+        }
+        .validation-feedback {
+            position: absolute;
+            right: 14px;
+            top: 50%;
+            transform: translateY(-50%);
+            font-size: 1.1rem;
+            cursor: default;
+            transition: 0.3s ease;
+        }
+        .validation-feedback.valid { color: #4caf82; }
+        .validation-feedback.invalid { color: #e05c5c; }
+        .validation-message {
+            font-size: 0.7rem;
+            margin-top: 4px;
+            padding: 4px 12px;
+            border-radius: 8px;
+            display: none;
+            background: rgba(224, 92, 92, 0.1);
+            color: #e05c5c;
+            border-left: 2px solid #e05c5c;
+        }
+        .validation-message.show { display: block; }
+        .validation-message.success {
+            background: rgba(76, 175, 130, 0.1);
+            color: #4caf82;
+            border-left-color: #4caf82;
+        }
+        .password-checklist {
+            margin-top: 20px;
+            padding: 16px;
+            background: rgba(255,255,255,0.02);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            display: none;
+        }
+        .password-checklist.show { display: block; }
+        .checklist-title {
+            font-size: 0.8rem;
+            font-weight: 600;
+            color: var(--text-main);
+            margin-bottom: 10px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        .checklist-item {
+            font-size: 0.75rem;
+            display: flex;
+            align-items: center;
+            margin-bottom: 6px;
+            color: var(--text-muted);
+            transition: 0.2s ease;
+        }
+        .checklist-item.valid { color: #4caf82; }
+        .checklist-item i {
+            margin-right: 8px;
+            min-width: 16px;
+            font-size: 0.85rem;
+        }
+        .validation-summary {
+            margin-top: 16px;
+            padding: 12px 14px;
+            border-radius: 10px;
+            text-align: center;
+            font-size: 0.8rem;
+            font-weight: 600;
+            display: none;
+            background: rgba(76, 175, 130, 0.12);
+            color: #4caf82;
+            border: 1px solid rgba(76, 175, 130, 0.3);
+        }
+        .validation-summary.show { display: block; }
+        .validation-summary.error {
+            background: rgba(224, 92, 92, 0.12);
+            color: #e05c5c;
+            border-color: rgba(224, 92, 92, 0.3);
+        }
+        @media (max-width: 900px) {
+            .container-box { width: 95%; height: auto; flex-direction: column; }
+            .welcome-side { display: none; }
+            .form-side { padding: 40px 24px; }
+        }
+    </style>
+</head>
+<body>
+<div class="container-box" id="mainBox">
+    <div class="split-left"></div>
+    <div class="split-right"></div>
+    <div class="welcome-side">
+        <h1>JOIN<br>US</h1>
+        <p>Create an account to start renting premium suits for your special events.</p>
+    </div>
+    <div class="form-side">
+        <h2>Create Account</h2>
+        {% for message in messages %}
+            <div class="alert alert-{% if message.tags %}{{ message.tags }}{% else %}info{% endif %} py-2" style="font-size: 0.8rem;">
+                <i class="fa-solid fa-circle-exclamation me-2"></i>{{ message }}
+            </div>
+        {% endfor %}
+        <form method="POST">
+            {% csrf_token %}
+            <div class="input-box">
+                <i class="fa-solid fa-user"></i>
+                <input type="text" id="username" name="username" placeholder="Username" required oninput="validateUsername(this)">
+                <span class="validation-feedback" id="usernameFeedback"></span>
+                <div class="validation-message" id="usernameMessage"></div>
+            </div>
+            <div class="input-box">
+                <i class="fa-solid fa-envelope"></i>
+                <input type="email" id="email" name="email" placeholder="Email Address" required oninput="validateEmail(this)">
+                <span class="validation-feedback" id="emailFeedback"></span>
+                <div class="validation-message" id="emailMessage"></div>
+            </div>
+            <div class="input-box">
+                <i class="fa-solid fa-lock"></i>
+                <input type="password" id="password" name="password" placeholder="Password" required oninput="validatePassword(this)">
+                <span class="validation-feedback" id="passwordFeedback"></span>
+                <div class="validation-message" id="passwordMessage"></div>
+            </div>
+            <div class="password-checklist" id="passwordChecklist">
+                <div class="checklist-title">Password Requirements</div>
+                <div class="checklist-item" id="check-length">
+                    <i class="fa-solid fa-circle"></i>
+                    <span>At least 8 characters</span>
+                </div>
+                <div class="checklist-item" id="check-upper">
+                    <i class="fa-solid fa-circle"></i>
+                    <span>One uppercase letter</span>
+                </div>
+                <div class="checklist-item" id="check-lower">
+                    <i class="fa-solid fa-circle"></i>
+                    <span>One lowercase letter</span>
+                </div>
+                <div class="checklist-item" id="check-number">
+                    <i class="fa-solid fa-circle"></i>
+                    <span>One number</span>
+                </div>
+                <div class="checklist-item" id="check-special">
+                    <i class="fa-solid fa-circle"></i>
+                    <span>One special character (@$!%*?&.#)</span>
+                </div>
+            </div>
+            <div class="input-box">
+                <i class="fa-solid fa-shield-check"></i>
+                <input type="password" id="password2" name="password2" placeholder="Confirm Password" required oninput="validatePasswordMatch(this)">
+                <span class="validation-feedback" id="password2Feedback"></span>
+                <div class="validation-message" id="password2Message"></div>
+            </div>
+            <div class="validation-summary" id="validationSummary"></div>
+            <button type="submit" class="btn-register" id="submitBtn">Register Now</button>
+        </form>
+        <div class="login-link">
+            Already have an account? <a href="{% url 'customer_login' %}">Sign In</a>
+        </div>
+    </div>
+</div>
+<script src="{% static 'js/form-validation.js' %}"></script>
+<script>
+    window.onload = function() {
+        setTimeout(() => {
+            document.getElementById("mainBox").classList.add("loaded");
+        }, 200);
+    }
+</script>
+</body>
+</html>

@@ -1,0 +1,1519 @@
+{% extends 'rental/base.html' %}
+{% block title %}Manage Users | Suit Luxe{% endblock %}
+
+{% block content %}
+<style>
+    :root {
+        --gold: #c9a84c;
+        --gold-light: #e8c96a;
+        --gold-dim: rgba(201,168,76,0.12);
+        --bg: #0f0f1a;
+        --border: rgba(255,255,255,0.07);
+        --text-main: #f0ede8;
+        --text-muted: rgba(240,237,232,0.5);
+        --success: #4caf82;
+        --danger: #e05c5c;
+        --warning: #e0a040;
+        --radius: 16px;
+    }
+
+    /* ══ Global Icon Size Reduction (mobile friendliness) ══ */
+    i.fas, i.fa-solid, i.fab, i.fa-brands, i.far, i.fa-regular {
+        font-size: 0.85em;
+        vertical-align: middle;
+    }
+
+    .usr-page-header h2 i { font-size: 1.4rem !important; }
+    .stat-card .bg-icon { font-size: 4rem !important; }
+    .empty-state i { font-size: 2.6rem !important; }
+    .modal-delete-icon i { font-size: 18px !important; }
+
+    .usr-bg {
+        position: fixed;
+        inset: 0;
+        z-index: 0;
+        pointer-events: none;
+        overflow: hidden;
+    }
+
+    .usr-bg::before {
+        content: '';
+        position: absolute;
+        inset: 0;
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 120'%3E%3Cpath d='M30 10 L15 30 L25 30 L20 120 L80 120 L75 30 L85 30 L70 10 Q60 20 50 18 Q40 20 30 10Z' fill='none' stroke='rgba(201,168,76,0.055)' stroke-width='1.5'/%3E%3Cpath d='M35 10 Q50 28 65 10' fill='none' stroke='rgba(201,168,76,0.055)' stroke-width='1.5'/%3E%3C/svg%3E");
+        background-size: 110px 132px;
+        background-repeat: repeat;
+        animation: bgDrift 70s linear infinite;
+    }
+
+    @keyframes bgDrift {
+        from { background-position: 0 0; }
+        to   { background-position: 110px 132px; }
+    }
+
+    .usr-orb {
+        position: fixed;
+        border-radius: 50%;
+        filter: blur(90px);
+        pointer-events: none;
+        animation: orbFloat 14s ease-in-out infinite;
+        z-index: 0;
+    }
+
+    .usr-orb-1 {
+        width: 500px; height: 500px;
+        background: radial-gradient(circle, rgba(201,168,76,0.08) 0%, transparent 70%);
+        top: -100px; right: 5%;
+    }
+
+    .usr-orb-2 {
+        width: 380px; height: 380px;
+        background: radial-gradient(circle, rgba(76,175,130,0.06) 0%, transparent 70%);
+        bottom: 5%; left: 10%;
+        animation-delay: -7s;
+    }
+
+    @keyframes orbFloat {
+        0%,100% { transform: translateY(0) scale(1); }
+        50%      { transform: translateY(-24px) scale(1.03); }
+    }
+
+    .usr-wrap {
+        position: relative;
+        z-index: 1;
+        padding: 30px 0 60px;
+    }
+
+    .usr-page-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        flex-wrap: wrap;
+        gap: 14px;
+        margin-bottom: 28px;
+    }
+
+    .usr-page-header h2 {
+        font-family: 'Cormorant Garamond', serif;
+        font-size: 2rem;
+        color: var(--text-main);
+        margin: 0;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+    }
+
+    .usr-page-header h2 i { color: var(--gold); }
+    .usr-page-header p { color: var(--text-muted); font-size: 0.84rem; margin: 4px 0 0; }
+
+    .date-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        background: var(--gold-dim);
+        border: 1px solid rgba(201,168,76,0.2);
+        color: #e8c96a;
+        padding: 5px 14px;
+        border-radius: 30px;
+        font-size: 0.78rem;
+        font-weight: 600;
+    }
+
+    .btn-header-action {
+        background: rgba(201,168,76,0.08);
+        border: 1px solid rgba(201,168,76,0.25);
+        color: #e8c96a;
+        padding: 9px 18px;
+        border-radius: 50px;
+        font-size: 0.8rem;
+        font-weight: 600;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        text-decoration: none;
+        transition: 0.2s ease;
+        cursor: pointer;
+    }
+
+    .btn-header-action:hover {
+        background: rgba(201,168,76,0.16);
+        border-color: rgba(201,168,76,0.4);
+        box-shadow: 0 6px 16px rgba(201,168,76,0.15);
+        color: #e8c96a;
+        transform: translateY(-1px);
+    }
+
+    .btn-header-action.variant-reception {
+        background: rgba(76,175,130,0.08);
+        border-color: rgba(76,175,130,0.25);
+        color: #7fd9ab;
+    }
+
+    .btn-header-action.variant-reception:hover {
+        background: rgba(76,175,130,0.16);
+        border-color: rgba(76,175,130,0.4);
+        box-shadow: 0 6px 16px rgba(76,175,130,0.15);
+        color: #7fd9ab;
+    }
+
+    .btn-header-action.variant-payroll {
+        background: rgba(106,176,232,0.08);
+        border-color: rgba(106,176,232,0.25);
+        color: #6ab0e8;
+    }
+
+    .btn-header-action.variant-payroll:hover {
+        background: rgba(106,176,232,0.16);
+        border-color: rgba(106,176,232,0.4);
+        box-shadow: 0 6px 16px rgba(106,176,232,0.15);
+        color: #6ab0e8;
+    }
+
+    .stat-card {
+        background: rgba(255,255,255,0.04);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        padding: 22px;
+        position: relative;
+        overflow: hidden;
+        transition: all 0.3s ease;
+        backdrop-filter: blur(12px);
+        height: 100%;
+    }
+
+    .stat-card::before {
+        content: '';
+        position: absolute;
+        top: 0; left: 0; right: 0;
+        height: 2px;
+        background: var(--card-accent, var(--gold));
+        border-radius: var(--radius) var(--radius) 0 0;
+    }
+
+    .stat-card .bg-icon {
+        position: absolute;
+        right: -8px; bottom: -8px;
+        opacity: 0.04;
+        color: var(--card-accent, var(--gold));
+        pointer-events: none;
+    }
+
+    .stat-card:hover {
+        transform: translateY(-5px);
+        border-color: var(--card-accent, var(--gold));
+        box-shadow: 0 14px 38px rgba(0,0,0,0.3);
+    }
+
+    .stat-icon {
+        width: 42px; height: 42px;
+        border-radius: 12px;
+        display: flex; align-items: center; justify-content: center;
+        font-size: 16px;
+        margin-bottom: 14px;
+    }
+
+    .stat-label {
+        font-size: 0.67rem;
+        text-transform: uppercase;
+        letter-spacing: 1.8px;
+        color: var(--text-muted);
+        font-weight: 600;
+        margin-bottom: 4px;
+    }
+
+    .stat-value {
+        font-family: 'Cormorant Garamond', serif;
+        font-size: 2.6rem;
+        line-height: 1;
+        margin-bottom: 5px;
+    }
+
+    .stat-sub { font-size: 0.75rem; color: var(--text-muted); }
+
+    .search-card {
+        background: rgba(255,255,255,0.03);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        padding: 20px 24px;
+        backdrop-filter: blur(12px);
+        margin-bottom: 20px;
+    }
+
+    .search-wrap {
+        display: flex;
+        align-items: center;
+        background: rgba(255,255,255,0.04);
+        border: 1px solid var(--border);
+        border-radius: 50px;
+        overflow: hidden;
+        transition: 0.25s;
+        flex: 1;
+    }
+
+    .search-wrap:focus-within {
+        border-color: rgba(201,168,76,0.4);
+        background: rgba(201,168,76,0.05);
+        box-shadow: 0 0 0 3px rgba(201,168,76,0.08);
+    }
+
+    .search-wrap i {
+        padding: 0 14px;
+        color: var(--text-muted);
+        font-size: 13px;
+        flex-shrink: 0;
+    }
+
+    .search-wrap input {
+        background: transparent;
+        border: none;
+        outline: none;
+        color: var(--text-main);
+        font-size: 0.86rem;
+        padding: 11px 0;
+        width: 100%;
+    }
+
+    .search-wrap input::placeholder { color: var(--text-muted); }
+
+    .btn-search {
+        background: linear-gradient(135deg, var(--gold), var(--gold-light));
+        color: #0c0c14;
+        font-weight: 700;
+        font-size: 0.8rem;
+        padding: 11px 22px;
+        border: none;
+        cursor: pointer;
+        transition: 0.2s;
+        white-space: nowrap;
+        flex-shrink: 0;
+        display: inline-flex;
+        align-items: center;
+        gap: 7px;
+    }
+
+    .btn-clear {
+        background: rgba(255,255,255,0.05);
+        border: 1px solid var(--border);
+        color: var(--text-muted);
+        font-size: 0.82rem;
+        font-weight: 600;
+        padding: 10px 18px;
+        border-radius: 50px;
+        text-decoration: none;
+        display: inline-flex;
+        align-items: center;
+        gap: 7px;
+        transition: 0.2s;
+        white-space: nowrap;
+    }
+
+    .btn-clear:hover {
+        background: rgba(255,255,255,0.09);
+        color: var(--text-main);
+    }
+
+    .usr-card {
+        background: rgba(255,255,255,0.03);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        overflow: hidden;
+        backdrop-filter: blur(12px);
+    }
+
+    .usr-table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+
+    .usr-table {
+        width: 100%;
+        border-collapse: separate;
+        border-spacing: 0 5px;
+        padding: 14px 16px 10px;
+    }
+
+    .usr-table thead th {
+        color: var(--text-muted);
+        font-size: 0.67rem;
+        text-transform: uppercase;
+        letter-spacing: 1.5px;
+        font-weight: 600;
+        padding: 7px 14px;
+        background: transparent;
+        border: none;
+        white-space: nowrap;
+    }
+
+    .usr-table tbody tr { background: rgba(255,255,255,0.025); transition: all 0.2s; }
+    .usr-table tbody tr:hover { background: var(--gold-dim); }
+    .usr-table tbody td {
+        padding: 13px 14px;
+        border: none;
+        color: var(--text-main);
+        font-size: 0.86rem;
+        vertical-align: middle;
+        white-space: nowrap;
+    }
+    .usr-table tbody td:first-child { border-radius: 10px 0 0 10px; }
+    .usr-table tbody td:last-child  { border-radius: 0 10px 10px 0; }
+
+    .user-avatar {
+        width: 36px; height: 36px;
+        border-radius: 10px;
+        background: var(--gold-dim);
+        border: 1px solid rgba(201,168,76,0.2);
+        display: flex; align-items: center; justify-content: center;
+        color: var(--gold);
+        font-size: 13px;
+        flex-shrink: 0;
+    }
+
+    .user-avatar.admin-av {
+        background: rgba(224,92,92,0.1);
+        border-color: rgba(224,92,92,0.25);
+        color: var(--danger);
+    }
+
+    .username-cell { font-weight: 600; font-size: 0.88rem; }
+    .email-cell { color: var(--text-muted); font-size: 0.82rem; }
+
+    .you-badge {
+        background: rgba(76,175,130,0.12);
+        border: 1px solid rgba(76,175,130,0.25);
+        color: var(--success);
+        padding: 2px 8px;
+        border-radius: 20px;
+        font-size: 0.65rem;
+        font-weight: 700;
+        margin-left: 6px;
+    }
+
+    .badge-admin {
+        background: rgba(224,92,92,0.12);
+        border: 1px solid rgba(224,92,92,0.25);
+        color: var(--danger);
+        padding: 4px 11px;
+        border-radius: 20px;
+        font-size: 0.72rem;
+        font-weight: 700;
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+    }
+
+    .badge-reception {
+        background: rgba(76,175,130,0.12);
+        border: 1px solid rgba(76,175,130,0.25);
+        color: var(--success);
+        padding: 4px 11px;
+        border-radius: 20px;
+        font-size: 0.72rem;
+        font-weight: 700;
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+    }
+
+    .badge-customer {
+        background: rgba(76,130,175,0.12);
+        border: 1px solid rgba(76,130,175,0.25);
+        color: #6ab0e8;
+        padding: 4px 11px;
+        border-radius: 20px;
+        font-size: 0.72rem;
+        font-weight: 700;
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+    }
+
+    .badge-active {
+        background: rgba(76,175,130,0.12);
+        border: 1px solid rgba(76,175,130,0.25);
+        color: var(--success);
+        padding: 4px 11px;
+        border-radius: 20px;
+        font-size: 0.72rem;
+        font-weight: 700;
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+    }
+
+    .badge-inactive {
+        background: rgba(224,160,64,0.12);
+        border: 1px solid rgba(224,160,64,0.25);
+        color: var(--warning);
+        padding: 4px 11px;
+        border-radius: 20px;
+        font-size: 0.72rem;
+        font-weight: 700;
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+    }
+
+    .date-cell { color: var(--text-muted); font-size: 0.82rem; }
+
+    .action-group { display: flex; gap: 5px; justify-content: flex-end; align-items: center; flex-wrap: wrap;}
+
+    .btn-act {
+        width: 32px; height: 32px;
+        border-radius: 8px;
+        border: 1px solid var(--border);
+        background: transparent;
+        display: flex; align-items: center; justify-content: center;
+        font-size: 12px;
+        cursor: pointer;
+        transition: all 0.2s;
+        text-decoration: none;
+        color: var(--text-muted);
+    }
+
+    .btn-act-toggle:hover {
+        background: rgba(224,160,64,0.1);
+        color: var(--warning);
+        border-color: rgba(224,160,64,0.3);
+    }
+
+    .btn-act-del:hover {
+        background: rgba(224,92,92,0.1);
+        color: var(--danger);
+        border-color: rgba(224,92,92,0.3);
+    }
+
+    .btn-act-payroll {
+        background: rgba(106,176,232,0.08);
+        border: 1px solid rgba(106,176,232,0.25);
+        color: #6ab0e8;
+        padding: 6px 10px;
+        border-radius: 8px;
+        font-size: 0.72rem;
+        font-weight: 600;
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        transition: 0.2s;
+    }
+
+    .btn-act-payroll:hover {
+        background: rgba(106,176,232,0.16);
+        border-color: rgba(106,176,232,0.4);
+    }
+
+    .empty-state {
+        text-align: center;
+        padding: 60px 20px;
+        color: var(--text-muted);
+    }
+
+    .empty-state i {
+        color: rgba(201,168,76,0.1);
+        margin-bottom: 14px;
+        display: block;
+    }
+
+    .modal-content {
+        background: #181828;
+        border: 1px solid rgba(201,168,76,0.18);
+        border-radius: 20px;
+        color: var(--text-main);
+    }
+
+    .modal-header {
+        padding: 18px 24px;
+        border-bottom: 1px solid var(--border);
+    }
+
+    .modal-title {
+        font-family: 'Cormorant Garamond', serif;
+        font-size: 1.2rem;
+        color: var(--danger);
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .modal-body { padding: 22px 24px; }
+    .modal-footer { border-top: 1px solid var(--border); padding: 14px 24px; gap: 8px; }
+    .btn-close { filter: invert(1) opacity(0.4); }
+    .modal-header-danger { background: rgba(224,92,92,0.08); border-bottom: 1px solid rgba(224,92,92,0.18); }
+    .modal-delete-icon {
+        width: 58px; height: 58px;
+        background: rgba(224,92,92,0.1);
+        border: 2px solid rgba(224,92,92,0.25);
+        border-radius: 50%;
+        display: flex; align-items: center; justify-content: center;
+        color: var(--danger);
+        margin: 0 auto 16px;
+    }
+
+    .modal-detail-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 9px 0;
+        border-bottom: 1px solid var(--border);
+        font-size: 0.85rem;
+    }
+    .modal-detail-row:last-child { border-bottom: none; }
+    .modal-detail-label { color: var(--text-muted); }
+    .modal-detail-value { font-weight: 600; }
+
+    .warn-box {
+        background: rgba(224,92,92,0.07);
+        border: 1px solid rgba(224,92,92,0.18);
+        border-radius: 10px;
+        padding: 12px 14px;
+        font-size: 0.8rem;
+        color: rgba(224,92,92,0.85);
+        margin-top: 14px;
+        display: flex;
+        align-items: flex-start;
+        gap: 8px;
+    }
+
+    .btn-modal-confirm-del {
+        background: rgba(224,92,92,0.15);
+        border: 1px solid rgba(224,92,92,0.35);
+        color: var(--danger);
+        font-weight: 700;
+        font-size: 0.84rem;
+        padding: 9px 22px;
+        border-radius: 10px;
+        text-decoration: none;
+        display: inline-flex;
+        align-items: center;
+        gap: 7px;
+        transition: 0.2s;
+    }
+
+    .btn-modal-confirm-del:hover {
+        background: rgba(224,92,92,0.25);
+        color: var(--danger);
+        box-shadow: 0 4px 16px rgba(224,92,92,0.25);
+    }
+
+    .btn-modal-cancel {
+        background: rgba(255,255,255,0.05);
+        border: 1px solid var(--border);
+        color: var(--text-muted);
+        font-weight: 600;
+        font-size: 0.84rem;
+        padding: 9px 22px;
+        border-radius: 10px;
+        cursor: pointer;
+        transition: 0.2s;
+    }
+
+    .btn-modal-cancel:hover {
+        background: rgba(255,255,255,0.09);
+        color: var(--text-main);
+    }
+
+    .modal-header-create {
+        background: rgba(201,168,76,0.08);
+        border-bottom: 1px solid rgba(201,168,76,0.18);
+    }
+
+    .modal-title-create {
+        font-family: 'Cormorant Garamond', serif;
+        font-size: 1.2rem;
+        color: var(--gold-light);
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .modal-header-create-reception {
+        background: rgba(76,175,130,0.08);
+        border-bottom: 1px solid rgba(76,175,130,0.18);
+    }
+
+    .modal-title-create-reception {
+        font-family: 'Cormorant Garamond', serif;
+        font-size: 1.2rem;
+        color: #7fd9ab;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .modal-header-create-payroll {
+        background: rgba(106,176,232,0.08);
+        border-bottom: 1px solid rgba(106,176,232,0.18);
+    }
+
+    .modal-title-create-payroll {
+        font-family: 'Cormorant Garamond', serif;
+        font-size: 1.2rem;
+        color: #6ab0e8;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .glass-form-group { margin-bottom: 16px; }
+    .glass-form-group:last-child { margin-bottom: 0; }
+
+    .glass-form-group label {
+        display: block;
+        color: var(--text-muted);
+        font-size: 0.7rem;
+        text-transform: uppercase;
+        letter-spacing: 1.2px;
+        font-weight: 600;
+        margin-bottom: 7px;
+    }
+
+    .glass-input {
+        width: 100%;
+        background: rgba(255,255,255,0.04);
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        padding: 10px 14px;
+        color: var(--text-main);
+        font-size: 0.88rem;
+        transition: 0.2s;
+    }
+
+    select.glass-input option { background: #181828; color: var(--text-main); }
+
+    .glass-input::placeholder { color: rgba(240,237,232,0.3); }
+
+    .glass-input:focus {
+        outline: none;
+        border-color: rgba(201,168,76,0.4);
+        background: rgba(201,168,76,0.05);
+        box-shadow: 0 0 0 3px rgba(201,168,76,0.08);
+    }
+
+    .modal-content:has(.modal-header-create-reception) .glass-input:focus {
+        border-color: rgba(76,175,130,0.4);
+        background: rgba(76,175,130,0.05);
+        box-shadow: 0 0 0 3px rgba(76,175,130,0.08);
+    }
+
+    .modal-content:has(.modal-header-create-payroll) .glass-input:focus {
+        border-color: rgba(106,176,232,0.4);
+        background: rgba(106,176,232,0.05);
+        box-shadow: 0 0 0 3px rgba(106,176,232,0.08);
+    }
+
+    .form-hint {
+        font-size: 0.72rem;
+        color: var(--text-muted);
+        margin-top: 6px;
+    }
+
+    .form-row-2 {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 12px;
+    }
+
+    .checkbox-row {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 0.82rem;
+        color: var(--text-muted);
+        cursor: pointer;
+        user-select: none;
+    }
+
+    .checkbox-row input { width: 15px; height: 15px; accent-color: var(--gold); cursor: pointer; }
+
+    .btn-modal-confirm-create {
+        background: linear-gradient(135deg, var(--gold), var(--gold-light));
+        border: none;
+        color: #0c0c14;
+        font-weight: 700;
+        font-size: 0.84rem;
+        padding: 9px 22px;
+        border-radius: 10px;
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        gap: 7px;
+        transition: 0.2s;
+    }
+
+    .btn-modal-confirm-create:hover {
+        box-shadow: 0 4px 16px rgba(201,168,76,0.3);
+        transform: translateY(-1px);
+    }
+
+    .btn-modal-confirm-create.variant-reception {
+        background: linear-gradient(135deg, #4caf82, #6ecb9f);
+        color: #0c1410;
+    }
+
+    .btn-modal-confirm-create.variant-reception:hover {
+        box-shadow: 0 4px 16px rgba(76,175,130,0.3);
+    }
+
+    .btn-modal-confirm-create.variant-payroll {
+        background: linear-gradient(135deg, #6ab0e8, #8ecdfa);
+        color: #0c1420;
+    }
+
+    .btn-modal-confirm-create.variant-payroll:hover {
+        box-shadow: 0 4px 16px rgba(106,176,232,0.3);
+    }
+
+    ::-webkit-scrollbar { width: 4px; height: 4px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: rgba(201,168,76,0.2); border-radius: 4px; }
+
+    /* ══════════════════════════════════════════════════════
+       MOBILE RESPONSIVE — smaller fonts, stacked layout
+       ══════════════════════════════════════════════════════ */
+    @media (max-width: 768px) {
+        .usr-wrap { padding: 18px 0 40px; }
+        .container-fluid.px-4 { padding-left: 12px !important; padding-right: 12px !important; }
+
+        .usr-page-header { flex-direction: column; align-items: stretch; gap: 10px; margin-bottom: 18px; }
+        .usr-page-header h2 { font-size: 1.35rem; gap: 8px; }
+        .usr-page-header h2 i { font-size: 1.1rem !important; }
+        .usr-page-header p { font-size: 0.72rem; }
+
+        .usr-page-header > div:last-child { flex-direction: column; align-items: stretch; width: 100%; }
+        .btn-header-action { width: 100%; justify-content: center; padding: 10px 14px; font-size: 0.75rem; }
+        .date-badge { width: 100%; justify-content: center; font-size: 0.7rem; }
+
+        .row.g-3.mb-4 { row-gap: 10px !important; }
+        .stat-card { padding: 14px; }
+        .stat-icon { width: 32px; height: 32px; font-size: 12px; margin-bottom: 8px; }
+        .stat-label { font-size: 0.58rem; letter-spacing: 1px; }
+        .stat-value { font-size: 1.6rem; }
+        .stat-sub { font-size: 0.65rem; }
+        .stat-card .bg-icon { font-size: 2.6rem !important; }
+
+        .search-card { padding: 12px 14px; }
+        .search-wrap { max-width: 100% !important; }
+        .search-wrap input { font-size: 0.78rem; }
+        .btn-search { padding: 9px 14px; font-size: 0.72rem; }
+        .search-card form > div { flex-direction: column; align-items: stretch !important; }
+        .btn-clear { justify-content: center; font-size: 0.72rem; }
+
+        h3 { font-size: 1.05rem !important; }
+
+        .usr-table { padding: 8px 8px 6px; border-spacing: 0 4px; }
+        .usr-table thead th { font-size: 0.58rem; padding: 5px 8px; letter-spacing: 1px; }
+        .usr-table tbody td { font-size: 0.74rem; padding: 9px 8px; }
+        .user-avatar { width: 28px; height: 28px; font-size: 10px; }
+        .username-cell { font-size: 0.76rem; }
+        .email-cell { font-size: 0.7rem; }
+        .badge-admin, .badge-reception, .badge-customer, .badge-active, .badge-inactive {
+            font-size: 0.62rem; padding: 3px 8px;
+        }
+        .date-cell { font-size: 0.7rem; }
+        .btn-act { width: 27px; height: 27px; font-size: 10px; }
+        .btn-act-payroll { font-size: 0.62rem; padding: 5px 8px; }
+        .action-group .btn.btn-sm { font-size: 0.62rem !important; padding: 5px 8px !important; }
+
+        .modal-dialog { margin: 10px; max-width: calc(100% - 20px) !important; }
+        .modal-header { padding: 14px 16px; }
+        .modal-title, .modal-title-create, .modal-title-create-reception, .modal-title-create-payroll { font-size: 1.02rem; }
+        .modal-body { padding: 16px; }
+        .modal-footer { padding: 12px 16px; flex-wrap: wrap; }
+        .modal-footer button, .modal-footer a { flex: 1; justify-content: center; font-size: 0.76rem; padding: 9px 14px; }
+        .glass-input { font-size: 0.8rem; padding: 9px 12px; }
+        .glass-form-group label { font-size: 0.64rem; }
+        .form-row-2 { grid-template-columns: 1fr; gap: 0; }
+        .form-hint { font-size: 0.66rem; }
+
+        .modal-detail-row { font-size: 0.76rem; }
+        .warn-box { font-size: 0.7rem; }
+        .empty-state { padding: 36px 14px; }
+        .empty-state i { font-size: 2rem !important; }
+        .empty-state p { font-size: 0.74rem !important; }
+    }
+
+    @media (max-width: 400px) {
+        .usr-page-header h2 { font-size: 1.2rem; }
+        .stat-value { font-size: 1.4rem; }
+        .usr-table tbody td { font-size: 0.7rem; padding: 8px 6px; }
+    }
+</style>
+
+<div class="usr-bg"></div>
+<div class="usr-orb usr-orb-1"></div>
+<div class="usr-orb usr-orb-2"></div>
+
+<div class="usr-wrap">
+    <div class="container-fluid px-4">
+        <div class="usr-page-header">
+            <div>
+                <h2>
+                    <i class="fa-solid fa-users"></i>
+                    User Management
+                </h2>
+                <p>View, manage and remove users from the system</p>
+            </div>
+            <div class="d-flex gap-2 flex-wrap">
+                <button type="button" class="btn-header-action variant-reception" onclick="openUserModal('createStaffModal')">
+                    <i class="fa-solid fa-user-tie"></i> Add Staff
+                </button>
+                <button type="button" class="btn-header-action variant-payroll" onclick="openPayrollModal()">
+                    <i class="fa-solid fa-money-check-dollar"></i> Add Payroll
+                </button>
+                <div class="date-badge">
+                    <i class="fa-regular fa-calendar"></i>
+                    <span id="live-date">—</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="row g-3 mb-4">
+            <div class="col-md-3 col-sm-6">
+                <div class="stat-card" style="--card-accent:#c9a84c">
+                    <i class="fa-solid fa-users bg-icon"></i>
+                    <div class="stat-icon" style="background:rgba(201,168,76,0.12);color:var(--gold)">
+                        <i class="fa-solid fa-users"></i>
+                    </div>
+                    <div class="stat-label">Total Users</div>
+                    <div class="stat-value" style="color:var(--gold)">{{ total_users }}</div>
+                    <div class="stat-sub">All registered accounts</div>
+                </div>
+            </div>
+            <div class="col-md-3 col-sm-6">
+                <div class="stat-card" style="--card-accent:#4caf82">
+                    <i class="fa-solid fa-circle-check bg-icon"></i>
+                    <div class="stat-icon" style="background:rgba(76,175,130,0.1);color:var(--success)">
+                        <i class="fa-solid fa-circle-check"></i>
+                    </div>
+                    <div class="stat-label">Active Users</div>
+                    <div class="stat-value" style="color:var(--success)">{{ active_users }}</div>
+                    <div class="stat-sub">Currently enabled</div>
+                </div>
+            </div>
+            <div class="col-md-3 col-sm-6">
+                <div class="stat-card" style="--card-accent:#e05c5c">
+                    <i class="fa-solid fa-shield bg-icon"></i>
+                    <div class="stat-icon" style="background:rgba(224,92,92,0.1);color:var(--danger)">
+                        <i class="fa-solid fa-shield"></i>
+                    </div>
+                    <div class="stat-label">Staff Members</div>
+                    <div class="stat-value" style="color:var(--danger)">{{ staff_count }}</div>
+                    <div class="stat-sub">Admin & staff accounts</div>
+                </div>
+            </div>
+            <div class="col-md-3 col-sm-6">
+                <div class="stat-card" style="--card-accent:#6ab0e8">
+                    <i class="fa-solid fa-user-tie bg-icon"></i>
+                    <div class="stat-icon" style="background:rgba(76,130,175,0.1);color:#6ab0e8">
+                        <i class="fa-solid fa-user-tie"></i>
+                    </div>
+                    <div class="stat-label">Customers</div>
+                    <div class="stat-value" style="color:#6ab0e8">{{ customer_count }}</div>
+                    <div class="stat-sub">Regular accounts</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="search-card">
+            <form method="GET">
+                <div class="d-flex gap-3 align-items-center flex-wrap">
+                    <div class="search-wrap" style="max-width:480px">
+                        <i class="fa-solid fa-magnifying-glass"></i>
+                        <input type="text" name="q" placeholder="Search username or email..." value="{{ current_q }}">
+                        <button type="submit" class="btn-search">
+                            <i class="fa-solid fa-search"></i> Search
+                        </button>
+                    </div>
+                    {% if current_q %}
+                    <a href="{% url 'manage_users' %}" class="btn-clear">
+                        <i class="fa-solid fa-xmark"></i> Clear
+                    </a>
+                    {% endif %}
+                </div>
+            </form>
+        </div>
+
+        <!-- Staff List -->
+        <div class="mb-4">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <h3 style="margin:0;">Staff</h3>
+                <div>
+                    <a href="/admin/rental/staff/" class="btn-clear">Open Staff Admin</a>
+                </div>
+            </div>
+            <div class="usr-card">
+                <div class="usr-table-wrap">
+                    <table class="usr-table">
+                        <thead>
+                            <tr>
+                                <th>Username</th>
+                                <th>Full Name</th>
+                                <th>Email</th>
+                                <th>Position</th>
+                                <th>Phone</th>
+                                <th>Hire Date</th>
+                                <th>Salary</th>
+                                <th>Total Paid</th>
+                                <th>Remaining</th>
+                                <th>Status</th>
+                                <th style="text-align:right">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for staff in staff_list %}
+                            <tr>
+                                <td>{% if staff.user %}{{ staff.user.username }}{% else %}—{% endif %}</td>
+                                <td>{% if staff.user %}{{ staff.user.get_full_name|default:staff.name }}{% else %}{{ staff.name }}{% endif %}</td>
+                                <td>{% if staff.user %}{{ staff.user.email|default:'—' }}{% else %}—{% endif %}</td>
+                                <td>{{ staff.position|default:"—" }}</td>
+                                <td>{{ staff.phone|default:"—" }}</td>
+                                <td>{{ staff.hire_date|date:"M d, Y"|default:"—" }}</td>
+                                <td>{{ staff.monthly_salary|floatformat:2 }}</td>
+                                <td>{{ staff.total_paid|floatformat:2 }}</td>
+                                <td>{{ staff.remaining_this_month|floatformat:2 }}</td>
+                                <td>
+                                    {% if staff.status == 'active' %}
+                                        <span class="badge-active">Active</span>
+                                    {% else %}
+                                        <span class="badge-inactive">{{ staff.status|capfirst }}</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <div class="action-group">
+                                        <button type="button" class="btn-act-payroll" onclick="openPayrollModal('{{ staff.id }}', '{{ staff.name|escapejs }}')" title="Add Payroll for {{ staff.name }}">
+                                            <i class="fa-solid fa-money-bill"></i> Pay
+                                        </button>
+                                        <button type="button" class="btn btn-sm btn-outline-light" style="border-color:rgba(201,168,76,0.25);color:#e8c96a;padding:6px 10px;font-size:0.74rem;" data-bs-toggle="modal" data-bs-target="#staffHistoryModal{{ staff.id }}">History</button>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% empty %}
+                            <tr>
+                                <td colspan="11">
+                                    <div class="empty-state">
+                                        <i class="fa-solid fa-user-tie"></i>
+                                        <p style="font-weight:600;margin-bottom:4px;color:var(--text-main)">No staff records</p>
+                                        <p style="font-size:0.82rem">Click "Add Staff" above to register your first staff member.</p>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        {% for staff in staff_list %}
+        <div class="modal fade" id="staffHistoryModal{{ staff.id }}" tabindex="-1" aria-hidden="true">
+            <div class="modal-dialog modal-dialog-centered modal-lg modal-dialog-scrollable">
+                <div class="modal-content">
+                    <div class="modal-header modal-header-create">
+                        <h5 class="modal-title-create">Payment History for {{ staff.name }}</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body" style="padding: 20px;">
+                        <div style="margin-bottom: 16px; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px;">
+                            <div style="background: rgba(201,168,76,0.08); padding: 12px; border-radius: 12px;">
+                                <div style="font-size: 0.82rem; color: var(--text-muted);">Total Paid</div>
+                                <div style="font-size: 1.2rem; font-weight: 700;">{{ staff.total_paid|floatformat:2 }}</div>
+                            </div>
+                            <div style="background: rgba(76,175,130,0.08); padding: 12px; border-radius: 12px;">
+                                <div style="font-size: 0.82rem; color: var(--text-muted);">Remaining This Month</div>
+                                <div style="font-size: 1.2rem; font-weight: 700;">{{ staff.remaining_this_month|floatformat:2 }}</div>
+                            </div>
+                            <div style="background: rgba(96,125,139,0.08); padding: 12px; border-radius: 12px;">
+                                <div style="font-size: 0.82rem; color: var(--text-muted);">Advances Taken</div>
+                                <div style="font-size: 1.2rem; font-weight: 700;">{{ staff.total_advance|floatformat:2 }}</div>
+                            </div>
+                        </div>
+                        <div style="overflow-x:auto;">
+                            <table class="usr-table" style="width:100%;">
+                                <thead>
+                                    <tr>
+                                        <th>Date</th>
+                                        <th>Type</th>
+                                        <th>Amount</th>
+                                        <th>Month</th>
+                                        <th>Year</th>
+                                        <th>Recorded By</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for payment in staff.payrolls_history %}
+                                    <tr>
+                                        <td>{{ payment.payment_date|date:"M d, Y" }}</td>
+                                        <td>{{ payment.payment_type }}</td>
+                                        <td>{{ payment.amount|floatformat:2 }}</td>
+                                        <td>{{ payment.month|default:"—" }}</td>
+                                        <td>{{ payment.year|default:"—" }}</td>
+                                        <td>
+                                            {% if payment.created_by %}
+                                                {{ payment.created_by.get_full_name|default:payment.created_by.username }}
+                                            {% else %}
+                                                —
+                                            {% endif %}
+                                        </td>
+                                    </tr>
+                                    {% empty %}
+                                    <tr>
+                                        <td colspan="6" style="text-align:center; padding: 24px; color: var(--text-muted);">No payroll history available for this staff member.</td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn-modal-cancel" data-bs-dismiss="modal">Close</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+
+        <div class="usr-card">
+            <div class="usr-table-wrap">
+                <table class="usr-table">
+                    <thead>
+                        <tr>
+                            <th>Username</th>
+                            <th>Email</th>
+                            <th>Role</th>
+                            <th>Status</th>
+                            <th>Joined</th>
+                            <th style="text-align:right">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for user in users %}
+                        <tr>
+                            <td>
+                                <div style="display:flex;align-items:center;gap:10px">
+                                    <div class="user-avatar {% if user.is_staff and not user.profile.is_reception %}admin-av{% endif %}">
+                                        <i class="fa-solid fa-{% if user.is_staff and not user.profile.is_reception %}shield{% else %}user{% endif %}"></i>
+                                    </div>
+                                    <div>
+                                        <div class="username-cell">
+                                            <a href="{% url 'customer_detail_by_user' user.id %}" style="color:inherit;text-decoration:none;">
+                                                {{ user.username }}
+                                            </a>
+                                            {% if user.id == request.user.id %}
+                                                <span class="you-badge">You</span>
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                </div>
+                            </td>
+                            <td class="email-cell">{{ user.email|default:"—" }}</td>
+                            <td>
+                                {% if user.profile.is_reception %}
+                                    <span class="badge-reception">
+                                        <i class="fa-solid fa-concierge-bell" style="font-size:9px"></i> Reception
+                                    </span>
+                                {% elif user.profile.is_cashier %}
+                                    <span class="badge-customer" style="background:rgba(224,160,64,0.12); border-color:rgba(224,160,64,0.25); color:var(--warning)">
+                                        <i class="fa-solid fa-cash-register" style="font-size:9px"></i> Cashier
+                                    </span>
+                                {% elif user.is_staff %}
+                                    <span class="badge-admin">
+                                        <i class="fa-solid fa-shield" style="font-size:9px"></i> Admin
+                                    </span>
+                                {% else %}
+                                    <span class="badge-customer">
+                                        <i class="fa-solid fa-user" style="font-size:9px"></i> Customer
+                                    </span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if user.is_active %}
+                                    <span class="badge-active">
+                                        <i class="fa-solid fa-circle-check" style="font-size:9px"></i> Active
+                                    </span>
+                                {% else %}
+                                    <span class="badge-inactive">
+                                        <i class="fa-solid fa-circle-xmark" style="font-size:9px"></i> Inactive
+                                    </span>
+                                {% endif %}
+                            </td>
+                            <td class="date-cell">{{ user.date_joined|date:"M d, Y" }}</td>
+                            <td>
+                                <div class="action-group">
+                                    <a href="{% url 'customer_detail_by_user' user.id %}" class="btn btn-sm btn-outline-light" style="border-color:rgba(201,168,76,0.25);color:#e8c96a;padding:6px 10px;font-size:0.74rem;display:inline-flex;align-items:center;gap:6px;">
+                                        <i class="fa-solid fa-id-card"></i> Customer Details
+                                    </a>
+                                    
+                                    {# New Rent: Macaamiisha caadiga ah oo kaliya ayaa arki kara #}
+                                    {% if not user.is_staff and not user.profile.is_cashier and not user.profile.is_reception %}
+                                        <a href="{% url 'new_rent_for_customer' user.id %}" class="btn btn-sm btn-success" style="padding:6px 10px;font-size:0.74rem;display:inline-flex;align-items:center;gap:6px;">
+                                            <i class="fa-solid fa-plus-circle"></i> New Rent
+                                        </a>
+                                    {% endif %}
+
+                                    {# TRTIRIS & EDIT: Halkan waxaa laga beddelay `not user.is_staff` oo loogu daray xaaladda Reception `user.profile.is_reception` si uu isna u tirtirmi karo #}
+                                    {% if not user.is_staff or user.profile.is_reception %}
+                                        <a href="{% url 'toggle_user_active' user.id %}" class="btn-act btn-act-toggle" title="Toggle Active Status">
+                                            <i class="fa-solid fa-toggle-{% if user.is_active %}on{% else %}off{% endif %}"></i>
+                                        </a>
+                                        {% if user.id != request.user.id %}
+                                            <a href="{% url 'toggle_reception_role' user.id %}" class="btn-act btn-act-toggle" title="{% if user.profile.is_reception %}Remove reception role{% else %}Grant reception role{% endif %}">
+                                                <i class="fa-solid fa-user-gear"></i>
+                                            </a>
+                                            {% if not request.user.profile.is_reception %}
+                                            <button class="btn-act btn-act-del" title="Delete User" data-bs-toggle="modal" data-bs-target="#deleteModal{{ user.id }}">
+                                                <i class="fa-solid fa-trash"></i>
+                                            </button>
+                                            {% endif %}
+                                        {% endif %}
+                                    {% else %}
+                                        {# Admin-ka caadiga ah wuxuu ahaanayaa Protected #}
+                                        <span style="color:var(--text-muted); font-size:0.76rem; display:inline-flex; align-items:center; gap:5px; padding: 0 8px;">
+                                            <i class="fa-solid fa-lock" style="color:var(--warning)"></i> Protected
+                                        </span>
+                                    {% endif %}
+                                </div>
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="6">
+                                <div class="empty-state">
+                                    <i class="fa-solid fa-inbox"></i>
+                                    <p style="font-weight:600;margin-bottom:4px;color:var(--text-main)">No users found</p>
+                                    <p style="font-size:0.82rem">Try a different search term.</p>
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+
+
+<!-- Add Staff Modal (replaces old Add Reception link) -->
+<div class="modal fade" id="createStaffModal" tabindex="-1" aria-hidden="true" role="dialog">
+    <div class="modal-dialog modal-dialog-centered" style="max-width:460px">
+        <div class="modal-content">
+            <div class="modal-header modal-header-create-reception">
+                <h5 class="modal-title-create-reception">
+                    <i class="fa-solid fa-user-tie"></i> Add Staff Member
+                </h5>
+                <button type="button" class="btn-close" onclick="closeUserModal('createStaffModal')" aria-label="Close"></button>
+            </div>
+            <form method="POST" action="{% url 'add_staff' %}" data-user-create-form>
+                {% csrf_token %}
+                <div class="modal-body">
+                    <div class="glass-form-group">
+                        <label>Full Name</label>
+                        <input type="text" name="name" class="glass-input" placeholder="e.g. Bilan Xasan" required>
+                    </div>
+                    <div class="form-row-2">
+                        <div class="glass-form-group">
+                            <label>Position</label>
+                            <select name="position" class="glass-input">
+                                <option value="Reception">Reception</option>
+                                <option value="Cashier">Cashier</option>
+                                <option value="Tailor">Tailor</option>
+                                <option value="Cleaner">Cleaner</option>
+                                <option value="Manager">Manager</option>
+                                <option value="Other">Other</option>
+                            </select>
+                        </div>
+                        <div class="glass-form-group">
+                            <label>Phone</label>
+                            <input type="text" name="phone" class="glass-input" placeholder="+252...">
+                        </div>
+                    </div>
+                    <div class="form-row-2">
+                        <div class="glass-form-group">
+                            <label>Hire Date</label>
+                            <input type="date" name="hire_date" class="glass-input">
+                        </div>
+                        <div class="glass-form-group">
+                            <label>Monthly Salary</label>
+                            <input type="number" step="0.01" name="monthly_salary" class="glass-input" placeholder="0.00" required>
+                        </div>
+                    </div>
+                    <div class="glass-form-group">
+                        <label>Status</label>
+                        <select name="status" class="glass-input">
+                            <option value="active">Active</option>
+                            <option value="inactive">Inactive</option>
+                        </select>
+                    </div>
+
+                    <hr style="border-color:var(--border); margin: 18px 0;">
+
+                    <label class="checkbox-row" style="margin-bottom:12px;">
+                        <input type="checkbox" id="createLoginToggle" name="create_login" onchange="toggleStaffLoginFields(this)">
+                        Also create a login account for this staff member
+                    </label>
+
+                    <div id="staffLoginFields" style="display:none;">
+                        <div class="glass-form-group">
+                            <label>Username</label>
+                            <input type="text" name="username" id="staffUsername" class="glass-input" placeholder="e.g. bilan_reception">
+                        </div>
+                        <div class="glass-form-group">
+                            <label>Email (optional)</label>
+                            <input type="email" name="email" class="glass-input" placeholder="name@example.com">
+                        </div>
+                        <div class="form-row-2">
+                            <div class="glass-form-group">
+                                <label>Password</label>
+                                <input type="password" name="password" id="staffPassword" class="glass-input" minlength="4">
+                            </div>
+                            <div class="glass-form-group">
+                                <label>Confirm Password</label>
+                                <input type="password" name="password2" id="staffPassword2" class="glass-input" minlength="4">
+                            </div>
+                        </div>
+                        <div class="form-hint">Minimum 4 characters. This lets the staff member log in as Reception/Cashier.</div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn-modal-cancel" onclick="closeUserModal('createStaffModal')">
+                        <i class="fa-solid fa-xmark me-1"></i> Cancel
+                    </button>
+                    <button type="submit" class="btn-modal-confirm-create variant-reception">
+                        <i class="fa-solid fa-check"></i> Add Staff
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Add Payroll Modal -->
+<div class="modal fade" id="addPayrollModal" tabindex="-1" aria-hidden="true" role="dialog">
+    <div class="modal-dialog modal-dialog-centered" style="max-width:440px">
+        <div class="modal-content">
+            <div class="modal-header modal-header-create-payroll">
+                <h5 class="modal-title-create-payroll">
+                    <i class="fa-solid fa-money-check-dollar"></i> Add Payroll
+                </h5>
+                <button type="button" class="btn-close" onclick="closeUserModal('addPayrollModal')" aria-label="Close"></button>
+            </div>
+            <form method="POST" action="{% url 'add_payroll' %}">
+                {% csrf_token %}
+                <div class="modal-body">
+                    <div class="glass-form-group">
+                        <label>Staff Member</label>
+                        <select name="staff" id="payrollStaffSelect" class="glass-input" required>
+                            <option value="">-- Select Staff --</option>
+                            {% for staff in staff_list %}
+                            <option value="{{ staff.id }}">{{ staff.name }}{% if staff.position %} — {{ staff.position }}{% endif %}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="form-row-2">
+                        <div class="glass-form-group">
+                            <label>Type</label>
+                            <select name="payment_type" class="glass-input">
+                                <option value="Salary">Salary</option>
+                                <option value="Advance">Advance</option>
+                                <option value="Bonus">Bonus</option>
+                                <option value="Deduction">Deduction</option>
+                            </select>
+                        </div>
+                        <div class="glass-form-group">
+                            <label>Amount</label>
+                            <input type="number" step="0.01" name="amount" class="glass-input" placeholder="0.00" required>
+                        </div>
+                    </div>
+                    <div class="glass-form-group">
+                        <label>Payment Date</label>
+                        <input type="date" name="payment_date" id="payrollDate" class="glass-input" required>
+                    </div>
+                    <div class="form-row-2">
+                        <div class="glass-form-group">
+                            <label>Month</label>
+                            <select name="month" class="glass-input">
+                                <option value="1">January</option>
+                                <option value="2">February</option>
+                                <option value="3">March</option>
+                                <option value="4">April</option>
+                                <option value="5">May</option>
+                                <option value="6">June</option>
+                                <option value="7">July</option>
+                                <option value="8">August</option>
+                                <option value="9">September</option>
+                                <option value="10">October</option>
+                                <option value="11">November</option>
+                                <option value="12">December</option>
+                            </select>
+                        </div>
+                        <div class="glass-form-group">
+                            <label>Year</label>
+                            <input type="number" name="year" id="payrollYear" class="glass-input" placeholder="2026">
+                        </div>
+                    </div>
+                    <div class="glass-form-group">
+                        <label>Notes (optional)</label>
+                        <input type="text" name="notes" class="glass-input" placeholder="e.g. July advance payment">
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn-modal-cancel" onclick="closeUserModal('addPayrollModal')">
+                        <i class="fa-solid fa-xmark me-1"></i> Cancel
+                    </button>
+                    <button type="submit" class="btn-modal-confirm-create variant-payroll">
+                        <i class="fa-solid fa-check"></i> Save Payroll
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+{# DELETE MODAL LOOP: Halkan waxaa laga saaray xannibaaddii `not user.is_staff` si modal-ka tirtirista uu u abuurmo sidoo kale marka uu yahay Reception #}
+{% for user in users %}
+{% if user.id != request.user.id and not request.user.profile.is_reception %}
+{% if not user.is_staff or user.profile.is_reception %}
+<div class="modal fade" id="deleteModal{{ user.id }}" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered" style="max-width:400px">
+        <div class="modal-content">
+            <div class="modal-header modal-header-danger">
+                <h5 class="modal-title">
+                    <i class="fa-solid fa-triangle-exclamation"></i> Delete User
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body text-center">
+                <div class="modal-delete-icon">
+                    <i class="fa-solid fa-user-minus"></i>
+                </div>
+                <div style="text-align:left">
+                    <div class="modal-detail-row">
+                        <span class="modal-detail-label">Username</span>
+                        <span class="modal-detail-value">{{ user.username }}</span>
+                    </div>
+                    <div class="modal-detail-row">
+                        <span class="modal-detail-label">Email</span>
+                        <span class="modal-detail-value">{{ user.email|default:"—" }}</span>
+                    </div>
+                    <div class="modal-detail-row">
+                        <span class="modal-detail-label">Role</span>
+                        <span class="modal-detail-value">
+                            {% if user.profile.is_reception %}Reception{% elif user.profile.is_cashier %}Cashier{% elif user.is_staff %}Admin{% else %}Customer{% endif %}
+                        </span>
+                    </div>
+                </div>
+                <div class="warn-box">
+                    <i class="fa-solid fa-triangle-exclamation" style="flex-shrink:0;margin-top:1px"></i>
+                    This action <strong>cannot be undone</strong>. All associated rental requests will be retained but orphaned.
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-modal-cancel" data-bs-dismiss="modal">
+                    <i class="fa-solid fa-xmark me-1"></i> Cancel
+                </button>
+                <a href="{% url 'delete_user' user.id %}" class="btn-modal-confirm-del">
+                    <i class="fa-solid fa-trash"></i> Delete User
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+{% endif %}
+{% endfor %}
+
+<script>
+    document.getElementById('live-date').textContent = new Date().toLocaleDateString('en-US', {
+        weekday: 'short', year: 'numeric', month: 'short', day: 'numeric'
+    });
+</script>
+
+<script>
+    function openUserModal(modalId) {
+        var el = document.getElementById(modalId);
+        if (!el || typeof bootstrap === 'undefined') return;
+        var instance = bootstrap.Modal.getOrCreateInstance(el, { backdrop: true, keyboard: true });
+        instance.show();
+    }
+
+    function closeUserModal(modalId) {
+        var el = document.getElementById(modalId);
+        if (!el || typeof bootstrap === 'undefined') return;
+        var instance = bootstrap.Modal.getOrCreateInstance(el);
+        instance.hide();
+    }
+
+    function toggleStaffLoginFields(checkbox) {
+        var fields = document.getElementById('staffLoginFields');
+        var username = document.getElementById('staffUsername');
+        var password = document.getElementById('staffPassword');
+        var password2 = document.getElementById('staffPassword2');
+        if (checkbox.checked) {
+            fields.style.display = 'block';
+            username.required = true;
+            password.required = true;
+            password2.required = true;
+        } else {
+            fields.style.display = 'none';
+            username.required = false;
+            password.required = false;
+            password2.required = false;
+        }
+    }
+
+    // Opens the Add Payroll modal. If staffId is passed, preselects that staff member.
+    function openPayrollModal(staffId, staffName) {
+        var select = document.getElementById('payrollStaffSelect');
+        var dateInput = document.getElementById('payrollDate');
+        var yearInput = document.getElementById('payrollYear');
+
+        if (staffId && select) {
+            select.value = staffId;
+        }
+
+        var today = new Date();
+        if (dateInput && !dateInput.value) {
+            dateInput.value = today.toISOString().slice(0, 10);
+        }
+        if (yearInput && !yearInput.value) {
+            yearInput.value = today.getFullYear();
+        }
+
+        openUserModal('addPayrollModal');
+    }
+
+    document.addEventListener('DOMContentLoaded', function () {
+        document.querySelectorAll('.modal').forEach(function (modalEl) {
+            document.body.appendChild(modalEl);
+        });
+
+        ['createCashierModal', 'createStaffModal', 'addPayrollModal'].forEach(function (id) {
+            var modalEl = document.getElementById(id);
+            if (!modalEl) return;
+            modalEl.addEventListener('shown.bs.modal', function () {
+                var input = modalEl.querySelector('input[name="name"], input[name="username"], select[name="staff"]');
+                if (input) input.focus();
+            });
+        });
+
+        document.querySelectorAll('form[data-user-create-form]').forEach(function (form) {
+            form.addEventListener('submit', function (event) {
+                var password = form.querySelector('input[name="password"]');
+                var confirmPassword = form.querySelector('input[name="password2"]');
+                if (!password || !confirmPassword) return;
+                if (!password.required && password.value === '' && confirmPassword.value === '') return;
+                if (password.value.length < 4) {
+                    event.preventDefault();
+                    alert('Password must be at least 4 characters long.');
+                    password.focus();
+                    return;
+                }
+                if (password.value !== confirmPassword.value) {
+                    event.preventDefault();
+                    alert('Passwords do not match.');
+                    confirmPassword.focus();
+                }
+            });
+        });
+    });
+</script>
+
+{% endblock %}

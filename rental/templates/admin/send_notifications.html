@@ -1,0 +1,593 @@
+{% extends "rental/base.html" %}
+{% block title %}Send Notifications | Suit Luxe{% endblock %}
+
+{% block content %}
+<style>
+    :root {
+        --gold: #c9a84c;
+        --gold-light: #e8c96a;
+        --gold-dim: rgba(201,168,76,0.12);
+        --gold-glow: rgba(201,168,76,0.28);
+        --bg: #0f0f1a;
+        --border: rgba(255,255,255,0.07);
+        --text-main: #f0ede8;
+        --text-muted: rgba(240,237,232,0.5);
+        --success: #4caf82;
+        --danger: #e05c5c;
+        --warning: #e0a040;
+        --radius: 16px;
+    }
+
+    /* ══ ANIMATED BACKGROUND ══ */
+    .notif-bg {
+        position: fixed;
+        inset: 0;
+        z-index: 0;
+        pointer-events: none;
+        overflow: hidden;
+    }
+
+    .notif-bg::before {
+        content: '';
+        position: absolute;
+        inset: 0;
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 120'%3E%3Cpath d='M30 10 L15 30 L25 30 L20 120 L80 120 L75 30 L85 30 L70 10 Q60 20 50 18 Q40 20 30 10Z' fill='none' stroke='rgba(201,168,76,0.055)' stroke-width='1.5'/%3E%3Cpath d='M35 10 Q50 28 65 10' fill='none' stroke='rgba(201,168,76,0.055)' stroke-width='1.5'/%3E%3C/svg%3E");
+        background-size: 110px 132px;
+        background-repeat: repeat;
+        animation: bgDrift 70s linear infinite;
+    }
+
+    @keyframes bgDrift {
+        from { background-position: 0 0; }
+        to   { background-position: 110px 132px; }
+    }
+
+    .notif-orb {
+        position: fixed;
+        border-radius: 50%;
+        filter: blur(90px);
+        pointer-events: none;
+        animation: orbFloat 14s ease-in-out infinite;
+        z-index: 0;
+    }
+
+    .notif-orb-1 {
+        width: 500px; height: 500px;
+        background: radial-gradient(circle, rgba(201,168,76,0.08) 0%, transparent 70%);
+        top: -100px; right: 5%;
+    }
+
+    .notif-orb-2 {
+        width: 380px; height: 380px;
+        background: radial-gradient(circle, rgba(76,175,130,0.06) 0%, transparent 70%);
+        bottom: 5%; left: 10%;
+        animation-delay: -7s;
+    }
+
+    @keyframes orbFloat {
+        0%,100% { transform: translateY(0) scale(1); }
+        50%      { transform: translateY(-24px) scale(1.03); }
+    }
+
+    /* ══ PAGE WRAP ══ */
+    .notif-wrap {
+        position: relative;
+        z-index: 1;
+        padding: 30px 0 60px;
+        animation: pageIn 0.7s cubic-bezier(0.22,1,0.36,1) both;
+    }
+
+    @keyframes pageIn {
+        from { opacity: 0; transform: translateY(20px); }
+        to   { opacity: 1; transform: translateY(0); }
+    }
+
+    /* ══ PAGE HEADER ══ */
+    .notif-page-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        flex-wrap: wrap;
+        gap: 14px;
+        margin-bottom: 32px;
+    }
+
+    .notif-page-header h2 {
+        font-family: 'Cormorant Garamond', serif;
+        font-size: 2rem;
+        color: var(--text-main);
+        margin: 0;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+    }
+
+    .notif-page-header h2 i { color: var(--gold); font-size: 1.6rem; }
+    .notif-page-header p { color: var(--text-muted); font-size: 0.84rem; margin: 4px 0 0; }
+
+    .btn-back {
+        background: transparent;
+        border: 1px solid var(--border);
+        color: var(--text-muted);
+        font-size: 0.82rem;
+        font-weight: 600;
+        padding: 9px 20px;
+        border-radius: 50px;
+        text-decoration: none;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        transition: 0.22s;
+    }
+
+    .btn-back:hover {
+        background: var(--gold-dim);
+        border-color: rgba(201,168,76,0.35);
+        color: var(--gold);
+    }
+
+    /* ══ FORM CARD ══ */
+    .notif-card {
+        background: rgba(255,255,255,0.03);
+        border: 1px solid var(--border);
+        border-radius: 22px;
+        overflow: hidden;
+        backdrop-filter: blur(12px);
+        position: relative;
+    }
+
+    .notif-card::before {
+        content: '';
+        position: absolute;
+        top: 0; left: 0; right: 0;
+        height: 2px;
+        background: linear-gradient(90deg, transparent, var(--gold), transparent);
+    }
+
+    .notif-card-header {
+        padding: 24px 32px;
+        border-bottom: 1px solid var(--border);
+        background: rgba(0,0,0,0.15);
+        display: flex;
+        align-items: center;
+        gap: 14px;
+    }
+
+    .notif-card-icon {
+        width: 46px; height: 46px;
+        background: var(--gold-dim);
+        border: 1px solid rgba(201,168,76,0.25);
+        border-radius: 13px;
+        display: flex; align-items: center; justify-content: center;
+        color: var(--gold);
+        font-size: 18px;
+        flex-shrink: 0;
+        animation: iconPulse 3s ease-in-out infinite;
+    }
+
+    @keyframes iconPulse {
+        0%,100% { box-shadow: 0 0 0 0 rgba(201,168,76,0.2); }
+        50%      { box-shadow: 0 0 0 10px rgba(201,168,76,0); }
+    }
+
+    .notif-card-header h4 {
+        font-family: 'Cormorant Garamond', serif;
+        font-size: 1.3rem;
+        color: var(--text-main);
+        margin: 0;
+    }
+
+    .notif-card-header p {
+        color: var(--text-muted);
+        font-size: 0.78rem;
+        margin: 3px 0 0;
+    }
+
+    .notif-card-body { padding: 32px; }
+
+    /* ══ FORM ELEMENTS ══ */
+    .form-group { margin-bottom: 24px; }
+
+    .form-label-custom {
+        display: flex;
+        align-items: center;
+        gap: 7px;
+        font-size: 0.72rem;
+        text-transform: uppercase;
+        letter-spacing: 1.8px;
+        color: var(--text-muted);
+        font-weight: 700;
+        margin-bottom: 10px;
+    }
+
+    .form-label-custom i { color: var(--gold); font-size: 11px; }
+
+    .form-textarea {
+        width: 100%;
+        background: rgba(255,255,255,0.04);
+        border: 1px solid var(--border);
+        border-radius: 14px;
+        color: var(--text-main);
+        font-family: 'DM Sans', sans-serif;
+        font-size: 0.88rem;
+        padding: 16px 18px;
+        outline: none;
+        resize: vertical;
+        min-height: 140px;
+        transition: all 0.25s;
+        line-height: 1.6;
+    }
+
+    .form-textarea::placeholder { color: var(--text-muted); }
+
+    .form-textarea:focus {
+        background: rgba(201,168,76,0.05);
+        border-color: rgba(201,168,76,0.45);
+        box-shadow: 0 0 0 3px rgba(201,168,76,0.08);
+    }
+
+    /* Char counter */
+    .char-counter {
+        text-align: right;
+        font-size: 0.72rem;
+        color: var(--text-muted);
+        margin-top: 6px;
+        transition: color 0.2s;
+    }
+
+    .char-counter.warn { color: var(--warning); }
+    .char-counter.danger { color: var(--danger); }
+
+    /* Target selector */
+    .target-options {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+    }
+
+    .target-option {
+        flex: 1;
+        min-width: 140px;
+    }
+
+    .target-option input[type="radio"] { display: none; }
+
+    .target-option label {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 10px;
+        padding: 20px 16px;
+        background: rgba(255,255,255,0.03);
+        border: 1px solid var(--border);
+        border-radius: 14px;
+        cursor: pointer;
+        transition: all 0.22s;
+        text-align: center;
+        width: 100%;
+    }
+
+    .target-option label:hover {
+        background: var(--gold-dim);
+        border-color: rgba(201,168,76,0.3);
+    }
+
+    .target-option input:checked + label {
+        background: var(--gold-dim);
+        border-color: rgba(201,168,76,0.45);
+        box-shadow: 0 0 0 3px rgba(201,168,76,0.08);
+    }
+
+    .target-icon {
+        width: 42px; height: 42px;
+        border-radius: 12px;
+        background: rgba(255,255,255,0.05);
+        display: flex; align-items: center; justify-content: center;
+        font-size: 16px;
+        color: var(--text-muted);
+        transition: 0.22s;
+    }
+
+    .target-option input:checked + label .target-icon {
+        background: linear-gradient(135deg, var(--gold), var(--gold-light));
+        color: #0c0c14;
+        box-shadow: 0 4px 14px var(--gold-glow);
+    }
+
+    .target-name {
+        font-size: 0.84rem;
+        font-weight: 600;
+        color: var(--text-muted);
+        transition: 0.22s;
+    }
+
+    .target-option input:checked + label .target-name { color: var(--gold); }
+
+    .target-desc {
+        font-size: 0.72rem;
+        color: var(--text-muted);
+        opacity: 0.7;
+    }
+
+    /* ══ DIVIDER ══ */
+    .form-divider {
+        border: none;
+        border-top: 1px solid var(--border);
+        margin: 28px 0;
+    }
+
+    /* ══ PREVIEW BOX ══ */
+    .preview-box {
+        background: rgba(201,168,76,0.04);
+        border: 1px solid rgba(201,168,76,0.15);
+        border-radius: 14px;
+        padding: 18px 20px;
+        margin-bottom: 24px;
+        display: none;
+    }
+
+    .preview-box.visible { display: block; }
+
+    .preview-label {
+        font-size: 0.65rem;
+        text-transform: uppercase;
+        letter-spacing: 2px;
+        color: var(--gold);
+        font-weight: 700;
+        margin-bottom: 8px;
+    }
+
+    .preview-text {
+        color: var(--text-main);
+        font-size: 0.86rem;
+        line-height: 1.6;
+    }
+
+    /* ══ SUBMIT BUTTON ══ */
+    .btn-send {
+        background: linear-gradient(135deg, var(--gold), var(--gold-light));
+        color: #0c0c14;
+        font-weight: 700;
+        font-size: 0.9rem;
+        padding: 14px 36px;
+        border-radius: 12px;
+        border: none;
+        cursor: pointer;
+        transition: all 0.25s;
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+        box-shadow: 0 8px 24px var(--gold-glow);
+        letter-spacing: 0.5px;
+    }
+
+    .btn-send:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 14px 36px var(--gold-glow);
+    }
+
+    .btn-send:active { transform: translateY(0); }
+
+    /* ══ SUCCESS ALERT ══ */
+    .alert-success-custom {
+        background: rgba(76,175,130,0.08);
+        border: 1px solid rgba(76,175,130,0.25);
+        border-radius: 12px;
+        padding: 14px 18px;
+        color: var(--success);
+        font-size: 0.86rem;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin-bottom: 24px;
+    }
+
+    /* Info tip */
+    .info-tip {
+        display: flex;
+        align-items: flex-start;
+        gap: 10px;
+        background: rgba(106,176,232,0.06);
+        border: 1px solid rgba(106,176,232,0.15);
+        border-radius: 12px;
+        padding: 14px 16px;
+        font-size: 0.8rem;
+        color: rgba(106,176,232,0.85);
+        margin-top: 20px;
+    }
+
+    .info-tip i { flex-shrink: 0; margin-top: 1px; }
+
+    ::-webkit-scrollbar { width: 4px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: rgba(201,168,76,0.2); border-radius: 4px; }
+</style>
+
+<!-- Background -->
+<div class="notif-bg"></div>
+<div class="notif-orb notif-orb-1"></div>
+<div class="notif-orb notif-orb-2"></div>
+
+<div class="notif-wrap">
+    <div class="container">
+        <div style="max-width: 720px; margin: 0 auto;">
+
+            <!-- ══ PAGE HEADER ══ -->
+            <div class="notif-page-header">
+                <div>
+                    <h2>
+                        <i class="fa-solid fa-bell"></i>
+                        Send Notifications
+                    </h2>
+                    <p>Broadcast messages to users in the system</p>
+                </div>
+                <a href="{% url 'dashboard' %}" class="btn-back">
+                    <i class="fa-solid fa-arrow-left"></i> Dashboard
+                </a>
+            </div>
+
+            <!-- Success message -->
+            {% if messages %}
+                {% for message in messages %}
+                <div class="alert-success-custom">
+                    <i class="fa-solid fa-circle-check fa-lg"></i>
+                    {{ message }}
+                </div>
+                {% endfor %}
+            {% endif %}
+
+            <!-- ══ FORM CARD ══ -->
+            <div class="notif-card">
+
+                <div class="notif-card-header">
+                    <div class="notif-card-icon">
+                        <i class="fa-solid fa-paper-plane"></i>
+                    </div>
+                    <div>
+                        <h4>New Notification</h4>
+                        <p>Write your message and choose who receives it</p>
+                    </div>
+                </div>
+
+                <div class="notif-card-body">
+                    <form method="post" id="notifForm">
+                        {% csrf_token %}
+
+                        <!-- Message -->
+                        <div class="form-group">
+                            <div class="form-label-custom">
+                                <i class="fa-solid fa-message"></i>
+                                Notification Message
+                            </div>
+                            <textarea class="form-textarea"
+                                      name="message"
+                                      id="msgTextarea"
+                                      rows="5"
+                                      placeholder="Write your notification message here..."
+                                      maxlength="500"
+                                      required></textarea>
+                            <div class="char-counter" id="charCounter">0 / 500</div>
+                        </div>
+
+                        <!-- Live Preview -->
+                        <div class="preview-box" id="previewBox">
+                            <div class="preview-label">
+                                <i class="fa-solid fa-eye me-1"></i> Preview
+                            </div>
+                            <div class="preview-text" id="previewText"></div>
+                        </div>
+
+                        <hr class="form-divider">
+
+                        <!-- Send To -->
+                        <div class="form-group">
+                            <div class="form-label-custom">
+                                <i class="fa-solid fa-users"></i>
+                                Send To
+                            </div>
+
+                            <div class="target-options">
+
+                                <div class="target-option">
+                                    <input type="radio" name="send_to"
+                                           id="opt-all" value="all" checked>
+                                    <label for="opt-all">
+                                        <div class="target-icon">
+                                            <i class="fa-solid fa-users"></i>
+                                        </div>
+                                        <div class="target-name">All Users</div>
+                                        <div class="target-desc">Every registered account</div>
+                                    </label>
+                                </div>
+
+                                <div class="target-option">
+                                    <input type="radio" name="send_to"
+                                           id="opt-active" value="active">
+                                    <label for="opt-active">
+                                        <div class="target-icon">
+                                            <i class="fa-solid fa-circle-check"></i>
+                                        </div>
+                                        <div class="target-name">Active Renters</div>
+                                        <div class="target-desc">Currently renting suits</div>
+                                    </label>
+                                </div>
+
+                                <div class="target-option">
+                                    <input type="radio" name="send_to"
+                                           id="opt-overdue" value="overdue">
+                                    <label for="opt-overdue">
+                                        <div class="target-icon">
+                                            <i class="fa-solid fa-clock"></i>
+                                        </div>
+                                        <div class="target-name">Overdue Renters</div>
+                                        <div class="target-desc">Past their return date</div>
+                                    </label>
+                                </div>
+
+                            </div>
+                        </div>
+
+                        <hr class="form-divider">
+
+                        <!-- Submit -->
+                        <div class="d-flex align-items-center gap-3 flex-wrap">
+                            <button type="submit" class="btn-send">
+                                <i class="fa-solid fa-paper-plane"></i>
+                                Send Notification
+                            </button>
+                            <span style="color:var(--text-muted);font-size:0.8rem">
+                                Message will be sent immediately
+                            </span>
+                        </div>
+
+                        <div class="info-tip">
+                            <i class="fa-solid fa-circle-info"></i>
+                            <span>
+                                Notifications are delivered to users' accounts in real-time.
+                                Make sure your message is clear and professional before sending.
+                            </span>
+                        </div>
+
+                    </form>
+                </div>
+            </div>
+
+        </div>
+    </div>
+</div>
+
+<script>
+    // ══ CHAR COUNTER + PREVIEW ══
+    const textarea  = document.getElementById('msgTextarea');
+    const counter   = document.getElementById('charCounter');
+    const previewBox  = document.getElementById('previewBox');
+    const previewText = document.getElementById('previewText');
+
+    textarea.addEventListener('input', function () {
+        const len = this.value.length;
+        const max = 500;
+
+        counter.textContent = len + ' / ' + max;
+        counter.className = 'char-counter';
+        if (len > 400) counter.classList.add('warn');
+        if (len > 470) counter.classList.add('danger');
+
+        if (len > 0) {
+            previewBox.classList.add('visible');
+            previewText.textContent = this.value;
+        } else {
+            previewBox.classList.remove('visible');
+        }
+    });
+
+    // ══ SEND ANIMATION ══
+    document.getElementById('notifForm').addEventListener('submit', function () {
+        const btn = this.querySelector('.btn-send');
+        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Sending...';
+        btn.style.opacity = '0.8';
+        btn.disabled = true;
+    });
+</script>
+
+{% endblock %}

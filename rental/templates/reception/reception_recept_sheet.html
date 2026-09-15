@@ -1,0 +1,390 @@
+{% extends "rental/base_admin.html" %}
+{% block title %}Receipt - Suit Rental{% endblock %}
+
+{% block content %}
+<style>
+    .receipt-wrapper {
+        background: #f4f6fb;
+        padding: 20px 0;
+    }
+
+    .receipt-paper {
+        width: min(80mm, 100%);
+        max-width: 80mm;
+        margin: auto;
+        background: #fff;
+        padding: 18px;
+        border-radius: 14px;
+        box-shadow: 0 20px 60px rgba(15, 23, 42, 0.08);
+        border: 1px solid rgba(226, 232, 240, 0.8);
+        font-family: 'Inter', sans-serif;
+        color: #111827;
+    }
+
+    .receipt-header {
+        display: grid;
+        grid-template-columns: 1fr auto;
+        gap: 16px;
+        align-items: start;
+        margin-bottom: 18px;
+    }
+
+    .brand-title {
+        margin: 0;
+        font-size: 1.2rem;
+        font-weight: 800;
+        letter-spacing: 0.02em;
+    }
+
+    .brand-meta,
+    .receipt-meta div,
+    .receipt-detail-item {
+        font-size: 0.82rem;
+        line-height: 1.5;
+        color: #475569;
+    }
+
+    .receipt-meta {
+        text-align: right;
+        font-size: 0.82rem;
+    }
+
+    .receipt-meta strong,
+    .receipt-detail-label {
+        color: #0f172a;
+    }
+
+    .section-title {
+        margin: 0 0 12px;
+        font-size: 0.92rem;
+        font-weight: 700;
+        letter-spacing: 0.05em;
+        text-transform: uppercase;
+        color: #0f172a;
+    }
+
+    .section-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 14px 22px;
+        margin-bottom: 20px;
+    }
+
+    .receipt-block {
+        padding: 14px 16px;
+        border: 1px solid rgba(148, 163, 184, 0.18);
+        border-radius: 12px;
+        background: #f8fafc;
+        margin-bottom: 14px;
+    }
+
+    .receipt-block:nth-child(odd) {
+        background: #ffffff;
+    }
+
+    .receipt-detail-item {
+        margin-bottom: 8px;
+    }
+
+    .receipt-detail-label {
+        display: inline-block;
+        min-width: 120px;
+        font-weight: 700;
+    }
+
+    .amount-grid {
+        display: grid;
+        gap: 10px;
+        margin-bottom: 18px;
+    }
+
+    .amount-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        font-size: 0.92rem;
+        color: #475569;
+        border-bottom: 1px solid rgba(148, 163, 184, 0.16);
+        padding-bottom: 10px;
+    }
+
+    .amount-row strong {
+        color: #0f172a;
+    }
+
+    .amount-total {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 14px 16px;
+        border-radius: 12px;
+        background: #0f172a;
+        color: #fff;
+        font-size: 1rem;
+        font-weight: 700;
+    }
+
+    .thank-you {
+        margin-top: 20px;
+        text-align: center;
+        font-size: 0.92rem;
+        color: #334155;
+    }
+
+    .receipt-footnote {
+        margin-top: 16px;
+        font-size: 0.78rem;
+        color: #64748b;
+        text-align: center;
+    }
+
+    .receipt-actions {
+        display: flex;
+        justify-content: flex-end;
+        gap: 10px;
+        margin-top: 16px;
+    }
+
+    .receipt-actions .btn {
+        white-space: nowrap;
+    }
+
+    .receipt-barcode {
+        margin: 22px auto 0;
+        max-width: 220px;
+        text-align: center;
+        font-size: 0.72rem;
+        color: #475569;
+    }
+
+    .receipt-barcode span {
+        display: block;
+        margin-top: 10px;
+        letter-spacing: 0.12em;
+    }
+
+    @media (max-width: 720px) {
+        .receipt-paper {
+            padding: 14px;
+        }
+        .section-grid {
+            grid-template-columns: 1fr;
+        }
+        .receipt-meta {
+            text-align: left;
+        }
+    }
+
+    /* ══════════════════════════════════════════════════════
+       PRINT — hide everything except the receipt, force
+       the whole thing onto a single physical page.
+       ══════════════════════════════════════════════════════ */
+    @media print {
+        body, html {
+            margin: 0 !important;
+            padding: 0 !important;
+            background: #fff !important;
+            color: #000 !important;
+            height: auto !important;
+            overflow: visible !important;
+        }
+
+        /* Step 1: hide absolutely everything on the page */
+        body * {
+            visibility: hidden !important;
+        }
+
+        /* Step 2: reveal only the receipt itself */
+        .receipt-paper,
+        .receipt-paper * {
+            visibility: visible !important;
+        }
+
+        /* Step 3: extra safety-net for common layout/sidebar
+           class names, in case any escape the visibility trick
+           (e.g. fixed/absolute elements rendered outside flow) */
+        .sidebar,
+        #sidebar,
+        .app-sidebar,
+        .main-sidebar,
+        .navbar,
+        .topbar,
+        .app-header,
+        .app-navbar,
+        .header,
+        .footer,
+        .app-footer,
+        nav,
+        aside,
+        .mobile-header,
+        .sidebar-overlay,
+        .sidebar-menu,
+        .receipt-actions,
+        .no-print {
+            display: none !important;
+            visibility: hidden !important;
+        }
+
+        /* Step 4: pin the receipt to the top-left of the page
+           and force it to stay within one single page */
+        .receipt-wrapper {
+            background: transparent !important;
+            padding: 0 !important;
+            margin: 0 !important;
+        }
+
+        .receipt-paper {
+            position: absolute !important;
+            left: 0 !important;
+            top: 0 !important;
+            width: 80mm !important;
+            max-width: 80mm !important;
+            margin: 0 !important;
+            padding: 8mm !important;
+            border: none !important;
+            box-shadow: none !important;
+            background: #fff !important;
+            border-radius: 0 !important;
+            page-break-inside: avoid !important;
+            break-inside: avoid !important;
+        }
+
+        /* Compact spacing so long receipts still fit one page */
+        .receipt-block {
+            padding: 8px 10px !important;
+            margin-bottom: 8px !important;
+        }
+
+        .receipt-header { margin-bottom: 10px !important; }
+        .section-title { margin-bottom: 6px !important; font-size: 0.82rem !important; }
+        .receipt-detail-item { margin-bottom: 4px !important; font-size: 0.74rem !important; }
+        .brand-meta, .receipt-meta div { font-size: 0.74rem !important; }
+        .amount-grid { margin-bottom: 10px !important; gap: 6px !important; }
+        .amount-row { padding-bottom: 6px !important; font-size: 0.8rem !important; }
+        .amount-total { padding: 8px 10px !important; font-size: 0.88rem !important; }
+        .thank-you, .receipt-footnote { margin-top: 8px !important; font-size: 0.7rem !important; }
+        .receipt-barcode { margin-top: 12px !important; }
+
+        /* One page only — cut off anything that would spill over */
+        @page {
+            size: auto;
+            margin: 6mm;
+        }
+    }
+</style>
+
+<div class="receipt-wrapper">
+    <div class="receipt-paper">
+        <div class="receipt-header">
+            <div>
+                <div class="brand-title"> Royal Suit Rental</div>
+                <div class="brand-meta">hargaisa somaliland <br>Phone: +252 61 234 5678</div>
+            </div>
+            <div class="receipt-meta">
+                <div><strong>Receipt No:</strong> {{ receipt_number }}</div>
+                <div><strong>Date:</strong> {{ req.request_date|date:'d/m/Y H:i' }}</div>
+                <div><strong>Reception:</strong> {{ reception_name }}</div>
+            </div>
+        </div>
+
+        
+
+        <div class="receipt-block">
+            <h5 class="section-title">Suit Details</h5>
+            <div class="receipt-detail-item"><span class="receipt-detail-label">Suit Name:</span> {{ req.suit.suit_name }}</div>
+            <div class="receipt-detail-item"><span class="receipt-detail-label">Size:</span> {{ req.suit.size }}</div>
+            <div class="receipt-detail-item"><span class="receipt-detail-label">Days:</span> {{ req.days_requested }}</div>
+            {% if req.rental_start_time %}
+            <div class="receipt-detail-item"><span class="receipt-detail-label">Rental Date:</span> {{ req.rental_start_time|date:'d/m/Y H:i' }}</div>
+            {% endif %}
+            {% if req.end_time %}
+            <div class="receipt-detail-item"><span class="receipt-detail-label">Return Date:</span> {{ req.end_time|date:'d/m/Y H:i' }}</div>
+            {% endif %}
+        </div>
+
+        <div class="receipt-block">
+            <h5 class="section-title">Price</h5>
+            <div class="receipt-detail-item"><span class="receipt-detail-label">Rental Price:</span> {{ req.suit.price_per_day|floatformat:2 }} USD / day</div>
+            <div class="receipt-detail-item"><span class="receipt-detail-label">Late Penalty:</span> {{ req.late_fee|floatformat:2 }} USD</div>
+            <div class="receipt-detail-item"><span class="receipt-detail-label">Discount:</span> {{ discount_amount|floatformat:2 }} USD</div>
+        </div>
+
+        <div class="amount-grid">
+            <div class="amount-row"><span>Paid Now</span><strong>{{ req.amount_paid|floatformat:2 }} USD</strong></div>
+            <div class="amount-row"><span>Remaining Balance</span><strong>{{ req.balance_due|floatformat:2 }} USD</strong></div>
+            <div class="amount-total"><span>Total Amount</span><span>{{ total_amount|floatformat:2 }} USD</span></div>
+        </div>
+
+        <div class="receipt-block">
+            <h5 class="section-title">Payment</h5>
+            <div class="receipt-detail-item"><span class="receipt-detail-label">Method:</span> {{ req.payment_method|default:'Cash' }}</div>
+            <div class="receipt-detail-item"><span class="receipt-detail-label">Status:</span> {{ req.status }}</div>
+        </div>
+
+        <div class="receipt-barcode">
+            <div>QR / Barcode Placeholder</div>
+            <span>{{ receipt_number }}</span>
+        </div>
+
+        <div class="thank-you">Thank you for choosing Suit Rental. We appreciate your business!</div>
+        <div class="receipt-footnote">Keep this receipt as proof of your rental transaction.</div>
+
+        <div class="receipt-actions no-print">
+            <button class="btn btn-dark" onclick="window.print()"><i class="fa-solid fa-print me-2"></i>Print Receipt</button>
+            <a href="{% url 'reception_requests' %}" class="btn btn-secondary">Back to Requests</a>
+        </div>
+    </div>
+</div>
+
+<script>
+function copyReceipt() {
+    const lines = [];
+    lines.push('----------------------------------------');
+    lines.push('         SUIT RENTAL SYSTEM');
+    lines.push('          Sales Receipt');
+    lines.push('----------------------------------------');
+    lines.push('Company  : {{ company_name }}');
+    lines.push('Address  : {{ company_address }}');
+    lines.push('Phone    : {{ company_phone }}');
+    lines.push('');
+    lines.push('Receipt No : {{ receipt_number }}');
+    lines.push('Date       : {{ req.request_date|date:"d/m/Y H:i" }}');
+    lines.push('Reception  : {{ reception_name }}');
+    lines.push('----------------------------------------');
+    lines.push('Customer');
+    lines.push('Name       : {{ req.name }}');
+    lines.push('Phone      : {{ req.phone }}');
+    {% if req.customer_email %}lines.push('Email      : {{ req.customer_email }}');{% endif %}
+    {% if req.national_id %}lines.push('National ID: {{ req.national_id }}');{% endif %}
+    lines.push('----------------------------------------');
+    lines.push('Suit Details');
+    lines.push('Suit Name  : {{ req.suit.suit_name }}');
+    lines.push('Size       : {{ req.suit.size }}');
+    lines.push('Days       : {{ req.days_requested }}');
+    {% if req.rental_start_time %}lines.push('Rental Date: {{ req.rental_start_time|date:"d/m/Y H:i" }}');{% endif %}
+    {% if req.end_time %}lines.push('Return Date: {{ req.end_time|date:"d/m/Y H:i" }}');{% endif %}
+    lines.push('----------------------------------------');
+    lines.push('Pricing');
+    lines.push('Rental Price : {{ req.suit.price_per_day|floatformat:2 }} USD');
+    lines.push('Late Penalty : {{ req.late_fee|floatformat:2 }} USD');
+    lines.push('Discount     : {{ discount_amount|floatformat:2 }} USD');
+    lines.push('Total        : {{ total_amount|floatformat:2 }} USD');
+    lines.push('----------------------------------------');
+    lines.push('Payment Method : {{ req.payment_method|default:"Cash" }}');
+    lines.push('Status         : {{ req.status }}');
+    lines.push('----------------------------------------');
+    lines.push('Thank you for choosing Suit Rental.');
+    const receiptText = lines.join('\n');
+    navigator.clipboard.writeText(receiptText).then(() => {
+        const toast = document.createElement('div');
+        toast.className = 'position-fixed bottom-0 end-0 m-4 p-3 bg-dark text-white rounded-3 shadow';
+        toast.style.zIndex = '1100';
+        toast.innerText = '✓ Receipt details copied successfully!';
+        document.body.appendChild(toast);
+        setTimeout(() => toast.remove(), 2500);
+    }).catch(() => {
+        alert('Copy failed. Please copy manually.');
+    });
+}
+</script>
+{% endblock %}

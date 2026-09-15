@@ -1,0 +1,590 @@
+{% extends "rental/base_admin.html" %}
+{% block title %}Dry Cleaning Control | Royal Suit Rental{% endblock %}
+{% block page_title %}Dry Cleaning & Maintenance{% endblock %}
+
+{% block content %}
+<!-- FontAwesome for Enterprise Icons -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+<style>
+    :root {
+        --gold: #c9a84c;
+        --gold-light: #e8c96a;
+        --gold-dim: rgba(201,168,76,0.12);
+        --bg: #0f0f1a;
+        --bg-card: rgba(255,255,255,0.04);
+        --border: rgba(255,255,255,0.07);
+        --text-main: #f0ede8;
+        --text-muted: rgba(240,237,232,0.5);
+        --success: #4caf82;
+        --danger: #e05c5c;
+        --cleaning-blue: #38bdf8;
+        --radius: 16px;
+        --shadow: 0 20px 45px rgba(0,0,0,0.3);
+        --transition: all 0.3s cubic-bezier(0.4,0,0.2,1);
+    }
+
+    /* Page Header */
+    .laundry-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        flex-wrap: wrap;
+        gap: 1.5rem;
+        margin-bottom: 2.5rem;
+        padding-bottom: 1.5rem;
+        border-bottom: 1px solid var(--border);
+    }
+
+    .laundry-title {
+        font-family: 'Cormorant Garamond', 'Playfair Display', serif;
+        font-size: 2.2rem;
+        font-weight: 700;
+        color: var(--text-main);
+        margin: 0;
+        display: flex;
+        align-items: center;
+        gap: 14px;
+    }
+
+    .laundry-title i {
+        color: var(--cleaning-blue);
+        font-size: 1.9rem;
+        filter: drop-shadow(0 0 10px rgba(56,189,248,0.3));
+    }
+
+    .laundry-subtitle {
+        color: var(--text-muted);
+        font-size: 0.95rem;
+        margin: 6px 0 0;
+    }
+
+    /* Stats Badge */
+    .stats-container {
+        display: flex;
+        gap: 1rem;
+        flex-wrap: wrap;
+    }
+
+    .stats-badge {
+        background: var(--bg-card);
+        backdrop-filter: blur(20px);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        padding: 1.1rem 1.6rem;
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        box-shadow: var(--shadow);
+        transition: var(--transition);
+    }
+
+    .stats-badge:hover {
+        transform: translateY(-3px);
+        border-color: var(--cleaning-blue);
+        box-shadow: 0 25px 50px rgba(0,0,0,0.4);
+    }
+
+    .stats-badge-icon {
+        width: 44px;
+        height: 44px;
+        border-radius: 12px;
+        background: rgba(56,189,248,0.15);
+        color: var(--cleaning-blue);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.2rem;
+    }
+
+    .stats-badge-label {
+        font-size: 0.7rem;
+        text-transform: uppercase;
+        letter-spacing: 1.5px;
+        color: var(--text-muted);
+        font-weight: 700;
+    }
+
+    .stats-badge-value {
+        font-family: 'Cormorant Garamond', serif;
+        font-size: 1.9rem;
+        font-weight: 700;
+        color: var(--cleaning-blue);
+        line-height: 1;
+        margin-top: 2px;
+    }
+
+    .laundry-card {
+        background: var(--bg-card);
+        backdrop-filter: blur(20px);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        overflow: hidden;
+        box-shadow: var(--shadow);
+    }
+
+    .tab-nav {
+        display: flex;
+        gap: 0.75rem;
+        flex-wrap: wrap;
+        margin-bottom: 1.25rem;
+    }
+
+    .tab-nav a {
+        text-decoration: none;
+        padding: 0.7rem 1rem;
+        border-radius: 999px;
+        background: rgba(255,255,255,0.04);
+        color: var(--text-muted);
+        border: 1px solid var(--border);
+        font-weight: 700;
+        font-size: 0.85rem;
+    }
+
+    .tab-nav a.active {
+        background: rgba(56,189,248,0.16);
+        color: var(--cleaning-blue);
+        border-color: rgba(56,189,248,0.25);
+    }
+
+    .page-nav {
+        display: flex;
+        align-items: center;
+        justify-content: flex-end;
+        gap: 0.5rem;
+        margin-top: 1rem;
+    }
+
+    .page-nav a {
+        text-decoration: none;
+        padding: 0.45rem 0.75rem;
+        border-radius: 8px;
+        background: rgba(255,255,255,0.04);
+        color: var(--text-main);
+        border: 1px solid var(--border);
+        font-size: 0.85rem;
+    }
+
+    .page-nav .current {
+        background: rgba(201,168,76,0.16);
+        color: var(--gold);
+        border-color: rgba(201,168,76,0.25);
+    }
+
+    .laundry-card-header {
+        padding: 1.5rem 1.75rem;
+        border-bottom: 1px solid var(--border);
+        background: rgba(0,0,0,0.2);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 1rem;
+    }
+
+    .laundry-card-header h5 {
+        font-family: 'Cormorant Garamond', serif;
+        font-size: 1.3rem;
+        font-weight: 700;
+        color: var(--text-main);
+        margin: 0;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+    }
+
+    .laundry-card-header h5 i {
+        color: var(--cleaning-blue);
+        font-size: 1.3rem;
+    }
+
+    .laundry-card-body {
+        padding: 1.5rem;
+    }
+
+    /* Search Box Styling */
+    .search-wrapper {
+        position: relative;
+        max-width: 300px;
+        width: 100%;
+    }
+    .search-wrapper i {
+        position: absolute;
+        left: 14px;
+        top: 50%;
+        transform: translateY(-50%);
+        color: var(--text-muted);
+        font-size: 0.9rem;
+        transition: var(--transition);
+    }
+    .search-input {
+        width: 100%;
+        padding: 10px 10px 10px 38px;
+        background: rgba(255,255,255,0.03);
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        color: var(--text-main);
+        outline: none;
+        font-size: 0.9rem;
+        transition: var(--transition);
+    }
+    .search-input:focus {
+        border-color: var(--cleaning-blue);
+        box-shadow: 0 0 0 3px rgba(56,189,248,0.15);
+        background: rgba(0,0,0,0.3);
+    }
+    .search-input:focus + i {
+        color: var(--cleaning-blue);
+    }
+
+    /* Table System Architecture */
+    .laundry-table {
+        width: 100%;
+        border-collapse: separate;
+        border-spacing: 0 8px;
+    }
+
+    .laundry-table thead th {
+        color: var(--text-muted);
+        font-size: 0.72rem;
+        text-transform: uppercase;
+        letter-spacing: 1.5px;
+        font-weight: 700;
+        padding: 0.85rem 1.25rem;
+        text-align: left;
+        border-bottom: 1px solid var(--border);
+    }
+
+    .laundry-table tbody tr {
+        transition: var(--transition);
+    }
+
+    .laundry-table tbody td {
+        padding: 1rem 1.25rem;
+        background: rgba(255,255,255,0.015);
+        color: var(--text-main);
+        font-size: 0.92rem;
+        vertical-align: middle;
+        border-top: 1px solid rgba(255,255,255,0.01);
+        border-bottom: 1px solid rgba(255,255,255,0.01);
+    }
+
+    .laundry-table tbody tr:hover td {
+        background: rgba(56,189,248,0.04);
+        border-color: rgba(56,189,248,0.15);
+    }
+
+    .laundry-table tbody td:first-child {
+        border-radius: 12px 0 0 12px;
+        border-left: 1px solid rgba(255,255,255,0.01);
+    }
+
+    .laundry-table tbody td:last-child {
+        border-radius: 0 12px 12px 0;
+        text-align: right;
+        border-right: 1px solid rgba(255,255,255,0.01);
+    }
+
+    /* Components Styling */
+    .tag-number {
+        color: var(--gold);
+        font-weight: 700;
+        font-size: 0.9rem;
+        background: rgba(201,168,76,0.1);
+        padding: 4px 10px;
+        border-radius: 6px;
+        border: 1px solid rgba(201,168,76,0.2);
+    }
+
+    .suit-info { display: flex; flex-direction: column; gap: 2px; }
+    .suit-name { font-weight: 700; color: #fff; font-size: 0.95rem; }
+    .suit-meta { font-size: 0.78rem; color: var(--text-muted); }
+
+    .date-info { display: flex; align-items: center; gap: 6px; color: var(--text-muted); font-size: 0.88rem; }
+    .date-info i { color: var(--cleaning-blue); }
+
+    /* Actions Button Architecture */
+    .btn-ready {
+        background: linear-gradient(135deg, var(--success) 0%, #2e7d56 100%);
+        color: white; border: none; padding: 0.65rem 1.4rem; border-radius: 10px;
+        font-size: 0.85rem; font-weight: 700; cursor: pointer; transition: var(--transition);
+        display: inline-flex; align-items: center; gap: 8px; box-shadow: 0 4px 12px rgba(76,175,130,0.2);
+    }
+    .btn-ready:hover {
+        transform: translateY(-2px); box-shadow: 0 8px 20px rgba(76,175,130,0.35); filter: brightness(1.1);
+    }
+    .btn-ready:disabled {
+        opacity: 0.6; cursor: not-allowed; transform: none;
+    }
+
+    /* Empty State Container */
+    .empty-state { text-align: center; padding: 5rem 2rem; color: var(--text-muted); }
+    .empty-state-icon {
+        width: 74px; height: 74px; border-radius: 50%; background: rgba(56,189,248,0.06);
+        display: flex; align-items: center; justify-content: center;
+        margin: 0 auto 1.5rem; font-size: 2.2rem; color: var(--cleaning-blue);
+        border: 1px solid rgba(56,189,248,0.1);
+    }
+    .empty-state h6 { color: #fff; font-weight: 600; font-size: 1.2rem; margin-bottom: 0.4rem; font-family: 'Cormorant Garamond', serif; }
+
+    /* Responsive Grid System Configuration */
+    @media (max-width: 768px) {
+        .laundry-table thead { display: none; }
+        .laundry-table tbody tr { display: block; margin-bottom: 1rem; border: 1px solid var(--border); border-radius: 12px; padding: 0.5rem; background: rgba(255,255,255,0.01); }
+        .laundry-table tbody td { display: flex; justify-content: space-between; align-items: center; padding: 0.7rem 1rem; border: none; text-align: right !important; background: transparent !important; }
+        .laundry-table tbody td::before { content: attr(data-label); font-weight: 700; color: var(--text-muted); font-size: 0.7rem; text-transform: uppercase; letter-spacing: 1px; text-align: left; }
+        .laundry-table tbody td:first-child, .laundry-table tbody td:last-child { border-radius: 0; }
+        .search-wrapper { max-width: 100%; margin-top: 1rem; }
+    }
+</style>
+
+<div class="container-fluid px-4 py-4">
+    
+    <!-- PAGE HEADER -->
+    <div class="laundry-header">
+        <div>
+            <h1 class="laundry-title">
+                <i class="fas fa-soap"></i> Enterprise Laundry Control
+            </h1>
+            <p class="laundry-subtitle">Track and dispatch commercial dry-cleaning cycles and apparel restoration states.</p>
+        </div>
+        <div class="stats-container">
+            <div class="stats-badge">
+                <div class="stats-badge-icon"><i class="fas fa-spinner"></i></div>
+                <div>
+                    <div class="stats-badge-label">Active Cycles</div>
+                    <div class="stats-badge-value">{{ laundry_items|length|default:0 }}</div>
+                </div>
+            </div>
+           
+        </div>
+    </div>
+
+    <!-- MAIN QUEUE PANEL -->
+    <div class="laundry-card">
+        <div class="laundry-card-header">
+            <h5><i class="fas fa-list-check"></i> Real-Time Laundry Operations Terminal</h5>
+            
+            <!-- SEARCH BOX -->
+            <div class="search-wrapper">
+                <input type="text" id="laundrySearch" class="search-input" placeholder="Search Suit Name or ID..." onkeyup="searchTable()">
+                <i class="fas fa-search"></i>
+            </div>
+        </div>
+
+        <div class="laundry-card-body">
+            <div class="tab-nav">
+                <a href="{% url 'laundry_backlog' %}?tab=pending" class="{% if active_tab == 'pending' %}active{% endif %}">Pending Review</a>
+                <a href="{% url 'laundry_backlog' %}?tab=approved" class="{% if active_tab == 'approved' %}active{% endif %}">Approved</a>
+                <a href="{% url 'laundry_backlog' %}?tab=all" class="{% if active_tab == 'all' or not active_tab %}active{% endif %}">All</a>
+            </div>
+
+            {% if laundry_items %}
+            <div class="table-responsive">
+                <table class="laundry-table" id="laundryTerminalTable">
+                    <thead>
+                        <tr>
+                            <th>ID Number</th>
+                            <th>Suit Name</th>
+                            <th>Status & Cost</th>
+                            <th style="text-align: right;">Action</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for req in laundry_items %}
+                        {% with dry_clean=req.suit.dry_cleanings.first %}
+                        <tr id="row-{{ req.id }}" data-suit-name="{{ req.suit.suit_name|lower }}" data-id="{{ req.id }}">
+                            <td data-label="ID Number">
+                                <span class="tag-number">#{{ req.id }}</span>
+                            </td>
+                            <td data-label="Suit Name">
+                                <div class="suit-info">
+                                    <span class="suit-name">{{ req.suit.suit_name }}</span>
+                                    <span class="suit-meta">{{ req.suit.collection|default:"Premium" }} Collection</span>
+                                </div>
+                            </td>
+                            <td data-label="Status & Cost">
+                                <div class="status-section" style="display: flex; flex-direction: column; gap: 8px;">
+                                    {% if not dry_clean %}
+                                        <span class="status-badge" style="background: rgba(224,160,64,0.15); color: #f39c12; padding: 6px 12px; border-radius: 8px; font-weight: 600; font-size: 0.75rem; display: inline-block; width: fit-content;">
+                                            📋 Pending Review
+                                        </span>
+                                        <div style="display: flex; align-items: center; gap: 8px;">
+                                            <span class="cost-prefix" style="background: rgba(255,255,255,0.02); color: var(--cleaning-blue); font-weight: 700; padding: 4px 8px; border-radius: 6px;">$</span>
+                                            <input type="number" min="0" step="0.01" value="5.00" style="width: 70px; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.1); color: #fff; padding: 5px 8px; border-radius: 6px; font-size: 0.85rem;" class="cost-input" id="cost-{{ req.id }}" data-req="{{ req.id }}" placeholder="Cost">
+                                        </div>
+                                    {% elif dry_clean.status == 'pending' %}
+                                        <span class="status-badge" style="background: rgba(243,156,18,0.15); color: #f39c12; padding: 6px 12px; border-radius: 8px; font-weight: 600; font-size: 0.75rem; display: inline-block; width: fit-content;">
+                                            ⏳ Awaiting Approval
+                                        </span>
+                                        <span style="color: var(--text-muted); font-size: 0.78rem;">Admin must approve before the suit can be marked ready.</span>
+                                        <span class="cost-badge" style="background: rgba(56,189,248,0.15); color: #38bdf8; padding: 6px 12px; border-radius: 8px; font-weight: 700; font-size: 0.75rem; display: inline-block; width: fit-content;">
+                                            ${{ dry_clean.amount }}
+                                        </span>
+                                    {% elif dry_clean.status == 'approved' %}
+                                        <span class="status-badge" style="background: rgba(76,175,130,0.15); color: var(--success); padding: 6px 12px; border-radius: 8px; font-weight: 600; font-size: 0.75rem; display: inline-block; width: fit-content;">
+                                            ✓ Approved Ready
+                                        </span>
+                                        <span style="color: var(--text-muted); font-size: 0.78rem;">Approved by admin — you can now mark it ready.</span>
+                                        <span class="cost-badge" style="background: rgba(56,189,248,0.15); color: #38bdf8; padding: 6px 12px; border-radius: 8px; font-weight: 700; font-size: 0.75rem; display: inline-block; width: fit-content;">
+                                            ${{ dry_clean.amount }}
+                                        </span>
+                                    {% else %}
+                                        <span class="status-badge" style="background: rgba(224,92,92,0.15); color: var(--danger); padding: 6px 12px; border-radius: 8px; font-weight: 600; font-size: 0.75rem; display: inline-block; width: fit-content;">
+                                            ✗ Rejected
+                                        </span>
+                                        <span style="color: var(--text-muted); font-size: 0.78rem;">This request was rejected by admin.</span>
+                                    {% endif %}
+                                </div>
+                            </td>
+                            <td data-label="Action" style="text-align: right;">
+                                {% if not dry_clean %}
+                                    <form method="POST" action="{% url 'laundry_backlog' %}" id="form-{{ req.id }}" style="display:inline;">
+                                        {% csrf_token %}
+                                        <input type="hidden" name="action" value="mark_paid">
+                                        <input type="hidden" name="request_id" value="{{ req.id }}">
+                                        <input type="hidden" name="suit_id" value="{{ req.suit.id }}">
+                                        <input type="hidden" name="cleaning_cost" id="hidden-cost-{{ req.id }}" value="5.00">
+                                        <input type="hidden" name="laundry_notes" value="Submitted via Reception Laundry Terminal">
+                                        <button type="button" id="btn-submit-{{ req.id }}" class="btn-ready" onclick="submitPayment('{{ req.id }}')">
+                                            <i class="fas fa-check-circle"></i>
+                                            <span>Submit Payment</span>
+                                        </button>
+                                    </form>
+                                {% elif dry_clean.status == 'pending' %}
+                                    <button type="button" class="btn-ready" style="opacity: 0.5; cursor: not-allowed;" disabled>
+                                        <i class="fas fa-hourglass"></i>
+                                        <span>Awaiting Approval</span>
+                                    </button>
+                                {% elif dry_clean.status == 'approved' %}
+                                    <form method="POST" action="{% url 'laundry_backlog' %}" id="form-ready-{{ req.id }}" style="display:inline;">
+                                        {% csrf_token %}
+                                        <input type="hidden" name="action" value="mark_ready">
+                                        <input type="hidden" name="request_id" value="{{ req.id }}">
+                                        <input type="hidden" name="suit_id" value="{{ req.suit.id }}">
+                                        <input type="hidden" name="cleaning_cost" value="{{ dry_clean.amount }}">
+                                        <input type="hidden" name="laundry_notes" value="Marked ready via Reception Terminal">
+                                        <button type="submit" class="btn-ready" onclick="this.disabled=true; this.innerHTML='<i class=\'fas fa-spinner fa-spin\'></i> <span>Processing...</span>'; this.closest('form').submit();">
+                                            <i class="fas fa-check-circle"></i>
+                                            <span>Mark Ready</span>
+                                        </button>
+                                    </form>
+                                {% else %}
+                                    <button type="button" class="btn-ready" style="opacity: 0.5; cursor: not-allowed;" disabled>
+                                        <i class="fas fa-times-circle"></i>
+                                        <span>Rejected</span>
+                                    </button>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endwith %}
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            {% if page_obj %}
+            <div class="page-nav">
+                {% if page_obj.has_previous %}
+                    <a href="{% url 'laundry_backlog' %}?tab={{ active_tab|default:'all' }}&page={{ page_obj.previous_page_number }}">Previous</a>
+                {% endif %}
+                <span class="current">Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
+                {% if page_obj.has_next %}
+                    <a href="{% url 'laundry_backlog' %}?tab={{ active_tab|default:'all' }}&page={{ page_obj.next_page_number }}">Next</a>
+                {% endif %}
+            </div>
+            {% endif %}
+            {% else %}
+            <div class="empty-state">
+                <div class="empty-state-icon">
+                    <i class="fas fa-soap"></i>
+                </div>
+                <h6>Dry Cleaning Terminal Clear</h6>
+                <p>All apparel variants are optimized, ironed, and restored into showroom inventory.</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // 1. Smooth entrance animations for rows
+        const rows = document.querySelectorAll('.laundry-table tbody tr');
+        rows.forEach((row, index) => {
+            row.style.opacity = '0';
+            row.style.transform = 'translateY(15px)';
+            setTimeout(() => {
+                row.style.transition = 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)';
+                row.style.opacity = '1';
+                row.style.transform = 'translateY(0)';
+            }, index * 70);
+        });
+
+        // 2. Prevent duplicate suits from showing (suit ku yuuna 2 jeer kusoo noqon)
+        const seenSuits = new Set();
+        rows.forEach(row => {
+            const suitName = row.getAttribute('data-suit-name');
+            if (suitName) {
+                if (seenSuits.has(suitName)) {
+                    row.setAttribute('data-duplicate', 'true');
+                    row.style.display = 'none'; // Hide the duplicate row
+                } else {
+                    seenSuits.add(suitName);
+                }
+            }
+        });
+    });
+
+    // 3. Search Box Logic
+    function searchTable() {
+        const input = document.getElementById('laundrySearch');
+        const filter = input.value.toLowerCase();
+        const rows = document.querySelectorAll('#laundryTerminalTable tbody tr');
+        
+        rows.forEach(row => {
+            // Always keep duplicates hidden regardless of search
+            if (row.getAttribute('data-duplicate') === 'true') {
+                row.style.display = 'none';
+                return;
+            }
+            
+            const suitName = row.getAttribute('data-suit-name') || '';
+            const id = row.getAttribute('data-id') || '';
+            
+            if (suitName.includes(filter) || id.includes(filter)) {
+                row.style.display = '';
+            } else {
+                row.style.display = 'none';
+            }
+        });
+    }
+
+    function submitPayment(requestId) {
+        const form = document.getElementById('form-' + requestId);
+        const costInput = document.getElementById('cost-' + requestId);
+        const submitBtn = document.getElementById('btn-submit-' + requestId);
+
+        if (form && costInput) {
+            const hiddenCost = form.querySelector('input[name="cleaning_cost"]');
+            if (hiddenCost) {
+                hiddenCost.value = costInput.value || '5.00';
+            }
+        }
+
+        if (submitBtn) {
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = '<i class="fas fa-circle-notch animation-spin"></i> Processing...';
+        }
+
+        if (form) {
+            form.submit();
+        }
+    }
+</script>
+
+<style>
+    .animation-spin { animation: spin 1s linear infinite !important; }
+    @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+</style>
+{% endblock %}

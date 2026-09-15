@@ -1,0 +1,154 @@
+{% extends "rental/base.html" %}
+
+{% block title %}Edit Suit{% endblock %}
+
+{% block content %}
+<style>
+    .card {
+        background: #1e293b !important;
+        border: 1px solid rgba(56, 189, 248, 0.1) !important;
+        color: #e2e8f0;
+    }
+    
+    .card-header {
+        background: #0f172a !important;
+        border-bottom: 1px solid rgba(56, 189, 248, 0.1) !important;
+    }
+    
+    .form-control, .form-select {
+        background: #334155 !important;
+        border: 1px solid #475569 !important;
+        color: #e2e8f0 !important;
+    }
+    
+    .form-control:focus, .form-select:focus {
+        background: #334155 !important;
+        border-color: #38bdf8 !important;
+        color: #e2e8f0 !important;
+        box-shadow: 0 0 0 0.25rem rgba(56, 189, 248, 0.25);
+    }
+    
+    .form-label {
+        color: #e2e8f0;
+    }
+    
+    .form-check-label {
+        color: #e2e8f0;
+    }
+    
+    .form-text {
+        color: #cbd5e1 !important;
+    }
+</style>
+
+<div class="container mt-5">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+
+            <div class="card shadow border-0 rounded-4">
+                <div class="card-header bg-dark text-white rounded-top-4">
+                    <h3 class="mb-0">
+                        <i class="fa-solid fa-pen-to-square me-2"></i>
+                        Edit Suit
+                    </h3>
+                </div>
+
+                <div class="card-body p-4">
+
+                    <form method="post" enctype="multipart/form-data">
+                        {% csrf_token %}
+
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label fw-bold">Suit Name</label>
+                                <input type="text" class="form-control" name="suit_name"
+                                       value="{{ suit.suit_name }}" required>
+                            </div>
+
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label fw-bold">Collection</label>
+                                <select class="form-control" name="collection" required>
+                                    <option value="Luxury" {% if suit.collection == "Luxury" %}selected{% endif %}>Luxury</option>
+                                    <option value="Standard" {% if suit.collection == "Standard" %}selected{% endif %}>Standard</option>
+                                    <option value="Budget" {% if suit.collection == "Budget" %}selected{% endif %}>Budget</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-4 mb-3">
+                                <label class="form-label fw-bold">Size</label>
+                                <input type="text" class="form-control" name="size"
+                                       value="{{ suit.size }}" required>
+                            </div>
+
+                            <div class="col-md-4 mb-3">
+                                <label class="form-label fw-bold">Color</label>
+                                <input type="text" class="form-control" name="color"
+                                       value="{{ suit.color }}" required>
+                            </div>
+
+                            <div class="col-md-4 mb-3">
+                                <label class="form-label fw-bold">Quantity</label>
+                                <input type="number" class="form-control" name="quantity"
+                                       value="{{ suit.quantity }}" min="0" required>
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label fw-bold">Price Per Day ($)</label>
+                                <input type="number" step="0.01" class="form-control" name="price_per_day"
+                                       value="{{ suit.price_per_day }}" required>
+                            </div>
+
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Status</label>
+                            <select class="form-control" name="status" required>
+                                <option value="Available" {% if suit.status == "Available" %}selected{% endif %}>
+                                    Available
+                                </option>
+                                <option value="Rented" {% if suit.status == "Rented" %}selected{% endif %}>
+                                    Rented
+                                </option>
+                            </select>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Suit Image</label>
+                            {% if suit.image %}
+                                <div class="mb-2">
+                                    <img src="{{ suit.image_url }}" alt="Current Image" style="max-width: 200px; max-height: 200px;">
+                                </div>
+                                {% if request.user.is_staff or request.user.profile.is_reception %}
+                                <div class="form-check mb-2">
+                                    <input class="form-check-input" type="checkbox" name="clear_image" id="clear_image">
+                                    <label class="form-check-label" for="clear_image">
+                                        Remove current image
+                                    </label>
+                                </div>
+                                {% endif %}
+                            {% endif %}
+                            <input type="file" class="form-control" name="image" accept="image/*">
+                            <small class="form-text text-muted">Leave empty to keep current image. Upload new image to replace.</small>
+                        </div>
+
+                        <div class="d-flex justify-content-between mt-4">
+                            <a href="{% url 'dashboard' %}" class="btn btn-secondary px-4 rounded-pill">
+                                <i class="fa-solid fa-arrow-left me-2"></i> Cancel
+                            </a>
+
+                            <button type="submit" class="btn btn-success px-4 rounded-pill">
+                                <i class="fa-solid fa-floppy-disk me-2"></i> Update Suit
+                            </button>
+                        </div>
+
+                    </form>
+
+                </div>
+            </div>
+
+        </div>
+    </div>
+</div>
+{% endblock %}

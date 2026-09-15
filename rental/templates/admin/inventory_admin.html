@@ -1,0 +1,735 @@
+{% extends "rental/base.html" %}
+{% load static %}
+
+{% block content %}
+<style>
+  :root {
+    --gold: #c9a84c;
+    --gold-light: #e8c96a;
+    --gold-bg: rgba(201,168,76,0.08);
+    --gold-border: rgba(201,168,76,0.25);
+    --gold-glow: rgba(201,168,76,0.25);
+    --card-bg: rgba(255,255,255,0.03);
+    --surface: rgba(255,255,255,0.04);
+    --border: rgba(255,255,255,0.07);
+    --text: #f0ede8;
+    --muted: rgba(240,237,232,0.45);
+    --success: #4caf82;
+    --danger: #e05c5c;
+    --warning: #e0a040;
+    --info: #6ab0e8;
+    --radius: 12px;
+    --radius-sm: 8px;
+    --bg-modal: #13131a;
+  }
+
+  * { box-sizing: border-box; }
+
+  .inv-wrap { max-width: 1300px; margin: 0 auto; padding: 0 0.8rem 1rem; font-size: 0.85rem; }
+  
+  .inv-header {
+    display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap;
+    gap: 0.8rem; padding: 0.9rem 1rem; background: var(--card-bg);
+    border: 1px solid var(--border); border-radius: var(--radius) var(--radius) 0 0;
+    backdrop-filter: blur(12px);
+  }
+  
+  .inv-title { display: flex; align-items: center; gap: 10px; }
+  
+  .inv-title-icon {
+    width: 36px; height: 36px; border-radius: 8px; background: var(--gold-bg);
+    border: 1px solid var(--gold-border); display: flex; align-items: center; justify-content: center;
+    color: var(--gold); font-size: 0.95rem;
+  }
+  
+  .inv-title h1 { font-family: 'Cormorant Garamond', serif; font-size: 1.15rem; font-weight: 700; margin: 0; color: var(--text); }
+  .inv-title p { font-size: 0.7rem; color: var(--muted); margin: 2px 0 0; }
+  .inv-actions { display: flex; gap: 6px; flex-wrap: wrap; }
+
+  .btn {
+    display: inline-flex; align-items: center; gap: 5px; padding: 0.4rem 0.85rem;
+    border-radius: var(--radius-sm); font-size: 0.72rem; font-weight: 700; cursor: pointer;
+    border: 1px solid var(--border); text-decoration: none; background: var(--surface); color: var(--text);
+    transition: all 0.22s; white-space: nowrap;
+  }
+  .btn:hover { border-color: var(--gold-border); color: var(--gold-light); background: var(--gold-bg); transform: translateY(-1px); }
+  .btn-sm { padding: 0.35rem 0.7rem; font-size: 0.68rem; }
+  
+  .btn-gold {
+    background: linear-gradient(135deg, var(--gold), var(--gold-light)); color: #0c0c14;
+    border-color: var(--gold); box-shadow: 0 4px 14px var(--gold-glow);
+  }
+  .btn-gold:hover { filter: brightness(1.05); color: #0c0c14; }
+  .btn-danger { background: rgba(224,92,92,0.12); color: var(--danger); border-color: rgba(224,92,92,0.25); }
+  .btn-danger:hover { background: rgba(224,92,92,0.22); color: var(--text); }
+
+  .stats-grid {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 0.7rem;
+    padding: 0.85rem 1rem; background: var(--card-bg); border-left: 1px solid var(--border); border-right: 1px solid var(--border);
+    backdrop-filter: blur(12px);
+  }
+  
+  .stat-card {
+    background: var(--surface); border-radius: var(--radius-sm); padding: 0.7rem;
+    border: 1px solid var(--border); position: relative; overflow: hidden; transition: all 0.25s;
+  }
+  .stat-card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px; background: var(--stat-color, var(--gold)); }
+  .stat-card:hover { transform: translateY(-2px); border-color: var(--stat-color, var(--gold)); box-shadow: 0 8px 24px rgba(0,0,0,0.2); }
+  .stat-label { font-size: 0.6rem; text-transform: uppercase; letter-spacing: 1px; color: var(--muted); font-weight: 700; }
+  .stat-value { font-family: 'Cormorant Garamond', serif; font-size: 1.35rem; font-weight: 700; line-height: 1.2; margin: 4px 0 2px; }
+  .stat-sub { font-size: 0.65rem; color: var(--muted); }
+
+  .inv-toolbar {
+    display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.7rem;
+    padding: 0.7rem 1rem; background: var(--card-bg); border-left: 1px solid var(--border); border-right: 1px solid var(--border); border-bottom: 1px solid var(--border);
+    backdrop-filter: blur(12px);
+  }
+  
+  /* ══ SEARCH BOX (DARK THEME MATCH) ══ */
+  .search-box { position: relative; flex: 1; max-width: 380px; }
+  .search-box input {
+    width: 100%; 
+    background: rgba(255,255,255,0.03); 
+    border: 1px solid var(--border); 
+    color: var(--text);
+    padding: 0.55rem 0.75rem 0.55rem 2.2rem; 
+    border-radius: var(--radius-sm); 
+    font-size: 0.8rem; 
+    font-weight: 500;
+    transition: all 0.2s;
+  }
+  .search-box input::placeholder {
+    color: var(--muted);
+  }
+  .search-box input:focus { 
+    outline: none; 
+    border-color: var(--gold); 
+    box-shadow: 0 0 0 3px rgba(201,168,76,0.12); 
+    background: rgba(255,255,255,0.05); 
+  }
+  .search-box i { 
+    position: absolute; 
+    left: 0.75rem; 
+    top: 50%; 
+    transform: translateY(-50%); 
+    color: var(--gold); 
+    font-size: 0.8rem; 
+  }
+  
+  .filter-group { display: flex; gap: 5px; flex-wrap: wrap; }
+  .filter-btn {
+    padding: 5px 11px; border-radius: var(--radius-sm); font-size: 0.68rem; font-weight: 700; cursor: pointer;
+    border: 1px solid var(--border); background: transparent; color: var(--muted); transition: all 0.2s; text-decoration: none;
+    display: inline-flex; align-items: center;
+  }
+  .filter-btn:hover { border-color: var(--gold-border); color: var(--gold); background: var(--gold-bg); }
+  .filter-btn.active { background: linear-gradient(135deg, var(--gold), var(--gold-light)); color: #0c0c14; border-color: var(--gold); }
+
+  .category-bar {
+    padding: 0.6rem 1rem; background: var(--card-bg); border-left: 1px solid var(--border); border-right: 1px solid var(--border);
+    display: flex; gap: 6px; align-items: center; flex-wrap: wrap;
+  }
+
+  .inv-table-wrap { background: var(--card-bg); border: 1px solid var(--border); border-top: none; overflow-x: auto; backdrop-filter: blur(12px); }
+  table.inv-tbl { width: 100%; border-collapse: separate; border-spacing: 0; }
+  table.inv-tbl th {
+    font-size: 0.6rem; text-transform: uppercase; letter-spacing: 1px; color: var(--muted); font-weight: 700;
+    padding: 0.65rem 0.8rem; text-align: left; border-bottom: 1px solid var(--border); background: var(--surface); white-space: nowrap;
+  }
+  table.inv-tbl td { padding: 0.6rem 0.8rem; border-bottom: 1px solid var(--border); font-size: 0.78rem; vertical-align: middle; }
+  table.inv-tbl tbody tr { transition: background 0.2s; }
+  table.inv-tbl tbody tr:hover { background: rgba(255, 255, 255, 0.015); }
+  
+  .suit-cell { display: flex; align-items: center; gap: 8px; }
+  .suit-thumb { width: 36px; height: 36px; border-radius: 6px; object-fit: cover; border: 1px solid var(--border); background: var(--surface); flex-shrink: 0; }
+  .suit-thumb-placeholder { width: 36px; height: 36px; border-radius: 6px; background: var(--surface); border: 1px solid var(--border); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .suit-thumb-placeholder i { color: var(--gold); opacity: 0.5; font-size: 0.9rem; }
+  .suit-info h6 { margin: 0; font-size: 0.78rem; font-weight: 700; color: var(--text); line-height: 1.3; }
+  .suit-info p { margin: 2px 0 0; font-size: 0.65rem; color: var(--muted); line-height: 1.3; }
+  
+  .badge { padding: 3px 8px; border-radius: 16px; font-size: 0.65rem; font-weight: 700; display: inline-flex; align-items: center; gap: 4px; }
+  .badge-success { background: rgba(76,175,130,0.12); color: var(--success); border: 1px solid rgba(76,175,130,0.25); }
+  .badge-warning { background: rgba(224,160,64,0.12); color: var(--warning); border: 1px solid rgba(224,160,64,0.25); }
+  .badge-danger { background: rgba(224,92,92,0.12); color: var(--danger); border: 1px solid rgba(224,92,92,0.25); }
+  .badge-info { background: rgba(106,176,232,0.12); color: var(--info); border: 1px solid rgba(106,176,232,0.25); }
+  .badge-gold { background: var(--gold-bg); color: var(--gold); border: 1px solid var(--gold-border); }
+  .badge-archive { background: rgba(156,106,200,0.12); color: #9c6ac8; border: 1px solid rgba(156,106,200,0.25); }
+  
+  .action-btns { display: flex; gap: 4px; justify-content: flex-end; }
+  .action-btn {
+    width: 28px; height: 28px; border-radius: 6px; border: 1px solid var(--border); background: rgba(255,255,255,0.02); color: var(--muted);
+    cursor: pointer; display: inline-flex; align-items: center; justify-content: center; transition: all 0.2s; font-size: 0.72rem; text-decoration: none;
+  }
+  .action-btn:hover { border-color: var(--gold-border); color: var(--gold); background: var(--gold-bg); }
+  .action-btn.edit:hover { color: var(--info); border-color: rgba(106,176,232,0.35); background: rgba(106,176,232,0.08); }
+  .action-btn.delete:hover { color: var(--danger); border-color: rgba(224,92,92,0.35); background: rgba(224,92,92,0.08); }
+  .action-btn.archive:hover { color: #9c6ac8; border-color: rgba(156,106,200,0.35); background: rgba(156,106,200,0.08); }
+  
+  .empty { text-align: center; padding: 2rem 1rem; color: var(--muted); }
+  .empty i { font-size: 2.2rem; color: rgba(201,168,76,0.15); display: block; margin-bottom: 0.6rem; }
+  .empty p { font-size: 0.78rem; margin: 0; }
+  
+  .inv-footer { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.7rem; padding: 0.7rem 1rem; background: var(--card-bg); border: 1px solid var(--border); border-top: none; border-radius: 0 0 var(--radius) var(--radius); backdrop-filter: blur(12px); }
+  .inv-footer .info { font-size: 0.72rem; color: var(--muted); }
+  .pagination { display: flex; gap: 3px; }
+  .page-btn { width: 28px; height: 28px; border-radius: 6px; border: 1px solid var(--border); background: var(--surface); color: var(--muted); display: flex; align-items: center; justify-content: center; transition: all 0.2s; font-size: 0.72rem; text-decoration: none; cursor: pointer; }
+  .page-btn:hover:not(.disabled) { border-color: var(--gold-border); color: var(--gold); }
+  .page-btn.active { background: linear-gradient(135deg, var(--gold), var(--gold-light)); color: #0c0c14; border-color: var(--gold); }
+  .page-btn.disabled { opacity: 0.3; cursor: not-allowed; }
+
+  /* Modal Styles */
+  .modal-overlay {
+    display: none; position: fixed; inset: 0; background: rgba(7, 7, 10, 0.85); backdrop-filter: blur(8px); z-index: 2000;
+    align-items: center; justify-content: center; padding: 0.8rem; overflow-y: auto;
+  }
+  .modal-overlay.show { display: flex; }
+  .modal-box {
+    background: var(--bg-modal); border: 1px solid rgba(201,168,76,0.2); border-radius: 14px; width: 100%; max-width: 680px;
+    box-shadow: 0 25px 60px rgba(0,0,0,0.55); overflow: hidden; display: flex; flex-direction: column;
+    animation: modalSlide 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  @keyframes modalSlide { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+  .modal-head { padding: 0.9rem 1.2rem; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; background: linear-gradient(180deg, rgba(201,168,76,0.03), transparent); }
+  .modal-head h5 { margin: 0; font-family: 'Cormorant Garamond', serif; font-size: 1.1rem; font-weight: 700; display: flex; align-items: center; gap: 8px; color: var(--text); }
+  .modal-close { background: rgba(255,255,255,0.04); border: 1px solid var(--border); color: var(--muted); width: 28px; height: 28px; border-radius: 6px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.2s; font-size: 1.2rem; }
+  .modal-close:hover { background: rgba(224,92,92,0.1); color: var(--danger); border-color: rgba(224,92,92,0.3); }
+  .modal-body { padding: 1rem; overflow-y: auto; max-height: 65vh; }
+  .modal-footer { padding: 0.9rem 1.2rem; border-top: 1px solid var(--border); display: flex; justify-content: flex-end; gap: 8px; background: rgba(0,0,0,0.2); }
+  
+  .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.9rem; }
+  .form-group { margin-bottom: 0.9rem; }
+  .form-label { font-size: 0.65rem; color: var(--muted); font-weight: 700; text-transform: uppercase; letter-spacing: 1px; display: block; margin-bottom: 4px; }
+  .required { color: var(--danger); margin-left: 2px; }
+  
+  .form-input { 
+    width: 100%; 
+    background: rgba(255,255,255,0.03); 
+    border: 1px solid var(--border); 
+    color: var(--text); 
+    padding: 0.55rem 0.75rem; 
+    border-radius: 6px; 
+    font-size: 0.78rem; 
+    box-sizing: border-box; 
+    transition: all 0.2s; 
+  }
+  .form-input:focus { 
+    outline: none; 
+    border-color: var(--gold); 
+    box-shadow: 0 0 0 3px rgba(201,168,76,0.12); 
+    background: rgba(255,255,255,0.05); 
+  }
+  
+  /* ══ DROPDOWN UPGRADE: DARK THEME MATCH ══ */
+  select.form-input { 
+    appearance: none; 
+    background-color: rgba(201,168,76,0.12) !important;
+    color: #f0ede8 !important;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='%23c9a84c' viewBox='0 0 16 16'%3E%3Cpath d='M7.247 11.14 2.451 5.658C1.885 5.013 2.345 4 3.204 4h9.592a1 1 0 0 1 .753 1.659l-4.796 5.48a1 1 0 0 1-1.506 0z'/%3E%3C/svg%3E"); 
+    background-repeat: no-repeat; 
+    background-position: right 10px center; 
+    padding-right: 32px; 
+    cursor: pointer; 
+    border: 1px solid var(--border);
+    font-weight: 500;
+  }
+  select.form-input option {
+    color: #f0ede8 !important;
+    background-color: #000000 !important;
+  }
+  select.form-input:focus {
+    background-color: #000000 !important;
+    color: #f0ede8 !important;
+    border-color: var(--gold);
+    box-shadow: 0 0 0 3px rgba(201,168,76,0.15);
+  }
+
+  textarea.form-input { min-height: 60px; resize: vertical; }
+  
+  .sec-label { font-family: 'Cormorant Garamond', serif; font-size: 0.92rem; color: var(--gold); font-weight: 600; margin: 0.4rem 0 0.7rem; display: flex; align-items: center; gap: 6px; border-bottom: 1px solid rgba(201,168,76,0.12); padding-bottom: 4px; }
+
+  @media (max-width: 768px) {
+    .inv-header, .inv-toolbar { flex-direction: column; align-items: stretch; }
+    .search-box { max-width: 100%; }
+    .form-grid { grid-template-columns: 1fr; }
+    .modal-footer { flex-direction: column-reverse; }
+    .modal-footer .btn { width: 100%; justify-content: center; }
+    .stats-grid { grid-template-columns: repeat(3, 1fr); }
+    .inv-wrap { font-size: 0.75rem; }
+    .inv-title h1 { font-size: 1rem; }
+    .stat-value { font-size: 1.1rem; }
+    table.inv-tbl th, table.inv-tbl td { padding: 0.5rem 0.6rem; font-size: 0.7rem; }
+    .suit-thumb, .suit-thumb-placeholder { width: 32px; height: 32px; }
+    .suit-info h6 { font-size: 0.72rem; }
+    .suit-info p { font-size: 0.6rem; }
+  }
+
+  @media (max-width: 480px) {
+    .stats-grid { grid-template-columns: repeat(2, 1fr); }
+    .inv-wrap { padding: 0 0.5rem 0.8rem; }
+    .inv-header, .inv-toolbar, .category-bar, .inv-footer { padding: 0.6rem 0.8rem; }
+    .stats-grid { padding: 0.6rem 0.8rem; gap: 0.5rem; }
+    .stat-card { padding: 0.55rem; }
+    .stat-value { font-size: 1rem; }
+    .stat-label { font-size: 0.55rem; }
+    .stat-sub { font-size: 0.6rem; }
+  }
+</style>
+
+<div class="inv-wrap">
+  <!-- Header Section -->
+  <div class="inv-header">
+    <div class="inv-title">
+      <div class="inv-title-icon"><i class="fa-solid fa-warehouse"></i></div>
+      <div>
+        <h1>Inventory Management</h1>
+        <p>Manage your suit catalog, stock levels, and pricing</p>
+      </div>
+    </div>
+    <div class="inv-actions">
+      <a href="{% url 'export_inventory' %}" class="btn btn-sm"><i class="fa-solid fa-file-export"></i> Export CSV</a>
+      <a href="{% url 'add_suit' %}" class="btn btn-sm btn-gold">
+        <i class="fa-solid fa-plus"></i> Add Suit
+      </a>
+    </div>
+  </div>
+
+  <!-- Quick Stats -->
+  <div class="stats-grid">
+    <div class="stat-card" style="--stat-color: var(--gold);">
+      <div class="stat-label">Total Suits</div>
+      <div class="stat-value" style="color:var(--gold)" id="totalSuits">{{ total_items|default:0 }}</div>
+      <div class="stat-sub">All items in catalog</div>
+    </div>
+    <div class="stat-card" style="--stat-color: var(--success);">
+      <div class="stat-label">Available</div>
+      <div class="stat-value" style="color:var(--success)">{{ available_count|default:0 }}</div>
+      <div class="stat-sub">Ready to rent</div>
+    </div>
+    <div class="stat-card" style="--stat-color: var(--info);">
+      <div class="stat-label">Currently Rented</div>
+      <div class="stat-value" style="color:var(--info)">{{ rented_count|default:0 }}</div>
+      <div class="stat-sub">With customers</div>
+    </div>
+    <div class="stat-card" style="--stat-color: var(--danger);">
+      <div class="stat-label">Out of Stock</div>
+      <div class="stat-value" style="color:var(--danger)">{{ out_of_stock_count|default:0 }}</div>
+      <div class="stat-sub">Zero quantity</div>
+    </div>
+    <div class="stat-card" style="--stat-color: #9c6ac8;">
+      <div class="stat-label">Retired</div>
+      <div class="stat-value" style="color:#9c6ac8" id="retiredCount">{{ retired_count|default:0 }}</div>
+      <div class="stat-sub">Archived items</div>
+    </div>
+    <div class="stat-card" style="--stat-color: #4caf82;">
+      <div class="stat-label">Total Quantity</div>
+      <div class="stat-value" style="color:#4caf82" id="totalQty">{{ total_quantity|default:0 }}</div>
+      <div class="stat-sub">All stock units</div>
+    </div>
+    <div class="stat-card" style="--stat-color: #c9a84c;">
+      <div class="stat-label">Total Value</div>
+      <div class="stat-value" style="color:#c9a84c" id="totalValue">${{ total_value|default:"0.00" }}</div>
+      <div class="stat-sub">Inventory worth</div>
+    </div>
+  </div>
+
+  <!-- Filters & Search Toolbar -->
+  <div class="inv-toolbar">
+    <form method="get" class="search-box">
+      <i class="fa-solid fa-search"></i>
+      {% if selected_category and selected_category != 'all' %}<input type="hidden" name="category" value="{{ selected_category }}">{% endif %}
+      {% if status_filter and status_filter != 'all' %}<input type="hidden" name="status" value="{{ status_filter }}">{% endif %}
+      <input type="text" id="searchInput" name="q" value="{{ query }}" placeholder="Search by name, color, size, collection..." oninput="this.form.submit()">
+    </form>
+    <div class="filter-group">
+      <a href="?{% if selected_category != 'all' %}category={{ selected_category }}&{% endif %}{% if query %}q={{ query|urlencode }}&{% endif %}status=all" class="filter-btn {% if not status_filter or status_filter == 'all' %}active{% endif %}">All</a>
+      <a href="?{% if selected_category != 'all' %}category={{ selected_category }}&{% endif %}{% if query %}q={{ query|urlencode }}&{% endif %}status=available" class="filter-btn {% if status_filter == 'available' %}active{% endif %}">Available</a>
+      <a href="?{% if selected_category != 'all' %}category={{ selected_category }}&{% endif %}{% if query %}q={{ query|urlencode }}&{% endif %}status=rented" class="filter-btn {% if status_filter == 'rented' %}active{% endif %}">Rented</a>
+      <a href="?{% if selected_category != 'all' %}category={{ selected_category }}&{% endif %}{% if query %}q={{ query|urlencode }}&{% endif %}status=out" class="filter-btn {% if status_filter == 'out' %}active{% endif %}">Out of Stock</a>
+      <a href="?{% if selected_category != 'all' %}category={{ selected_category }}&{% endif %}{% if query %}q={{ query|urlencode }}&{% endif %}status=retired" class="filter-btn {% if status_filter == 'retired' %}active{% endif %}">Retired</a>
+    </div>
+  </div>
+
+  <!-- Category Selection Bar -->
+  <div class="category-bar">
+    <a href="?category=all{% if query %}&q={{ query|urlencode }}{% endif %}{% if status_filter %}&status={{ status_filter|urlencode }}{% endif %}" class="filter-btn {% if selected_category == 'all' %}active{% endif %}">All Categories</a>
+    <a href="?category=suits{% if query %}&q={{ query|urlencode }}{% endif %}{% if status_filter %}&status={{ status_filter|urlencode }}{% endif %}" class="filter-btn {% if selected_category == 'suits' %}active{% endif %}">Suits</a>
+    <a href="?category=shirts{% if query %}&q={{ query|urlencode }}{% endif %}{% if status_filter %}&status={{ status_filter|urlencode }}{% endif %}" class="filter-btn {% if selected_category == 'shirts' %}active{% endif %}">Shirts</a>
+    <a href="?category=accessories{% if query %}&q={{ query|urlencode }}{% endif %}{% if status_filter %}&status={{ status_filter|urlencode }}{% endif %}" class="filter-btn {% if selected_category == 'accessories' %}active{% endif %}">Accessories</a>
+  </div>
+
+  <!-- Main Data Table -->
+  <div class="inv-table-wrap">
+    <table class="inv-tbl" id="inventoryTable">
+      <thead>
+        <tr>
+          <th>Suit Item</th>
+          <th>ID</th>
+          <th>Collection</th>
+          <th>Size</th>
+          <th>Color</th>
+          <th>Stock Qty</th>
+          <th>Price / Day</th>
+          <th>Status</th>
+          <th style="text-align:right;">Actions</th>
+        </tr>
+      </thead>
+      <tbody id="tableBody">
+        {% for suit in suits %}
+        <tr data-status="{% if suit.quantity == 0 %}out{% elif suit.status == 'Rented' %}rented{% elif suit.is_retired %}retired{% else %}available{% endif %}"
+            data-category="{{ suit.category|lower }}"
+            data-id="{{ suit.id }}"
+            data-name="{{ suit.suit_name|escapejs }}"
+            data-collection="{{ suit.collection|default:'Standard'|escapejs }}"
+            data-size="{{ suit.size|default:'M'|escapejs }}"
+            data-color="{{ suit.color|default:'N/A'|escapejs }}"
+            data-quantity="{{ suit.quantity }}"
+            data-price="{{ suit.price_per_day }}"
+            data-description="{{ suit.description|default:''|escapejs }}"
+            data-condition="{{ suit.condition_grade|default:'new'|escapejs }}"
+            data-damage="{{ suit.damage_notes|default:''|escapejs }}"
+            data-status-val="{{ suit.status|default:'Available'|escapejs }}"
+            data-retired="{{ suit.is_retired|default:False|lower }}">
+          <td>
+            <div class="suit-cell">
+              {% if suit.image %}
+                <img src="{{ suit.image.url }}" class="suit-thumb" alt="{{ suit.suit_name }}">
+              {% else %}
+                <div class="suit-thumb-placeholder"><i class="fa-solid fa-shirt"></i></div>
+              {% endif %}
+              <div class="suit-info">
+                <h6>{{ suit.suit_name }}</h6>
+                <p>{{ suit.description|default:"No description"|truncatewords:6 }}</p>
+              </div>
+            </div>
+          </td>
+          <td><strong>#{{ suit.id }}</strong></td>
+          <td><span class="badge badge-gold">{{ suit.collection|default:"Standard" }}</span></td>
+          <td>{{ suit.size|default:"M" }}</td>
+          <td>{{ suit.color|default:"N/A" }}</td>
+          <td><strong>{{ suit.quantity }}</strong></td>
+          <td style="color:var(--success); font-weight:700;">${{ suit.price_per_day }}</td>
+          <td>
+            {% if suit.is_retired %}
+              <span class="badge badge-archive"><i class="fa-solid fa-box-archive"></i> Retired</span>
+            {% elif suit.status == 'Available' %}
+              <span class="badge badge-success"><i class="fa-solid fa-check"></i> {{ suit.status }}</span>
+            {% elif suit.status == 'Pending Request' %}
+              <span class="badge badge-info"><i class="fa-solid fa-hourglass-half"></i> {{ suit.status }}</span>
+            {% elif suit.status == 'Reserved' %}
+              <span class="badge badge-warning"><i class="fa-solid fa-lock"></i> {{ suit.status }}</span>
+            {% elif suit.status == 'Rented' %}
+              <span class="badge badge-danger"><i class="fa-solid fa-user-tie"></i> {{ suit.status }}</span>
+            {% elif suit.status == 'Returned' %}
+              <span class="badge badge-warning"><i class="fa-solid fa-undo"></i> {{ suit.status }}</span>
+            {% elif suit.status == 'Dry Cleaning' %}
+              <span class="badge badge-gold"><i class="fa-solid fa-water"></i> {{ suit.status }}</span>
+            {% else %}
+              <span class="badge" style="background: rgba(200,200,200,0.12); color: #999;"><i class="fa-solid fa-info"></i> {{ suit.status }}</span>
+            {% endif %}
+          </td>
+          <td style="text-align:right;">
+            <div class="action-btns">
+              <a href="{% url 'suit_profile' suit.id %}" class="action-btn" title="View Details"><i class="fa-solid fa-eye"></i></a>
+              <button type="button" class="action-btn edit js-edit-suit" title="Edit" onclick="editSuit(this)"><i class="fa-solid fa-pen"></i></button>
+              {% if suit.status == 'Returned' %}
+                <a href="{% url 'mark_dry_cleaning' suit.id %}" class="action-btn" title="Mark Dry Cleaning" style="color: var(--gold);"><i class="fa-solid fa-water"></i></a>
+              {% elif suit.status == 'Dry Cleaning' %}
+                <a href="{% url 'mark_available' suit.id %}" class="action-btn" title="Mark Available" style="color: var(--success);"><i class="fa-solid fa-check"></i></a>
+              {% endif %}
+              {% if not suit.is_retired %}
+                <button type="button" class="action-btn archive" title="Retire Suit" onclick="retireSuit('{{ suit.id }}', '{{ suit.suit_name|escapejs }}')"><i class="fa-solid fa-box-archive"></i></button>
+              {% else %}
+                <button type="button" class="action-btn" title="Restore Suit" onclick="restoreSuit('{{ suit.id }}', '{{ suit.suit_name|escapejs }}')" style="color: var(--success);"><i class="fa-solid fa-rotate-left"></i></button>
+              {% endif %}
+              <button type="button" class="action-btn delete js-delete-suit" title="Delete" onclick="deleteSuit('{{ suit.id }}', '{{ suit.suit_name|escapejs }}')"><i class="fa-solid fa-trash"></i></button>
+            </div>
+          </td>
+        </tr>
+        {% empty %}
+        <tr>
+          <td colspan="9">
+            <div class="empty">
+              <i class="fa-solid fa-box-open"></i>
+              <p>No suits found in inventory. Click "Add Suit" to populate the catalog.</p>
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Pagination -->
+  <div class="inv-footer">
+    <div class="info">Showing <strong>{{ page_obj.start_index }}</strong> - <strong>{{ page_obj.end_index }}</strong> of <strong>{{ page_obj.paginator.count }}</strong> items</div>
+    <div class="pagination">
+      {% if page_obj.has_previous %}
+        <a class="page-btn" href="?page={{ page_obj.previous_page_number }}{% if selected_category and selected_category != 'all' %}&category={{ selected_category }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}{% if query %}&q={{ query|urlencode }}{% endif %}">&laquo;</a>
+      {% else %}
+        <button type="button" class="page-btn disabled">&laquo;</button>
+      {% endif %}
+      {% for num in page_range %}
+        {% if num == page_obj.number %}
+          <button type="button" class="page-btn active">{{ num }}</button>
+        {% else %}
+          <a class="page-btn" href="?page={{ num }}{% if selected_category and selected_category != 'all' %}&category={{ selected_category }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}{% if query %}&q={{ query|urlencode }}{% endif %}">{{ num }}</a>
+        {% endif %}
+      {% endfor %}
+      {% if page_obj.has_next %}
+        <a class="page-btn" href="?page={{ page_obj.next_page_number }}{% if selected_category and selected_category != 'all' %}&category={{ selected_category }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}{% if query %}&q={{ query|urlencode }}{% endif %}">&raquo;</a>
+      {% else %}
+        <button type="button" class="page-btn disabled">&raquo;</button>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+<!-- ══ POPUP BOX: ADD / EDIT SUIT MODAL ══ -->
+<div class="modal-overlay" id="suitModal">
+  <div class="modal-box">
+    <div class="modal-head">
+      <h5 id="modalTitle"><i class="fa-solid fa-shirt"></i> Add New Suit</h5>
+      <button type="button" class="modal-close" onclick="closeModal()">&times;</button>
+    </div>
+    <form id="suitForm" method="post" enctype="multipart/form-data" action="">
+      {% csrf_token %}
+      <input type="hidden" name="suit_id" id="suitId">
+      
+      <div class="modal-body">
+        <div class="sec-label"><i class="fa-solid fa-info-circle"></i> Primary Specifications</div>
+        
+        <div class="form-group">
+          <label class="form-label">Suit/Item Name <span class="required">*</span></label>
+          <input type="text" name="suit_name" class="form-input" required placeholder="e.g., Royal Blue Slim Fit">
+        </div>
+
+        <div class="form-grid">
+          <div class="form-group">
+            <label class="form-label">Category</label>
+            <select name="category" class="form-input">
+              <option value="suits">Suits</option>
+              <option value="shirts">Shirts</option>
+              <option value="accessories">Accessories</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Collection Type</label>
+            <select name="collection" class="form-input">
+              <option value="Standard">Standard Collection</option>
+              <option value="Premium">Premium Collection</option>
+              <option value="Luxury">Luxury Exclusive</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="form-grid">
+          <div class="form-group">
+            <label class="form-label">Status Label</label>
+            <select name="status" class="form-input">
+              <option value="Available">Available</option>
+              <option value="Dry Cleaning">Dry Cleaning</option>
+              <option value="Reserved">Reserved</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Size <span class="required">*</span></label>
+            <input type="text" name="size" class="form-input" placeholder="e.g., 48R, L, M" required>
+          </div>
+        </div>
+
+        <div class="form-grid">
+          <div class="form-group">
+            <label class="form-label">Color <span class="required">*</span></label>
+            <input type="text" name="color" class="form-input" placeholder="e.g., Midnight Black" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Quantity in Stock <span class="required">*</span></label>
+            <input type="number" name="quantity" class="form-input" min="0" value="1" required>
+          </div>
+        </div>
+
+        <div class="sec-label"><i class="fa-solid fa-dollar-sign"></i> Stock & Pricing</div>
+        <div class="form-grid">
+          <div class="form-group">
+            <label class="form-label">Price per Day ($) <span class="required">*</span></label>
+            <input type="number" step="0.01" name="price_per_day" class="form-input" required placeholder="0.00">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Condition Grade</label>
+            <select name="condition_grade" class="form-input">
+              <option value="new">Brand New (Excellent)</option>
+              <option value="good">Good (Light Use)</option>
+              <option value="fair">Fair (Noticeable wear)</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="sec-label"><i class="fa-solid fa-sliders"></i> Details</div>
+        <div class="form-group">
+          <label class="form-label">Item Description</label>
+          <textarea name="description" class="form-input" placeholder="Provide extra suit details..."></textarea>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Damage / Quality Notes</label>
+          <input type="text" name="damage_notes" class="form-input" placeholder="Specify any slight damage notes if applicable">
+        </div>
+
+        <div class="form-group mb-0">
+          <label class="form-label">Suit Image File</label>
+          <input type="file" name="image" class="form-input" accept="image/*">
+        </div>
+      </div>
+      
+      <div class="modal-footer">
+        <button type="button" class="btn" onclick="closeModal()">Cancel</button>
+        <button type="submit" class="btn btn-gold"><i class="fa-solid fa-save"></i> Save Changes</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- ══ POPUP BOX: DELETE CONFIRMATION MODAL ══ -->
+<div class="modal-overlay" id="deleteModal">
+  <div class="modal-box" style="max-width: 420px;">
+    <div class="modal-head">
+      <h5><i class="fa-solid fa-triangle-exclamation" style="color:var(--danger)"></i> Delete Suit</h5>
+      <button type="button" class="modal-close" onclick="closeDeleteModal()">&times;</button>
+    </div>
+    <form id="deleteForm" method="post" action="">
+      {% csrf_token %}
+      <input type="hidden" name="suit_id" id="deleteSuitId">
+      <div class="modal-body">
+        <p style="margin:0; font-size:0.82rem; line-height:1.5;">
+          Are you absolutely sure you want to completely delete <strong id="deleteSuitName" style="color:var(--gold);"></strong> from the catalog inventory? This Action cannot be undone.
+        </p>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn" onclick="closeDeleteModal()">Cancel</button>
+        <button type="submit" class="btn btn-danger"><i class="fa-solid fa-trash"></i> Permanently Delete</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- ══ POPUP BOX: RETIRE/RESTORE CONFIRMATION MODAL ══ -->
+<div class="modal-overlay" id="archiveModal">
+  <div class="modal-box" style="max-width: 420px;">
+    <div class="modal-head">
+      <h5><i class="fa-solid fa-box-archive" style="color:#9c6ac8"></i> <span id="archiveModalTitle">Retire Suit</span></h5>
+      <button type="button" class="modal-close" onclick="closeArchiveModal()">&times;</button>
+    </div>
+    <form id="archiveForm" method="post" action="">
+      {% csrf_token %}
+      <input type="hidden" name="suit_id" id="archiveSuitId">
+      <div class="modal-body">
+        <p style="margin:0; font-size:0.82rem; line-height:1.5;" id="archiveModalMessage">
+          Are you sure you want to retire <strong id="archiveSuitName" style="color:var(--gold);"></strong>? It will be moved to archived items and won't be available for rental.
+        </p>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn" onclick="closeArchiveModal()">Cancel</button>
+        <button type="submit" class="btn" style="background: rgba(156,106,200,0.15); color: #9c6ac8; border-color: rgba(156,106,200,0.3);" id="archiveSubmitBtn"><i class="fa-solid fa-box-archive"></i> Confirm</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+function openAddModal() {
+  document.getElementById('modalTitle').innerHTML = '<i class="fa-solid fa-shirt"></i> Add New Suit';
+  document.getElementById('suitForm').reset();
+  document.getElementById('suitId').value = '';
+  document.getElementById('suitForm').action = "{% url 'add_suit' %}"; 
+  document.getElementById('suitModal').classList.add('show');
+  document.body.style.overflow = 'hidden';
+}
+
+function closeModal() {
+  document.getElementById('suitModal').classList.remove('show');
+  document.body.style.overflow = '';
+}
+
+function editSuit(btnElement) {
+  const row = btnElement.closest('tr');
+  if (!row) return;
+  const data = row.dataset;
+  
+  document.getElementById('modalTitle').innerHTML = '<i class="fa-solid fa-pen"></i> Edit Suit Details';
+  document.getElementById('suitId').value = data.id;
+  document.getElementById('suitForm').action = "{% url 'inventory_edit_suit' 0 %}".replace('/0/', '/' + data.id + '/');
+
+  const form = document.getElementById('suitForm');
+  form.suit_name.value = data.name || '';
+  form.collection.value = data.collection || 'Standard';
+  form.size.value = data.size || 'M';
+  form.color.value = data.color || '';
+  form.quantity.value = data.quantity || 1;
+  form.price_per_day.value = data.price || '';
+  form.description.value = data.description || '';
+  form.condition_grade.value = data.condition || 'new';
+  form.damage_notes.value = data.damage || '';
+  if (form.status) form.status.value = data.statusVal || 'Available';
+  if (form.category) form.category.value = data.category || 'suits';
+
+  document.getElementById('suitModal').classList.add('show');
+  document.body.style.overflow = 'hidden';
+}
+
+function deleteSuit(id, name) {
+  document.getElementById('deleteSuitId').value = id;
+  document.getElementById('deleteSuitName').textContent = name;
+  document.getElementById('deleteForm').action = "{% url 'inventory_delete_suit' %}";
+  document.getElementById('deleteModal').classList.add('show');
+  document.body.style.overflow = 'hidden';
+}
+
+function closeDeleteModal() {
+  document.getElementById('deleteModal').classList.remove('show');
+  document.body.style.overflow = '';
+}
+
+function retireSuit(id, name) {
+  document.getElementById('archiveSuitId').value = id;
+  document.getElementById('archiveSuitName').textContent = name;
+  document.getElementById('archiveModalTitle').textContent = 'Retire Suit';
+  document.getElementById('archiveModalMessage').innerHTML = `Are you sure you want to retire <strong style="color:var(--gold);">${name}</strong>? It will be moved to archived items and won't be available for rental.`;
+  document.getElementById('archiveSubmitBtn').innerHTML = '<i class="fa-solid fa-box-archive"></i> Retire Suit';
+  document.getElementById('archiveForm').action = "{% url 'retire_suit' 0 %}".replace('/0/', '/' + id + '/');
+  document.getElementById('archiveModal').classList.add('show');
+  document.body.style.overflow = 'hidden';
+}
+
+function restoreSuit(id, name) {
+  document.getElementById('archiveSuitId').value = id;
+  document.getElementById('archiveSuitName').textContent = name;
+  document.getElementById('archiveModalTitle').textContent = 'Restore Suit';
+  document.getElementById('archiveModalMessage').innerHTML = `Are you sure you want to restore <strong style="color:var(--gold);">${name}</strong>? It will be moved back to active inventory.`;
+  document.getElementById('archiveSubmitBtn').innerHTML = '<i class="fa-solid fa-rotate-left"></i> Restore Suit';
+  document.getElementById('archiveSubmitBtn').style.background = 'rgba(76,175,130,0.15)';
+  document.getElementById('archiveSubmitBtn').style.color = 'var(--success)';
+  document.getElementById('archiveSubmitBtn').style.borderColor = 'rgba(76,175,130,0.3)';
+  document.getElementById('archiveForm').action = "{% url 'restore_suit' 0 %}".replace('/0/', '/' + id + '/');
+  document.getElementById('archiveModal').classList.add('show');
+  document.body.style.overflow = 'hidden';
+}
+
+function closeArchiveModal() {
+  document.getElementById('archiveModal').classList.remove('show');
+  document.body.style.overflow = '';
+}
+
+// Modal closing helpers on outer-click
+document.getElementById('suitModal').addEventListener('click', function (e) { if (e.target === this) closeModal(); });
+document.getElementById('deleteModal').addEventListener('click', function (e) { if (e.target === this) closeDeleteModal(); });
+document.getElementById('archiveModal').addEventListener('click', function (e) { if (e.target === this) closeArchiveModal(); });
+document.addEventListener('keydown', function (e) { 
+  if (e.key === 'Escape') { 
+    closeModal(); 
+    closeDeleteModal(); 
+    closeArchiveModal();
+  } 
+});
+</script>
+
+{% endblock %}

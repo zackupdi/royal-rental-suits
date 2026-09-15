@@ -1,0 +1,1371 @@
+<!DOCTYPE html>
+{% load static %}
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Premium Collection | Royal Suit Rental</title>
+
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <link href="https://cdn.jsdelivr.net/npm/aos@2.3.4/dist/aos.css" rel="stylesheet">
+
+    <style>
+        :root {
+            --gold: #c9a84c;
+            --gold-light: #e8c96a;
+            --gold-dim: rgba(201,168,76,0.12);
+            --gold-glow: rgba(201,168,76,0.28);
+            --bg: #0f0f1a;
+            --surface: rgba(255,255,255,0.04);
+            --surface-hover: rgba(255,255,255,0.08);
+            --border: rgba(255,255,255,0.07);
+            --border-hover: rgba(201,168,76,0.3);
+            --text-main: #f0ede8;
+            --text-muted: rgba(240,237,232,0.5);
+            --success: #4caf82;
+            --danger: #e05c5c;
+            --warning: #e0a040;
+            --radius: 16px;
+            --shadow: 0 20px 45px rgba(0,0,0,0.3);
+            --shadow-hover: 0 32px 55px rgba(0,0,0,0.4);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Poppins', sans-serif;
+            background: var(--bg);
+            color: var(--text-main);
+            overflow-x: hidden;
+        }
+
+        /* ═══════════════════════════════════════════
+           NAVBAR - PREMIUM DESIGN
+        ═══════════════════════════════════════════ */
+        .navbar {
+            background: rgba(15, 15, 26, 0.95) !important;
+            backdrop-filter: blur(20px) saturate(180%);
+            border-bottom: 1px solid var(--border);
+            padding: 16px 0;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+            position: fixed;
+            width: 100%;
+            top: 0;
+            z-index: 1050;
+            transition: all 0.3s ease;
+        }
+
+        .navbar.scrolled {
+            padding: 12px 0;
+            background: rgba(15, 15, 26, 0.98) !important;
+        }
+
+        .navbar-brand {
+            font-family: 'Playfair Display', serif;
+            font-size: 1.6rem;
+            font-weight: 900;
+            letter-spacing: 1.5px;
+            color: var(--gold) !important;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            transition: all 0.3s ease;
+        }
+
+        .navbar-brand:hover {
+            transform: scale(1.05);
+            text-shadow: 0 0 20px var(--gold-glow);
+        }
+
+        .navbar-brand i {
+            font-size: 1.8rem;
+            animation: crownFloat 3s ease-in-out infinite;
+        }
+
+        @keyframes crownFloat {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-3px); }
+        }
+
+        .nav-link {
+            color: var(--text-main) !important;
+            font-weight: 500;
+            font-size: 0.95rem;
+            padding: 10px 18px !important;
+            border-radius: 10px;
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .nav-link::before {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            left: 50%;
+            width: 0;
+            height: 2px;
+            background: var(--gold);
+            transition: all 0.3s ease;
+            transform: translateX(-50%);
+        }
+
+        .nav-link:hover::before,
+        .nav-link.active::before {
+            width: 80%;
+        }
+
+        .nav-link:hover {
+            color: var(--gold) !important;
+            background: var(--gold-dim);
+        }
+
+        .nav-link.active {
+            color: var(--gold) !important;
+            font-weight: 700;
+        }
+
+        /* Admin Navigation Dropdown */
+        .admin-nav-dropdown {
+            position: relative;
+        }
+
+        .admin-nav-btn {
+            background: linear-gradient(135deg, var(--gold), var(--gold-light));
+            color: #0f0f1a !important;
+            border: none;
+            padding: 10px 20px !important;
+            border-radius: 12px;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            transition: all 0.3s ease;
+            box-shadow: 0 8px 20px var(--gold-glow);
+        }
+
+        .admin-nav-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 12px 28px var(--gold-glow);
+        }
+
+        .admin-dropdown-menu {
+            position: absolute;
+            top: 100%;
+            right: 0;
+            min-width: 280px;
+            background: rgba(15, 15, 26, 0.98);
+            backdrop-filter: blur(20px);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 12px;
+            margin-top: 10px;
+            opacity: 0;
+            visibility: hidden;
+            transform: translateY(-10px);
+            transition: all 0.3s ease;
+            box-shadow: 0 20px 50px rgba(0,0,0,0.5);
+            z-index: 1060;
+        }
+
+        .admin-nav-dropdown:hover .admin-dropdown-menu {
+            opacity: 1;
+            visibility: visible;
+            transform: translateY(0);
+        }
+
+        .admin-dropdown-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px 16px;
+            color: var(--text-main);
+            text-decoration: none;
+            border-radius: 10px;
+            transition: all 0.3s ease;
+            font-size: 0.92rem;
+            font-weight: 500;
+        }
+
+        .admin-dropdown-item:hover {
+            background: var(--gold-dim);
+            color: var(--gold);
+            transform: translateX(5px);
+        }
+
+        .admin-dropdown-item i {
+            width: 20px;
+            text-align: center;
+            font-size: 1.1rem;
+            color: var(--gold);
+        }
+
+        .admin-dropdown-divider {
+            height: 1px;
+            background: var(--border);
+            margin: 8px 0;
+        }
+
+        /* User Dropdown */
+        .user-dropdown-btn {
+            background: rgba(255,255,255,0.08);
+            border: 1px solid var(--border);
+            color: var(--text-main);
+            padding: 10px 20px !important;
+            border-radius: 999px;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            transition: all 0.3s ease;
+        }
+
+        .user-dropdown-btn:hover {
+            background: var(--surface-hover);
+            border-color: var(--gold);
+            color: var(--gold);
+        }
+
+        .user-dropdown-menu {
+            background: rgba(15, 15, 26, 0.98);
+            backdrop-filter: blur(20px);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 12px;
+            margin-top: 10px;
+            box-shadow: 0 20px 50px rgba(0,0,0,0.5);
+            min-width: 220px;
+        }
+
+        .user-dropdown-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px 14px;
+            color: var(--text-main);
+            text-decoration: none;
+            border-radius: 10px;
+            transition: all 0.3s ease;
+            font-size: 0.9rem;
+        }
+
+        .user-dropdown-item:hover {
+            background: var(--gold-dim);
+            color: var(--gold);
+        }
+
+        .user-dropdown-item.text-danger:hover {
+            background: rgba(224,92,92,0.15);
+            color: var(--danger);
+        }
+
+        /* ═══════════════════════════════════════════
+           HERO BANNER
+        ═══════════════════════════════════════════ */
+        .hero-banner {
+            background: linear-gradient(180deg, rgba(15,15,26,0.92), rgba(26,26,46,0.92)),
+                        url('https://images.unsplash.com/photo-1497339100210-9e87df79c218?q=80&w=1600&auto=format&fit=crop');
+            background-size: cover;
+            background-position: center;
+            background-attachment: fixed;
+            height: 70vh;
+            display: flex;
+            align-items: center;
+            color: var(--text-main);
+            margin-bottom: -50px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .hero-banner::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: radial-gradient(circle at 30% 50%, var(--gold-glow) 0%, transparent 50%);
+            opacity: 0.3;
+        }
+
+        .hero-title {
+            font-family: 'Playfair Display', serif;
+            font-size: clamp(2.5rem, 5vw, 4.5rem);
+            font-weight: 900;
+            text-shadow: 0 14px 30px rgba(0,0,0,0.4);
+            background: linear-gradient(135deg, var(--text-main), var(--gold));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .hero-subtitle {
+            font-size: 1.2rem;
+            color: var(--text-muted);
+            max-width: 600px;
+            margin: 0 auto;
+        }
+
+        .btn-hero {
+            background: linear-gradient(135deg, var(--gold), var(--gold-light));
+            color: #0f0f1a;
+            border: none;
+            padding: 16px 48px;
+            border-radius: 999px;
+            font-weight: 700;
+            font-size: 1.1rem;
+            box-shadow: 0 16px 40px var(--gold-glow);
+            transition: all 0.3s ease;
+        }
+
+        .btn-hero:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 20px 50px var(--gold-glow);
+        }
+
+        /* ═══════════════════════════════════════════
+           CONTROL PANEL
+        ═══════════════════════════════════════════ */
+        .control-panel {
+            background: var(--surface);
+            backdrop-filter: blur(20px);
+            padding: 32px;
+            border-radius: 24px;
+            box-shadow: var(--shadow);
+            margin-bottom: 40px;
+            position: relative;
+            z-index: 10;
+            border: 1px solid var(--border);
+        }
+
+        .filter-btn {
+            border-radius: 14px;
+            padding: 12px 24px;
+            font-weight: 600;
+            font-size: 0.9rem;
+            transition: all 0.3s ease;
+            border: 1px solid var(--border);
+            background: transparent;
+            color: var(--text-main);
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .filter-btn.active,
+        .filter-btn:hover {
+            background: var(--gold-dim);
+            color: var(--gold);
+            border-color: var(--gold);
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px var(--gold-glow);
+        }
+
+        .filter-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 18px;
+            border-radius: 999px;
+            border: 1px solid rgba(255,255,255,0.12);
+            background: rgba(255,255,255,0.04);
+            color: var(--text-main);
+            text-decoration: none;
+            font-weight: 600;
+            transition: all 0.25s ease;
+        }
+
+        .filter-pill:hover,
+        .filter-pill.active-pill {
+            background: var(--gold-dim);
+            color: var(--gold);
+            border-color: var(--gold);
+        }
+
+        .text-gold {
+            color: var(--gold) !important;
+        }
+
+        .search-form .form-control,
+        .search-form .form-select {
+            background: rgba(255,255,255,0.08);
+            border: 1px solid var(--border);
+            color: var(--text-main);
+            padding: 12px 20px;
+            border-radius: 14px;
+            transition: all 0.3s ease;
+            font-weight: 600;
+            font-size: 0.9rem;
+        }
+
+        .search-form .form-control {
+            padding-right: 60px;
+            border-radius: 999px;
+        }
+
+        .search-form .form-select {
+            min-width: 150px;
+            appearance: none;
+            background-image: linear-gradient(45deg, transparent 50%, var(--gold) 50%), linear-gradient(135deg, var(--gold) 50%, transparent 50%);
+            background-position: calc(100% - 20px) calc(1em + 2px), calc(100% - 14px) calc(1em + 2px);
+            background-size: 6px 6px, 6px 6px;
+            background-repeat: no-repeat;
+            cursor: pointer;
+        }
+
+        .search-form .form-control:focus,
+        .search-form .form-select:focus {
+            background: var(--gold-dim);
+            color: var(--gold);
+            border-color: var(--gold);
+            box-shadow: 0 8px 20px var(--gold-glow);
+            outline: none;
+        }
+
+        .search-form .form-control::placeholder {
+            color: var(--text-muted);
+        }
+
+        .search-form .btn {
+            background: linear-gradient(135deg, var(--gold), var(--gold-light));
+            color: #0f0f1a;
+            border: none;
+            transition: all 0.3s ease;
+            font-weight: 700;
+            box-shadow: 0 8px 20px var(--gold-glow);
+        }
+
+        .search-form .btn:hover {
+            background: linear-gradient(135deg, var(--gold-light), var(--gold));
+            transform: scale(1.05);
+            box-shadow: 0 12px 28px var(--gold-glow);
+        }
+
+        /* ═══════════════════════════════════════════
+           SUIT CARDS
+        ═══════════════════════════════════════════ */
+        .suit-card {
+            background: var(--surface);
+            backdrop-filter: blur(20px);
+            border-radius: 28px;
+            border: 1px solid var(--border);
+            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+            height: 100%;
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            box-shadow: var(--shadow);
+            overflow: hidden;
+        }
+
+        .suit-card:hover {
+            transform: translateY(-12px);
+            box-shadow: var(--shadow-hover);
+            border-color: var(--gold);
+        }
+
+        .suit-img-wrapper {
+            height: 340px;
+            border-radius: 28px 28px 0 0;
+            overflow: hidden;
+            background: rgba(255,255,255,0.02);
+            position: relative;
+        }
+
+        .suit-img-wrapper img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            transition: transform 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .suit-card:hover .suit-img-wrapper img {
+            transform: scale(1.08);
+        }
+
+        .price-tag {
+            position: absolute;
+            bottom: 16px;
+            left: 16px;
+            background: rgba(15, 15, 26, 0.95);
+            color: var(--gold);
+            padding: 8px 18px;
+            border-radius: 999px;
+            font-weight: 700;
+            font-size: 1.1rem;
+            backdrop-filter: blur(10px);
+            box-shadow: 0 12px 30px rgba(0,0,0,0.4);
+            border: 1px solid var(--gold-dim);
+        }
+
+        .status-badge {
+            position: absolute;
+            top: 16px;
+            right: 16px;
+            padding: 7px 16px;
+            border-radius: 999px;
+            font-size: 0.75rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            backdrop-filter: blur(10px);
+            box-shadow: 0 8px 20px rgba(0,0,0,0.3);
+        }
+
+        .card-body {
+            padding: 24px;
+            display: flex;
+            flex-direction: column;
+            flex-grow: 1;
+        }
+
+        .suit-name {
+            font-family: 'Playfair Display', serif;
+            font-size: 1.3rem;
+            font-weight: 700;
+            color: var(--text-main);
+            margin-bottom: 8px;
+        }
+
+        .collection-badge {
+            font-size: 0.7rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: var(--gold);
+            background: var(--gold-dim);
+            padding: 4px 12px;
+            border-radius: 999px;
+        }
+
+        .meta-pill {
+            background: var(--gold-dim);
+            padding: 6px 14px;
+            border-radius: 999px;
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            margin-right: 6px;
+            margin-bottom: 6px;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            border: 1px solid var(--border);
+        }
+
+        .favorite-btn {
+            color: var(--danger);
+            font-size: 1.2rem;
+            transition: all 0.3s ease;
+            text-decoration: none;
+        }
+
+        .favorite-btn:hover {
+            transform: scale(1.2);
+            filter: drop-shadow(0 0 10px var(--danger));
+        }
+
+        .btn-book {
+            background: linear-gradient(135deg, var(--gold), var(--gold-light));
+            color: #0f0f1a;
+            border-radius: 16px;
+            padding: 14px;
+            font-weight: 700;
+            width: 100%;
+            transition: all 0.3s ease;
+            border: none;
+            margin-top: auto;
+            box-shadow: 0 16px 30px var(--gold-glow);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+
+        .btn-book:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 20px 40px var(--gold-glow);
+        }
+
+        .btn-book:disabled {
+            background: rgba(255,255,255,0.1);
+            color: var(--text-muted);
+            cursor: not-allowed;
+            box-shadow: none;
+        }
+
+        /* ═══════════════════════════════════════════
+           MODALS
+        ═══════════════════════════════════════════ */
+        .booking-modal .modal-content,
+        #loginModal .modal-content {
+            background: rgba(15, 15, 26, 0.98);
+            backdrop-filter: blur(20px);
+            border: 1px solid var(--border);
+            border-radius: 28px;
+            overflow: hidden;
+            box-shadow: 0 30px 60px rgba(0,0,0,0.5);
+        }
+
+        .booking-modal .modal-header,
+        #loginModal .modal-header {
+            border: none;
+            padding: 1.6rem 1.6rem 0.8rem;
+        }
+
+        .booking-modal .modal-title,
+        #loginModal .modal-title {
+            color: var(--text-main);
+            font-size: 1.4rem;
+            font-weight: 700;
+        }
+
+        .booking-modal .modal-body,
+        #loginModal .modal-body {
+            padding: 1.5rem 1.6rem 1.2rem;
+            background: rgba(15,15,26,0.95);
+        }
+
+        .booking-modal .detail-box {
+            background: rgba(255,255,255,0.06);
+            border: 1px solid rgba(255,255,255,0.12);
+            border-radius: 18px;
+            padding: 18px 16px;
+            margin-bottom: 1.25rem;
+            color: var(--text-main);
+        }
+
+        .booking-modal .form-label,
+        #loginModal .form-label {
+            color: rgba(228,231,240,0.8);
+            font-size: 0.72rem;
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+            margin-bottom: 0.35rem;
+            display: inline-block;
+            font-weight: 600;
+        }
+
+        .booking-modal .form-control,
+        #loginModal .form-control {
+            background: rgba(255,255,255,0.08);
+            border: 1px solid rgba(255,255,255,0.14);
+            color: var(--text-main);
+            padding: 15px 16px;
+            border-radius: 16px;
+            min-height: 52px;
+            transition: all 0.3s ease;
+        }
+
+        .booking-modal .form-control::placeholder,
+        #loginModal .form-control::placeholder {
+            color: rgba(228,231,240,0.55);
+        }
+
+        .booking-modal .form-control:focus,
+        #loginModal .form-control:focus {
+            border-color: var(--gold);
+            box-shadow: 0 0 0 4px var(--gold-dim);
+            background: rgba(255,255,255,0.12);
+            color: var(--text-main);
+        }
+
+        .booking-modal .modal-footer,
+        #loginModal .modal-footer {
+            border: none;
+            padding: 1rem 1.6rem 1.2rem;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.85rem;
+            justify-content: flex-end;
+        }
+
+        .booking-modal .btn,
+        #loginModal .btn {
+            min-height: 48px;
+            font-weight: 700;
+            border-radius: 999px;
+            padding: 0.85rem 1.8rem;
+            transition: all 0.3s ease;
+        }
+
+        .booking-modal .btn-light,
+        #loginModal .btn-light {
+            background: rgba(255,255,255,0.08);
+            color: var(--text-main);
+            border: 1px solid rgba(255,255,255,0.14);
+        }
+
+        .booking-modal .btn-light:hover,
+        #loginModal .btn-light:hover {
+            background: rgba(255,255,255,0.12);
+            border-color: var(--gold);
+        }
+
+        .booking-modal .btn-dark,
+        #loginModal .btn-dark {
+            background: linear-gradient(135deg, var(--gold), var(--gold-light));
+            color: #0f0f1a;
+            border: none;
+        }
+
+        .booking-modal .btn-dark:hover,
+        #loginModal .btn-dark:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 12px 30px var(--gold-glow);
+        }
+
+        .modal-backdrop.show {
+            opacity: 0.85;
+            backdrop-filter: blur(8px);
+        }
+
+        /* ═══════════════════════════════════════════
+           FOOTER
+        ═══════════════════════════════════════════ */
+        footer {
+            background: var(--surface);
+            backdrop-filter: blur(20px);
+            color: var(--text-muted);
+            padding: 60px 0 30px;
+            margin-top: 80px;
+            border-top: 1px solid var(--border);
+        }
+
+        .footer-logo {
+            font-family: 'Playfair Display', serif;
+            font-size: 1.6rem;
+            font-weight: 900;
+            color: var(--gold);
+            margin-bottom: 20px;
+            display: block;
+            letter-spacing: 1px;
+        }
+
+        .social-link {
+            width: 44px;
+            height: 44px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: rgba(255,255,255,0.08);
+            border: 1px solid var(--border);
+            border-radius: 50%;
+            color: var(--text-main);
+            transition: all 0.3s ease;
+            text-decoration: none;
+        }
+
+        .social-link:hover {
+            background: var(--gold);
+            color: #0f0f1a;
+            transform: translateY(-3px);
+            box-shadow: 0 12px 25px var(--gold-glow);
+        }
+
+        /* ═══════════════════════════════════════════
+           RESPONSIVE
+        ═══════════════════════════════════════════ */
+        @media (max-width: 991px) {
+            .navbar-collapse {
+                background: rgba(15, 15, 26, 0.98);
+                backdrop-filter: blur(20px);
+                padding: 20px;
+                border-radius: 16px;
+                margin-top: 10px;
+                border: 1px solid var(--border);
+            }
+
+            .admin-dropdown-menu {
+                position: static;
+                opacity: 1;
+                visibility: visible;
+                transform: none;
+                margin-top: 10px;
+                box-shadow: none;
+            }
+
+            .hero-banner {
+                height: 60vh;
+            }
+        }
+
+        /* ═══════════════════════════════════════════
+           ANIMATIONS
+        ═══════════════════════════════════════════ */
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .fade-in-up {
+            animation: fadeInUp 0.6s ease forwards;
+        }
+
+        /* Scrollbar */
+        ::-webkit-scrollbar {
+            width: 10px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: var(--bg);
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: var(--gold-dim);
+            border-radius: 10px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: var(--gold);
+        }
+    </style>
+</head>
+
+<body>
+
+<!-- ═══════════════════════════════════════════
+     NAVBAR - PREMIUM DESIGN
+═══════════════════════════════════════════ -->
+<nav class="navbar navbar-expand-lg navbar-dark">
+    <div class="container">
+        <a class="navbar-brand fw-bold" href="{% url 'home' %}">
+            <i class="fa-solid fa-crown"></i> ROYAL RENTAL SUITS
+        </a>
+        <button class="navbar-toggler border-0" type="button" data-bs-toggle="collapse" data-bs-target="#allSuitsNav">
+            <span class="navbar-toggler-icon"></span>
+        </button>
+        <div class="collapse navbar-collapse" id="allSuitsNav">
+            <ul class="navbar-nav ms-auto align-items-center gap-2">
+                <li class="nav-item">
+                    <a class="nav-link" href="{% url 'home' %}">
+                        <i class="fa-solid fa-house me-1"></i> Home
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link active fw-bold" href="{% url 'all_suits' %}">
+                        <i class="fa-solid fa-shirt me-1"></i> Collections
+                    </a>
+                </li>
+
+                <!-- Admin/Staff Navigation -->
+                {% if user.is_authenticated and user.is_staff %}
+                    <li class="nav-item admin-nav-dropdown">
+                        <button class="nav-link admin-nav-btn">
+                            <i class="fa-solid fa-gauge-high"></i>
+                            <span>Admin Panel</span>
+                            <i class="fa-solid fa-chevron-down" style="font-size: 0.7rem;"></i>
+                        </button>
+                        <div class="admin-dropdown-menu">
+                            {% if user.profile.is_reception or user.profile.is_cashier %}
+                                <!-- Staff Links -->
+                                <a href="{% url 'reception_requests' %}" class="admin-dropdown-item">
+                                    <i class="fa-solid fa-file-lines"></i> Requests
+                                </a>
+                                <a href="{% url 'reception_payments' %}" class="admin-dropdown-item">
+                                    <i class="fa-solid fa-receipt"></i> Payments
+                                </a>
+                                <a href="{% url 'reception_inventory' %}" class="admin-dropdown-item">
+                                    <i class="fa-solid fa-warehouse"></i> Inventory
+                                </a>
+                                <a href="{% url 'reception_reports' %}" class="admin-dropdown-item">
+                                    <i class="fa-solid fa-chart-line"></i> Reports
+                                </a>
+                            {% else %}
+                                <!-- Admin Links -->
+                                <a href="{% url 'dashboard' %}" class="admin-dropdown-item">
+                                    <i class="fa-solid fa-gauge-high"></i> Dashboard
+                                </a>
+                                <a href="{% url 'requests' %}" class="admin-dropdown-item">
+                                    <i class="fa-solid fa-file-invoice-dollar"></i> Requests
+                                </a>
+                                <a href="{% url 'all_suits' %}" class="admin-dropdown-item">
+                                    <i class="fa-solid fa-shirt"></i> Suit Catalog
+                                </a>
+                                <a href="{% url 'inventory' %}" class="admin-dropdown-item">
+                                    <i class="fa-solid fa-warehouse"></i> Inventory
+                                </a>
+                                <a href="{% url 'payments' %}" class="admin-dropdown-item">
+                                    <i class="fa-solid fa-receipt"></i> Finances
+                                </a>
+                                <a href="{% url 'reports' %}" class="admin-dropdown-item">
+                                    <i class="fa-solid fa-chart-bar"></i> Analytics
+                                </a>
+                                <div class="admin-dropdown-divider"></div>
+                                <a href="{% url 'manage_users' %}" class="admin-dropdown-item">
+                                    <i class="fa-solid fa-users-gear"></i> Manage Users
+                                </a>
+                            {% endif %}
+                        </div>
+                    </li>
+                {% endif %}
+
+                <!-- User Dropdown -->
+                <li class="nav-item">
+                    {% if user.is_authenticated %}
+                        <div class="dropdown">
+                            <button class="nav-link user-dropdown-btn dropdown-toggle" data-bs-toggle="dropdown">
+                                <i class="fa-regular fa-user"></i>
+                                <span>{{ user.username }}</span>
+                            </button>
+                            <ul class="dropdown-menu user-dropdown-menu dropdown-menu-end">
+                                <li>
+                                    <a class="user-dropdown-item" href="{% url 'customer_history' %}">
+                                        <i class="fa-solid fa-clock-rotate-left text-muted"></i>
+                                        <span>My Bookings</span>
+                                    </a>
+                                </li>
+                                <li>
+                                    <a class="user-dropdown-item" href="{% url 'notifications' %}">
+                                        <i class="fa-solid fa-bell text-primary"></i>
+                                        <span>Notifications</span>
+                                    </a>
+                                </li>
+                                <li><hr class="dropdown-divider" style="border-color: var(--border);"></li>
+                                <li>
+                                    <a class="user-dropdown-item text-danger" href="{% url 'customer_logout' %}">
+                                        <i class="fa-solid fa-power-off"></i>
+                                        <span>Logout</span>
+                                    </a>
+                                </li>
+                            </ul>
+                        </div>
+                    {% else %}
+                        <a href="{% url 'customer_login' %}" class="nav-link" style="background: linear-gradient(135deg, var(--gold), var(--gold-light)); color: #0f0f1a !important; border-radius: 999px; padding: 10px 28px !important; font-weight: 700;">
+                            <i class="fa-solid fa-sign-in-alt me-1"></i> Login
+                        </a>
+                    {% endif %}
+                </li>
+            </ul>
+        </div>
+    </div>
+</nav>
+
+<!-- Messages -->
+{% if messages %}
+    <div class="container mt-5" style="margin-top: 100px;">
+        {% for message in messages %}
+            <div class="alert alert-{% if message.tags %}{{ message.tags }}{% else %}info{% endif %} alert-dismissible fade show" role="alert" style="background: var(--surface); border: 1px solid var(--border); color: var(--text-main); border-radius: 16px;">
+                <i class="fa-solid fa-circle-{% if message.tags == 'error' %}xmark{% else %}info{% endif %} me-2" style="color: var(--gold);"></i>
+                {{ message }}
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="alert"></button>
+            </div>
+        {% endfor %}
+    </div>
+{% endif %}
+
+<!-- Hero Banner -->
+<section class="hero-banner">
+    <div class="container text-center" data-aos="zoom-out">
+        <h1 class="hero-title fw-900 mb-3">Elevate Your Style</h1>
+        <p class="hero-subtitle mb-4">Somaliland's premier suit rental destination for weddings and events.</p>
+        <a href="#collection-grid" class="btn btn-hero">
+            <i class="fa-solid fa-compass me-2"></i> Explore Now
+        </a>
+    </div>
+</section>
+
+<!-- Main Content -->
+<div class="container" style="margin-top: -60px;">
+
+    <!-- Control Panel -->
+    <div class="control-panel" id="collection-grid" data-aos="fade-up">
+        <div class="d-flex flex-wrap justify-content-between gap-3 mb-3">
+            <div class="d-flex flex-wrap gap-2 align-items-center">
+                <a href="{% url 'all_suits' %}?category=all{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}" class="filter-pill{% if selected_category == 'all' %} active-pill{% endif %}">All Items <strong>{{ all_items_count }}</strong></a>
+                <a href="{% url 'all_suits' %}?category=suits{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}" class="filter-pill{% if selected_category == 'suits' %} active-pill{% endif %}">Suits <strong>{{ suits_count }}</strong></a>
+                <a href="{% url 'all_suits' %}?category=shirts{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}" class="filter-pill{% if selected_category == 'shirts' %} active-pill{% endif %}">Shirts <strong>{{ shirts_count }}</strong></a>
+                <a href="{% url 'all_suits' %}?category=accessories{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}" class="filter-pill{% if selected_category == 'accessories' %} active-pill{% endif %}">Accessories <strong>{{ accessories_count }}</strong></a>
+            </div>
+            <div class="text-muted small align-self-center">Filter the collection by type or category.</div>
+        </div>
+        <div class="row align-items-center g-3">
+            <div class="col-lg-7">
+                <div class="d-flex flex-wrap gap-2">
+                    <a href="{% url 'all_suits' %}?category={{ selected_category }}{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}" class="filter-btn{% if not selected_collection %} active{% endif %}">
+                        <i class="fa-solid fa-border-all"></i> All Styles
+                    </a>
+                    {% if selected_category == 'suits' or selected_category == 'all' %}
+                        <a href="{% url 'all_suits' %}?category={{ selected_category }}{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}&collection=Luxury" class="filter-btn{% if selected_collection == 'Luxury' %} active{% endif %}">
+                            <i class="fa-solid fa-gem text-warning"></i> Luxury <span class="badge bg-dark text-gold">{{ luxury_count }}</span>
+                        </a>
+                        <a href="{% url 'all_suits' %}?category={{ selected_category }}{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}&collection=Standard" class="filter-btn{% if selected_collection == 'Standard' %} active{% endif %}">
+                            <i class="fa-solid fa-star"></i> Standard <span class="badge bg-dark text-gold">{{ standard_count }}</span>
+                        </a>
+                        <a href="{% url 'all_suits' %}?category={{ selected_category }}{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}&collection=Budget" class="filter-btn{% if selected_collection == 'Budget' %} active{% endif %}">
+                            <i class="fa-solid fa-coins"></i> Budget <span class="badge bg-dark text-gold">{{ budget_count }}</span>
+                        </a>
+                    {% endif %}
+                </div>
+            </div>
+            <div class="col-lg-5">
+                <form method="get" action="{% url 'all_suits' %}" class="search-form">
+                    <input type="hidden" name="category" value="{{ selected_category }}">
+                    {% if selected_collection %}
+                    <input type="hidden" name="collection" value="{{ selected_collection }}">
+                    {% endif %}
+                    <div class="position-relative">
+                        <input type="text" name="q" value="{{ request.GET.q }}" class="form-control"
+                               placeholder="Search by suit name or color...">
+                        <button class="btn position-absolute end-0 top-0 mt-1 me-1 rounded-pill px-4" style="height: 42px;" type="submit">
+                            <i class="fa-solid fa-magnifying-glass"></i>
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Suits Grid -->
+    <div class="row g-4">
+        {% for suit in suits %}
+        <div class="col-xl-3 col-lg-4 col-md-6" data-aos="fade-up" data-aos-delay="{{ forloop.counter0|divisibleby:4|yesno:'0,100,200,300' }}">
+            <div class="suit-card">
+                <div class="suit-img-wrapper">
+                    {% if suit.quantity == 0 %}
+                        <span class="status-badge bg-secondary text-white">
+                            <i class="fa-solid fa-box-archive me-1"></i> Out of Stock
+                        </span>
+                    {% elif suit.status == "Available" %}
+                        <span class="status-badge bg-success text-white">
+                            <i class="fa-solid fa-check me-1"></i> Available
+                        </span>
+                    {% else %}
+                        <span class="status-badge bg-danger text-white">
+                            <i class="fa-solid fa-clock me-1"></i> Rented
+                        </span>
+                    {% endif %}
+
+                    <img src="{{ suit.image_url }}" alt="{{ suit.suit_name }}">
+
+                    <div class="price-tag">
+                        ${{ suit.price_per_day }} <small class="fw-normal opacity-75">/ day</small>
+                    </div>
+                </div>
+
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-start mb-2">
+                        <div>
+                            <h5 class="suit-name">{{ suit.suit_name }}</h5>
+                            <span class="collection-badge">{{ suit.collection }}</span>
+                        </div>
+                        {% if user.is_authenticated %}
+                        <a href="{% url 'toggle_favorite' suit.id %}" class="favorite-btn"
+                           title="{% if suit.id in user_favorites %}Remove from favorites{% else %}Add to favorites{% endif %}">
+                            <i class="fa{% if suit.id in user_favorites %}s{% else %}r{% endif %} fa-heart"></i>
+                        </a>
+                        {% endif %}
+                    </div>
+
+                    <div class="mb-3">
+                        <span class="meta-pill">
+                            <i class="fa-solid fa-ruler-vertical"></i> {{ suit.size }}
+                        </span>
+                        <span class="meta-pill">
+                            <i class="fa-solid fa-palette"></i> {{ suit.color }}
+                        </span>
+                    </div>
+
+                    <div class="mb-3">
+                        {% if suit.available_quantity > 0 and suit.reserved_quantity > 0 %}
+                            <span class="meta-pill">
+                                <i class="fa-solid fa-check text-success"></i> {{ suit.available_quantity }} available
+                            </span>
+                            <span class="meta-pill">
+                                <i class="fa-solid fa-clock text-warning"></i> {{ suit.reserved_quantity }} rented
+                            </span>
+                        {% elif suit.available_quantity > 0 %}
+                            <span class="meta-pill">
+                                <i class="fa-solid fa-check text-success"></i> {{ suit.available_quantity }} available
+                            </span>
+                        {% else %}
+                            <span class="meta-pill">
+                                <i class="fa-solid fa-clock text-danger"></i> Next: {{ suit.next_available_text }}
+                            </span>
+                        {% endif %}
+                    </div>
+
+                    {% if suit.quantity == 0 %}
+                        <button class="btn-book" disabled>
+                            <i class="fa-solid fa-times-circle"></i> Out of Stock
+                        </button>
+                    {% elif suit.is_available_for_booking %}
+                        {% if user.is_authenticated %}
+                            <a href="{% url 'request_form' suit.id %}" class="btn-book text-decoration-none d-inline-flex align-items-center justify-content-center">
+                                <i class="fa-solid fa-calendar-check me-2"></i> Request Rental
+                            </a>
+                        {% else %}
+                            <button class="btn-book"
+                                    data-bs-toggle="modal"
+                                    data-bs-target="#loginModal"
+                                    data-suitid="{{ suit.id }}"
+                                    data-suitname="{{ suit.suit_name }}"
+                                    data-price="{{ suit.price_per_day }}"
+                                    data-collection="{{ suit.collection }}"
+                                    data-size="{{ suit.size }}"
+                                    data-color="{{ suit.color }}">
+                                <i class="fa-solid fa-calendar-check"></i> Request Rental
+                            </button>
+                        {% endif %}
+                    {% else %}
+                        {% if suit.rental_end_time %}
+                            <small class="text-danger d-block mb-2 text-center">
+                                <i class="fa-solid fa-hourglass-half"></i>
+                                Ends in <span class="countdown" data-endtime="{{ suit.rental_end_time|date:'c' }}">Loading...</span>
+                            </small>
+                        {% endif %}
+                        <button class="btn-book" disabled>
+                            <i class="fa-solid fa-clock-rotate-left"></i> Currently Booked
+                        </button>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        {% empty %}
+        <div class="col-12 text-center py-5">
+            <div class="rounded-4 p-5" style="background: var(--surface); border: 1px solid var(--border);">
+                <i class="fa-solid fa-magnifying-glass fa-3x mb-3" style="color: var(--text-muted);"></i>
+                <h3 style="color: var(--text-main);">No suits found</h3>
+                <p style="color: var(--text-muted);">Try using different filters or search keywords.</p>
+                <a href="{% url 'all_suits' %}" class="btn btn-hero mt-2">
+                    <i class="fa-solid fa-eye me-2"></i> View All Suits
+                </a>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+
+<!-- Booking Modal -->
+<div class="modal fade booking-modal" id="bookingModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered modal-fullscreen-sm-down">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="fa-solid fa-file-signature me-2" style="color: var(--gold);"></i>
+                    Booking Form
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="POST" id="bookingFormModal" enctype="multipart/form-data">
+                {% csrf_token %}
+                <div class="modal-body">
+                    <input type="hidden" name="suit_id" id="modal-suit-id">
+                    <div class="detail-box">
+                        <h6 id="modal-suit-name" class="mb-1 fw-bold"></h6>
+                        <small id="modal-details-line" style="color: var(--text-muted);"></small>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label" for="booking-name">Full Name</label>
+                        <input type="text" class="form-control" id="booking-name" name="name"
+                               placeholder="Enter your full name" required>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label" for="booking-email">Email Address</label>
+                        <input type="email" class="form-control" id="booking-email" name="email"
+                               placeholder="example@email.com" required>
+                    </div>
+
+                    <div class="row gx-3">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label" for="booking-phone">Phone</label>
+                            <input type="tel" class="form-control" id="booking-phone" name="phone"
+                                   placeholder="063xxxxxxx" inputmode="tel" required>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label" for="booking-days">Days (1-7)</label>
+                            <input type="number" class="form-control" id="booking-days" name="days_requested"
+                                   min="1" max="7" value="1" required>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label" for="booking-quantity">Quantity (1-5)</label>
+                        <input type="number" class="form-control" id="booking-quantity" name="quantity_requested"
+                               min="1" max="5" value="1" required>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label" for="booking-upload">
+                            Upload ID or Photo <span style="color: var(--gold);">*</span>
+                        </label>
+                        <input type="file" class="form-control" id="booking-upload"
+                               name="customer_image" accept="image/*" required>
+                        <small style="color: var(--text-muted); font-size: 0.75rem;">
+                            <i class="fa-solid fa-circle-info me-1"></i>
+                            ID-kaaga ama sawirkaaga ku dar si booking-ka loo xaqiijiyo.
+                        </small>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-dark">
+                        <i class="fa-solid fa-paper-plane me-2"></i> Submit Booking
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Login Required Modal -->
+<div class="modal fade" id="loginModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title text-center w-100">
+                    <i class="fa-solid fa-user-lock me-2" style="color: var(--gold);"></i>
+                    Login Required
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-4 text-center">
+                <i class="fa-solid fa-exclamation-triangle fa-3x mb-3" style="color: var(--gold);"></i>
+                <h5 class="mb-2 fw-bold" style="color: var(--gold);">Fadlan Ma Codsan Kartid</h5>
+                <p class="mb-4" style="color: var(--text-muted);">Ugu horayn is diwaan gali si aad u codsato kirada suudhka.</p>
+                <div class="d-grid gap-2">
+                    <a href="{% url 'customer_login' %}" class="btn btn-light rounded-pill px-4 fw-bold">
+                        <i class="fa-solid fa-sign-in-alt me-2"></i> Login
+                    </a>
+                    <a href="{% url 'register' %}" class="btn btn-dark rounded-pill px-4 fw-bold">
+                        <i class="fa-solid fa-user-plus me-2"></i> Register
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Footer -->
+<footer>
+    <div class="container text-center">
+        <span class="footer-logo">Royal Suit Rental</span>
+        <div class="d-flex justify-content-center gap-3 mb-4">
+            <a href="#" class="social-link"><i class="fa-brands fa-facebook-f"></i></a>
+            <a href="#" class="social-link"><i class="fa-brands fa-instagram"></i></a>
+            <a href="#" class="social-link"><i class="fa-brands fa-whatsapp"></i></a>
+        </div>
+        <p class="small opacity-50 mb-3">&copy; 2026 Royal Suit Rental. Hargeisa, Somaliland.</p>
+        <div class="badge bg-dark opacity-75 px-3 py-2 rounded-pill">
+            <i class="fa-regular fa-clock me-2" style="color: var(--gold);"></i>
+            <span id="current-time"></span>
+        </div>
+    </div>
+</footer>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/aos@2.3.4/dist/aos.js"></script>
+<script>
+    // Initialize AOS
+    AOS.init({ 
+        duration: 800, 
+        once: true,
+        offset: 100
+    });
+
+    // Navbar scroll effect
+    window.addEventListener('scroll', function() {
+        const navbar = document.querySelector('.navbar');
+        if (window.scrollY > 50) {
+            navbar.classList.add('scrolled');
+        } else {
+            navbar.classList.remove('scrolled');
+        }
+    });
+
+    // Update time
+    function updateTime() {
+        const options = { 
+            timeZone: 'Africa/Mogadishu', 
+            hour: '2-digit', 
+            minute: '2-digit', 
+            second: '2-digit', 
+            hour12: true 
+        };
+        document.getElementById('current-time').textContent = 
+            new Date().toLocaleTimeString('en-US', options);
+    }
+    setInterval(updateTime, 1000);
+    updateTime();
+
+    // Update countdowns
+    function updateCountdowns() {
+        document.querySelectorAll('.countdown').forEach(function(el) {
+            var diff = new Date(el.dataset.endtime) - new Date();
+            if (diff <= 0) { 
+                el.textContent = 'Expired'; 
+                return; 
+            }
+            var h = Math.floor(diff/1000/60/60);
+            var m = Math.floor((diff/1000/60)%60);
+            var s = Math.floor((diff/1000)%60);
+            el.textContent = h + 'h ' + m + 'm ' + s + 's';
+        });
+    }
+    updateCountdowns();
+    setInterval(updateCountdowns, 1000);
+
+    const bookingDaysInput = document.getElementById('booking-days');
+    const rentalDurationHint = document.getElementById('rentalDurationHint');
+    function updateRentalDurationHint() {
+        const days = parseInt(bookingDaysInput?.value, 10) || 1;
+        const hours = days * 24;
+        if (rentalDurationHint) {
+            rentalDurationHint.textContent = `Estimated rental duration: ${hours} hours`;
+        }
+    }
+    if (bookingDaysInput) {
+        bookingDaysInput.addEventListener('input', updateRentalDurationHint);
+        updateRentalDurationHint();
+    }
+
+    // Booking modal
+    const bookingModal = document.getElementById('bookingModal');
+    if (bookingModal) {
+        bookingModal.addEventListener('show.bs.modal', event => {
+            const btn = event.relatedTarget;
+            const suitId = btn.dataset.suitid;
+            document.getElementById('modal-suit-id').value = suitId;
+            document.getElementById('modal-suit-name').textContent = btn.dataset.suitname;
+            document.getElementById('modal-details-line').textContent =
+                `${btn.dataset.collection} • Size ${btn.dataset.size} • ${btn.dataset.color} • $${btn.dataset.price}/day`;
+            // Set form action URL with suit ID
+            document.getElementById('bookingFormModal').action = `/rental/request-form/${suitId}/`;
+        });
+    }
+
+    // Smooth scroll
+    document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+        anchor.addEventListener('click', function (e) {
+            e.preventDefault();
+            const target = document.querySelector(this.getAttribute('href'));
+            if (target) {
+                target.scrollIntoView({ 
+                    behavior: 'smooth',
+                    block: 'start'
+                });
+            }
+        });
+    });
+</script>
+
+{% if just_logged_out %}
+<script>localStorage.setItem('logged_out', 'true');</script>
+{% endif %}
+
+</body>
+</html>

@@ -1,0 +1,213 @@
+{% extends "rental/base.html" %}
+
+{% block content %}
+<div style="max-width: 1000px; margin: 0 auto; padding: 20px;">
+  
+  <!-- Suit Header -->
+  <div style="background: #1e293b; border-radius: 12px; padding: 30px; margin-bottom: 20px;">
+    <h1 style="margin: 0 0 10px 0;">{{ suit.suit_name }}</h1>
+    <p style="color: #94a3b8; margin: 0;">
+      {{ suit.size }} | {{ suit.color }} | 
+      {% if suit.condition_grade == 'new' %}
+        New
+      {% elif suit.condition_grade == 'medium' %}
+        Good
+      {% else %}
+        Worn
+      {% endif %}
+    </p>
+  </div>
+
+  <!-- Stats Grid -->
+  <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px; margin-bottom: 20px;">
+    
+    <div style="background: #1e293b; border-radius: 12px; padding: 20px;">
+      <h3 style="color: #3b82f6; margin: 0 0 10px 0; font-size: 0.9rem; text-transform: uppercase; letter-spacing: 1px;">Current Status</h3>
+      {% if suit.status == 'Available' %}
+        <span class="badge badge-Available" style="font-size: 1rem; padding: 8px 16px;">Available</span>
+      {% elif suit.status == 'Rented' %}
+        <span class="badge badge-Rented" style="font-size: 1rem; padding: 8px 16px;">Rented</span>
+      {% else %}
+        <span class="badge badge-Cleaning" style="font-size: 1rem; padding: 8px 16px;">Cleaning</span>
+      {% endif %}
+    </div>
+
+    <div style="background: #1e293b; border-radius: 12px; padding: 20px;">
+      <h3 style="color: #10b981; margin: 0 0 10px 0; font-size: 0.9rem; text-transform: uppercase; letter-spacing: 1px;">Total Revenue</h3>
+      <p style="font-size: 2rem; font-weight: 700; color: #10b981; margin: 0;">${{ total_earnings|floatformat:2 }}</p>
+    </div>
+
+    <div style="background: #1e293b; border-radius: 12px; padding: 20px;">
+      <h3 style="color: #f59e0b; margin: 0 0 10px 0; font-size: 0.9rem; text-transform: uppercase; letter-spacing: 1px;">Total Rentals</h3>
+      <p style="font-size: 2rem; font-weight: 700; color: #f59e0b; margin: 0;">{{ total_rentals }} times</p>
+    </div>
+
+  </div>
+
+  <!-- Timer Section -->
+  {% if suit.status == 'Rented' and suit.rented_at %}
+  <div style="background: #1e293b; border-radius: 12px; padding: 20px; margin-bottom: 20px; border: 1px solid rgba(245, 158, 11, 0.3);">
+    <h3 style="color: #f59e0b; margin: 0 0 10px 0; font-size: 0.9rem; text-transform: uppercase; letter-spacing: 1px;">
+      <i class="fas fa-clock"></i> Time Remaining (2m)
+    </h3>
+    <p id="profileTimer" style="font-size: 1.5rem; font-weight: 700; color: #f59e0b; margin: 0; font-family: 'Courier New', monospace;">
+      Loading...
+    </p>
+  </div>
+  {% endif %}
+
+  <!-- Damage Notes -->
+  {% if suit.damage_notes %}
+  <div style="background: #1e293b; border-radius: 12px; padding: 20px; margin-bottom: 20px; border: 1px solid rgba(239, 68, 68, 0.3);">
+    <h3 style="color: #ef4444; margin: 0 0 10px 0; font-size: 0.9rem; text-transform: uppercase; letter-spacing: 1px;">
+      <i class="fas fa-exclamation-triangle"></i> Damage / Defects
+    </h3>
+    <p style="color: #f1f5f9; margin: 0;">{{ suit.damage_notes }}</p>
+  </div>
+  {% endif %}
+
+  <!-- Details Section -->
+  <div style="background: #1e293b; border-radius: 12px; padding: 20px; margin-bottom: 20px;">
+    <h3 style="margin: 0 0 15px 0; font-size: 1.2rem;">Suit Details</h3>
+    <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px;">
+      <div>
+        <strong style="color: #94a3b8; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.5px;">Daily Rate:</strong>
+        <p style="margin: 5px 0 0 0; font-size: 1.2rem;">${{ suit.price_per_day|floatformat:2 }}</p>
+      </div>
+      <div>
+        <strong style="color: #94a3b8; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.5px;">Collection:</strong>
+        <p style="margin: 5px 0 0 0;">{{ suit.collection|default:"N/A" }}</p>
+      </div>
+      <div>
+        <strong style="color: #94a3b8; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.5px;">Quantity:</strong>
+        <p style="margin: 5px 0 0 0;">{{ suit.quantity }}</p>
+      </div>
+      <div>
+        <strong style="color: #94a3b8; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.5px;">Description:</strong>
+        <p style="margin: 5px 0 0 0;">{{ suit.description|default:"No description provided." }}</p>
+      </div>
+      {% if suit.created_at %}
+      <div>
+        <strong style="color: #94a3b8; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.5px;">Created On:</strong>
+        <p style="margin: 5px 0 0 0;">{{ suit.created_at|date:"M d, Y" }}</p>
+      </div>
+      {% endif %}
+      {% if suit.updated_at %}
+      <div>
+        <strong style="color: #94a3b8; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.5px;">Last Updated:</strong>
+        <p style="margin: 5px 0 0 0;">{{ suit.updated_at|date:"M d, Y" }}</p>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- Usage History -->
+  <div style="background: #1e293b; border-radius: 12px; padding: 20px; margin-bottom: 20px;">
+    <h3 style="margin: 0 0 15px 0; font-size: 1.2rem;">Usage History</h3>
+    {% if rental_history %}
+      <div style="display: grid; gap: 10px;">
+        {% for entry in rental_history %}
+        <div style="display: flex; justify-content: space-between; align-items: center; padding: 12px 14px; background: rgba(15, 23, 42, 0.7); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px;">
+          <div>
+            <p style="margin: 0; font-weight: 600;">{{ entry.name }}</p>
+            <p style="margin: 4px 0 0 0; color: #94a3b8; font-size: 0.9rem;">{{ entry.request_date|date:"M d, Y H:i" }} · {{ entry.status }}</p>
+          </div>
+          <div style="text-align: right;">
+            <p style="margin: 0; font-weight: 600;">${{ entry.total_amount|floatformat:2 }}</p>
+            <p style="margin: 4px 0 0 0; color: #94a3b8; font-size: 0.9rem;">{{ entry.quantity_requested }} qty</p>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+    {% else %}
+      <p style="margin: 0; color: #94a3b8;">No rental history yet.</p>
+    {% endif %}
+  </div>
+
+  <!-- Action Buttons -->
+  <div style="display: flex; gap: 12px; margin-top: 20px;">
+    <a href="{{ back_url }}" class="btn-icon" style="padding: 10px 20px; border: 1px solid rgba(255,255,255,0.1); background: transparent; color: #94a3b8; cursor: pointer; text-decoration: none; border-radius: 6px;">
+      <i class="fas fa-arrow-left"></i> Back to Inventory
+    </a>
+    <a href="{% url 'edit_suit_new' suit.id %}" class="btn-icon" style="padding: 10px 20px; border: 1px solid rgba(245,158,11,0.3); background: rgba(245,158,11,0.1); color: #f59e0b; cursor: pointer; text-decoration: none; border-radius: 6px;">
+      <i class="fas fa-edit"></i> Edit Suit
+    </a>
+  </div>
+
+</div>
+
+<!-- Timer Script -->
+{% if suit.status == 'Rented' and suit.rented_at %}
+<script>
+function updateProfileTimer() {
+  const rentedAt = new Date('{{ suit.rented_at|date:"c" }}');
+  const now = new Date();
+  const elapsed = now - rentedAt;
+  const twoMinutes = 2 * 60 * 1000;
+  const remaining = twoMinutes - elapsed;
+
+  const timer = document.getElementById('profileTimer');
+  if (remaining <= 0) {
+    timer.textContent = 'Time Expired!';
+    timer.style.color = '#ef4444';
+  } else {
+    const hours = Math.floor(remaining / (1000 * 60 * 60));
+    const minutes = Math.floor((remaining % (1000 * 60 * 60)) / (1000 * 60));
+    const seconds = Math.floor((remaining % (1000 * 60)) / 1000);
+    timer.textContent = `${hours}h ${minutes}m ${seconds}s`;
+  }
+}
+
+setInterval(updateProfileTimer, 1000);
+updateProfileTimer();
+</script>
+{% endif %}
+
+<style>
+  .badge {
+    display: inline-block;
+    padding: 4px 12px;
+    border-radius: 6px;
+    font-size: 0.8rem;
+    font-weight: 600;
+  }
+
+  .badge-Available {
+    background-color: rgba(16, 185, 129, 0.2);
+    color: #10b981;
+    border: 1px solid rgba(16, 185, 129, 0.3);
+  }
+
+  .badge-Rented {
+    background-color: rgba(245, 158, 11, 0.2);
+    color: #f59e0b;
+    border: 1px solid rgba(245, 158, 11, 0.3);
+  }
+
+  .badge-Cleaning {
+    background-color: rgba(139, 92, 246, 0.2);
+    color: #8b5cf6;
+    border: 1px solid rgba(139, 92, 246, 0.3);
+  }
+
+  .btn-icon {
+    padding: 6px 12px;
+    border-radius: 6px;
+    border: 1px solid rgba(255,255,255,0.1);
+    background: transparent;
+    color: #94a3b8;
+    cursor: pointer;
+    transition: all 0.2s;
+    font-size: 0.85rem;
+    font-weight: 600;
+    text-decoration: none;
+    display: inline-block;
+  }
+
+  .btn-icon:hover {
+    border-color: #f59e0b;
+    color: #f59e0b;
+  }
+</style>
+
+{% endblock %}

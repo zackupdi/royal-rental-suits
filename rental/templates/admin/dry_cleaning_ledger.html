@@ -1,0 +1,127 @@
+{% extends "rental/base.html" %}
+{% block title %}Dry Cleaning & Expenses | Suit Rental{% endblock %}
+{% block page_title %}Dry Cleaning Ledger{% endblock %}
+
+{% block content %}
+<style>
+    :root {
+        --royal-gold: #c9a227;
+        --luxury-radius: 16px;
+    }
+    .stat-box { background:#ffffff;border:1px solid #e2e8f0;border-radius:14px;padding:1.25rem; }
+    .table-card { background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.07);border-radius:16px;overflow:hidden; }
+</style>
+
+<div class="container-fluid p-4">
+    <div class="row g-3 mb-4">
+        <div class="col-md-4">
+            <div class="stat-box d-flex align-items-center justify-content-between">
+                <div>
+                    <span class="text-uppercase small fw-bold text-muted d-block">This Month's Cleaning Cost</span>
+                    <h3 class="fw-extrabold text-dark mb-0" style="color: var(--royal-gold) !important;">${{ month_total|floatformat:2 }}</h3>
+                </div>
+                <div class="fs-2 text-warning opacity-50"><i class="fas fa-file-invoice-dollar"></i></div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="stat-box d-flex align-items-center justify-content-between">
+                <div>
+                    <span class="text-uppercase small fw-bold text-muted d-block">Returned suits waiting</span>
+                    <h3 class="fw-extrabold text-dark mb-0" style="color: var(--royal-gold) !important;">{{ pending_dry_cleaning_count|default:0 }}</h3>
+                </div>
+                <div class="fs-2 text-info opacity-50"><i class="fas fa-broom"></i></div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="stat-box d-flex align-items-center justify-content-between">
+                <div>
+                    <span class="text-uppercase small fw-bold text-muted d-block">Inventory items</span>
+                    <h3 class="fw-extrabold text-dark mb-0" style="color: var(--royal-gold) !important;">{{ inventory_total|default:0 }}</h3>
+                </div>
+                <div class="fs-2 text-success opacity-50"><i class="fas fa-boxes-stacked"></i></div>
+            </div>
+        </div>
+    </div>
+
+    <div class="mb-4">
+        <h4 class="fw-bold text-dark mb-1">Cleaning Expense Ledger</h4>
+        <p class="text-muted small">Recent cleaning expenses recorded and suits waiting for processing.</p>
+    </div>
+
+    <div class="table-card p-3 mb-4">
+        <h5 class="fw-bold text-dark mb-3">Returned suits awaiting dry cleaning</h5>
+        <table class="rep-table" style="width:100%">
+            <thead>
+                <tr>
+                    <th>#</th>
+                    <th>Suit</th>
+                    <th>Customer</th>
+                    <th>Status</th>
+                    <th>Returned</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for req in dry_cleaning_queue %}
+                <tr>
+                    <td>{{ forloop.counter }}</td>
+                    <td>{{ req.suit.suit_name|default:"Suit" }}</td>
+                    <td>{{ req.name }}</td>
+                    <td>
+                        {% if req.suit.dry_cleanings.exists %}
+                            {% with latest=req.suit.dry_cleanings.first %}
+                                {% if latest.status == 'approved' %}Approved{% elif latest.status == 'rejected' %}Rejected{% else %}Pending{% endif %}
+                            {% endwith %}
+                        {% else %}Pending{% endif %}
+                    </td>
+                    <td>{{ req.return_date|date:'Y-m-d H:i'|default:"Pending" }}</td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="5" class="empty-state">No returned suits are currently waiting for cleaning.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <div class="table-card p-3">
+        <table class="rep-table" style="width:100%">
+            <thead>
+                <tr>
+                    <th>#</th>
+                    <th>Suit</th>
+                    <th>Status</th>
+                    <th>Date</th>
+                    <th style="text-align:right">Amount</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for e in cleaning_expenses %}
+                <tr>
+                    <td>{{ forloop.counter }}</td>
+                    <td>
+                        {{ e.description }}
+                        <div class="small text-muted">{{ e.notes }}</div>
+                    </td>
+                    <td>
+                        {% if e.status == 'approved' %}
+                            <span class="badge bg-success">Approved</span>
+                        {% elif e.status == 'rejected' %}
+                            <span class="badge bg-danger">Rejected</span>
+                        {% else %}
+                            <span class="badge bg-warning text-dark">Pending</span>
+                        {% endif %}
+                    </td>
+                    <td>{{ e.expense_date|date:'Y-m-d' }}</td>
+                    <td style="text-align:right;color:var(--royal-gold);font-weight:700">${{ e.amount|floatformat:2 }}</td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="5" class="empty-state">No cleaning expenses recorded this month.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

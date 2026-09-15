@@ -1,0 +1,144 @@
+{% extends 'rental/base.html' %}
+{% block title %}Create Reception Account | Suit Luxe{% endblock %}
+
+{% block content %}
+<style>
+    :root {
+        --gold: #c9a84c;
+        --gold-light: #e8c96a;
+        --bg-panel: rgba(255,255,255,0.03);
+        --border: rgba(255,255,255,0.07);
+        --text-main: #f0ede8;
+        --text-muted: rgba(240,237,232,0.5);
+        --danger: #e05c5c;
+        --radius: 16px;
+    }
+
+    body { background: #0f0f1a; }
+    .rf-wrap { position: relative; z-index: 1; padding: 40px 0 60px; }
+    .rf-card {
+        max-width: 620px;
+        margin: 0 auto;
+        background: var(--bg-panel);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        backdrop-filter: blur(12px);
+        overflow: hidden;
+    }
+    .rf-header {
+        padding: 24px 30px;
+        background: rgba(76,175,130,0.08);
+        border-bottom: 1px solid rgba(76,175,130,0.18);
+    }
+    .rf-header h2 {
+        font-family: 'Cormorant Garamond', serif;
+        color: #7fd9ab;
+        margin: 0;
+        font-size: 1.6rem;
+        display: flex; align-items: center; gap: 10px;
+    }
+    .rf-header p { color: var(--text-muted); font-size: 0.82rem; margin: 4px 0 0; }
+    .rf-body { padding: 28px 30px; }
+    .glass-form-group { margin-bottom: 18px; }
+    .glass-form-group label {
+        display: block;
+        color: var(--text-muted);
+        font-size: 0.7rem;
+        text-transform: uppercase;
+        letter-spacing: 1.2px;
+        font-weight: 600;
+        margin-bottom: 7px;
+    }
+    .glass-input {
+        width: 100%;
+        background: rgba(255,255,255,0.04);
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        padding: 11px 14px;
+        color: var(--text-main);
+        font-size: 0.9rem;
+        transition: 0.2s;
+    }
+    .glass-input:focus {
+        outline: none;
+        border-color: rgba(76,175,130,0.4);
+        background: rgba(76,175,130,0.05);
+        box-shadow: 0 0 0 3px rgba(76,175,130,0.08);
+    }
+    .rf-hint { font-size: 0.72rem; color: var(--text-muted); margin-top: 6px; }
+    .rf-footer {
+        padding: 18px 30px;
+        border-top: 1px solid var(--border);
+        display: flex; justify-content: flex-end; gap: 10px;
+    }
+    .btn-rf-cancel {
+        background: rgba(255,255,255,0.05);
+        border: 1px solid var(--border);
+        color: var(--text-muted);
+        font-weight: 600;
+        font-size: 0.85rem;
+        padding: 10px 22px;
+        border-radius: 10px;
+        text-decoration: none;
+    }
+    .btn-rf-save {
+        background: linear-gradient(135deg, #4caf82, #6ecb9f);
+        border: none;
+        color: #0c1410;
+        font-weight: 700;
+        font-size: 0.85rem;
+        padding: 10px 26px;
+        border-radius: 10px;
+        display: inline-flex; align-items: center; gap: 8px;
+    }
+</style>
+
+<div class="rf-wrap">
+    <div class="container-fluid px-4">
+        <div class="rf-card">
+            <div class="rf-header">
+                <h2>
+                    <i class="fa-solid fa-door-open"></i>
+                    Create Reception Account
+                </h2>
+                <p>Create a dedicated reception user with access to desk operations.</p>
+            </div>
+            <form method="POST" action="{% url 'reception_form' %}">
+                {% csrf_token %}
+                <div class="rf-body">
+                    <div class="glass-form-group">
+                        <label>Username</label>
+                        <input type="text" name="username" class="glass-input" value="{{ username|default:'' }}" placeholder="e.g. bilan_reception" required>
+                    </div>
+                    <div class="glass-form-group">
+                        <label>Email (optional)</label>
+                        <input type="email" name="email" class="glass-input" value="{{ email|default:'' }}" placeholder="name@example.com">
+                    </div>
+                    <div class="glass-form-group">
+                        <label>Monthly Salary</label>
+                        <input type="number" name="salary" class="glass-input" value="{{ salary|default:'' }}" min="0" step="0.01" placeholder="e.g. 250.00" required>
+                        <div class="rf-hint">Enter the staff member's monthly salary in your local currency.</div>
+                    </div>
+                    <div class="glass-form-group">
+                        <label>Password</label>
+                        <input type="password" name="password" class="glass-input" required minlength="4">
+                    </div>
+                    <div class="glass-form-group">
+                        <label>Confirm Password</label>
+                        <input type="password" name="password2" class="glass-input" required minlength="4">
+                        <div class="rf-hint">Minimum 4 characters.</div>
+                    </div>
+                </div>
+                <div class="rf-footer">
+                    <a href="{% url 'manage_users' %}" class="btn-rf-cancel">
+                        <i class="fa-solid fa-xmark me-1"></i> Cancel
+                    </a>
+                    <button type="submit" class="btn-rf-save">
+                        <i class="fa-solid fa-check"></i> Create Reception
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

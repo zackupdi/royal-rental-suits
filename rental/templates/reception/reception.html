@@ -1,0 +1,821 @@
+{% extends "rental/base_admin.html" %}
+{% block title %}Admin Desk | Royal Suit Rental{% endblock %}
+
+{% block content %}
+<style>
+  :root {
+    --gold: #c9a227;
+    --gold-bg: rgba(201,162,39,0.08);
+    --gold-border: rgba(201,162,39,0.25);
+    --bg-dark: #0b0b12;
+    --card-bg: #13131f;
+    --surface: #000000;
+    --border: rgba(255,255,255,0.12);
+    --text: #ffffff;
+    --muted: #b4b4c0;
+    --success: #2ecc71;
+    --danger: #e74c3c;
+    --warning: #f39c12;
+    --info: #3498db;
+    --radius: 12px;
+    --radius-sm: 6px;
+  }
+
+  body { 
+    background: var(--bg-dark); 
+    color: var(--text) !important; 
+    font-family: 'Inter', system-ui, sans-serif; 
+  }
+
+  p, span, label, td {
+    color: var(--text);
+  }
+  
+  .muted-text, .cphone, .stat-sub, .form-label {
+    color: var(--muted) !important;
+  }
+
+  .reception-wrap { max-width: 1200px; margin: 0 auto; padding: 0 1rem 2rem; }
+
+  .rec-header {
+    display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap;
+    gap: 1rem; padding: 1.25rem 1.5rem; background: var(--card-bg);
+    border: 1px solid var(--border); border-radius: var(--radius) var(--radius) 0 0;
+  }
+  .rec-title { display: flex; align-items: center; gap: 12px; }
+  .rec-title i { font-size: 1.6rem; color: var(--gold); }
+  .rec-title h1 { font-size: 1.3rem; font-weight: 600; margin: 0; color: #ffffff; }
+  .rec-title p { font-size: 0.82rem; margin: 4px 0 0; }
+  .clock-pill {
+    display: inline-flex; align-items: center; gap: 8px;
+    background: var(--gold-bg); border: 1px solid var(--gold-border);
+    color: var(--gold); padding: 6px 14px; border-radius: 30px;
+    font-size: 0.85rem; font-weight: 600;
+  }
+
+  .tab-bar {
+    display: flex; gap: 6px; flex-wrap: wrap; padding: 0.85rem 1.5rem;
+    background: var(--surface); border-left: 1px solid var(--border);
+    border-right: 1px solid var(--border);
+  }
+  .tab-btn {
+    padding: 8px 14px; border-radius: var(--radius-sm); font-size: 0.82rem;
+    font-weight: 600; cursor: pointer; border: 1px solid var(--border);
+    background: transparent; color: var(--muted);
+    display: flex; align-items: center; gap: 6px; transition: all 0.15s; white-space: nowrap;
+  }
+  .tab-btn:hover { border-color: var(--gold-border); color: var(--gold); }
+  .tab-btn.active { background: var(--gold); color: #1a1a00; border-color: var(--gold); }
+
+  .stats-grid {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem;
+    padding: 1.25rem 1.5rem; background: var(--card-bg);
+    border-left: 1px solid var(--border); border-right: 1px solid var(--border);
+    border-bottom: 1px solid var(--border);
+  }
+  .stat-card { background: var(--surface); border-radius: var(--radius-sm); padding: 1rem; border: 1px solid var(--border); }
+  .stat-label { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 700; color: var(--gold) !important; }
+  .stat-value { font-size: 1.6rem; font-weight: 700; line-height: 1.2; margin: 4px 0; }
+
+  .tab-panel {
+    display: none; padding: 1.5rem;
+    background: var(--bg-dark);
+    border-left: 1px solid var(--border); border-right: 1px solid var(--border);
+    border-bottom: 1px solid var(--border); border-radius: 0 0 var(--radius) var(--radius);
+  }
+  .tab-panel.active { display: block; }
+
+  .card { background: var(--card-bg); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; margin-bottom: 1.25rem; }
+  .card-head {
+    padding: 0.9rem 1.1rem; border-bottom: 1px solid var(--border); background: var(--surface);
+    display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.5rem;
+  }
+  .card-head h5 { font-size: 0.95rem; font-weight: 600; margin: 0; display: flex; align-items: center; gap: 8px; color: #ffffff; }
+  .card-head h5 i { color: var(--gold); }
+  .card-body { padding: 1.1rem; }
+
+  .form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 0.9rem; }
+  .form-group { margin-bottom: 0.9rem; }
+  .form-label { font-size: 0.78rem; font-weight: 600; display: block; margin-bottom: 4px; }
+  .form-input {
+    width: 100%; background: var(--surface); border: 1px solid var(--border); color: #ffffff !important;
+    padding: 0.55rem 0.8rem; border-radius: var(--radius-sm); font-size: 0.88rem;
+  }
+  .form-input option { background: var(--card-bg); color: #ffffff; }
+  .form-input:focus { outline: none; border-color: var(--gold); }
+  .form-input[readonly] { opacity: 0.6; cursor: not-allowed; }
+
+  .btn {
+    display: inline-flex; align-items: center; gap: 6px; padding: 0.5rem 1.05rem;
+    border-radius: var(--radius-sm); font-size: 0.82rem; font-weight: 600; cursor: pointer;
+    border: 1px solid var(--border); text-decoration: none; background: var(--surface); color: #ffffff;
+    transition: all 0.15s;
+  }
+  .btn:hover { border-color: var(--gold-border); color: var(--gold); }
+  .btn-sm { padding: 0.3rem 0.75rem; font-size: 0.76rem; }
+  .btn-gold { background: var(--gold); color: #1a1a00 !important; border-color: var(--gold); }
+  .btn-gold * { color: #1a1a00 !important; }
+  .btn-gold:hover { opacity: 0.9; }
+  .btn-success { background: rgba(46,204,113,0.12); color: var(--success); border-color: transparent; }
+  .btn-danger { background: rgba(231,76,60,0.12); color: var(--danger); border-color: transparent; }
+
+  .table-wrap { overflow-x: auto; }
+  table.tbl { width: 100%; border-collapse: collapse; }
+  table.tbl th {
+    font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.5px; color: #ffffff !important;
+    font-weight: 700; padding: 0.75rem 0.9rem; text-align: left; border-bottom: 1px solid var(--border);
+    background: var(--surface);
+  }
+  table.tbl td { padding: 0.75rem 0.9rem; border-bottom: 1px solid var(--border); font-size: 0.86rem; vertical-align: middle; color: #ffffff; }
+  
+  .badge { padding: 3px 9px; border-radius: 4px; font-size: 0.7rem; font-weight: 600; display: inline-flex; align-items: center; gap: 4px; }
+  .badge-success { background: rgba(46,204,113,0.12); color: var(--success); }
+  .badge-warning { background: rgba(243,156,18,0.12); color: var(--warning); }
+  .badge-danger  { background: rgba(231,76,60,0.12);  color: var(--danger); }
+  .badge-info    { background: rgba(52,152,219,0.12); color: var(--info); }
+  .badge-gold    { background: var(--gold-bg); color: var(--gold); border: 1px solid var(--gold-border); }
+
+  .cname { font-weight: 600; color: #ffffff; }
+  .cphone { font-size: 0.76rem; margin-top: 2px; }
+
+  .pay-box { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 1.05rem; }
+  .pay-row { display: flex; justify-content: space-between; align-items: center; padding: 0.4rem 0; font-size: 0.85rem; border-bottom: 1px solid var(--border); }
+  .pay-row:last-child { border-bottom: none; }
+  .pay-total { font-weight: 700; font-size: 1rem; color: #2ecc71 !important; }
+  .pay-total * { color: #2ecc71 !important; }
+
+  .sec-label {
+    font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.6px; color: var(--gold);
+    font-weight: 700; margin: 1.1rem 0 0.7rem; display: flex; align-items: center; gap: 6px;
+  }
+
+  .empty { text-align: center; padding: 2.5rem 1rem; color: var(--muted); }
+  .empty i { font-size: 2rem; opacity: 0.2; display: block; margin-bottom: 0.75rem; }
+
+  .suit-card { background: var(--card-bg); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; transition: transform 0.2s; }
+  .suit-card:hover { transform: translateY(-3px); border-color: var(--gold-border); }
+  .suit-card-img { width: 100%; height: 200px; object-fit: cover; }
+  .suit-card-noimg {
+    width: 100%; height: 200px; background: var(--surface);
+    display: flex; align-items: center; justify-content: center;
+  }
+  .suit-card-noimg i { font-size: 2.5rem; color: var(--gold); opacity: 0.3; }
+
+  .accessory-row {
+    display: grid; grid-template-columns: 240px 1fr 1fr 1fr; gap: 0.75rem; align-items: center;
+    background: rgba(255,255,255,0.02); padding: 0.5rem 0.8rem; border-radius: var(--radius-sm);
+    margin-bottom: 0.5rem; border: 1px solid transparent;
+  }
+  .accessory-row.selected {
+    border-color: var(--gold-border); background: rgba(201,162,39,0.05);
+  }
+  .accessory-row label { color: #ffffff; }
+
+  @media print {
+    body * { visibility: hidden; }
+    #print-area, #print-area * { visibility: visible; }
+    #print-area { position: absolute; left: 0; top: 0; width: 100%; }
+  }
+  #print-area { display: none; }
+</style>
+
+<div class="reception-wrap">
+
+  <div class="rec-header">
+    <div class="rec-title">
+      <i class="fas fa-concierge-bell"></i>
+      <div>
+        <h1>Reception Desk</h1>
+        <p class="muted-text">Royal Suit Rental &middot; Logged in as <strong style="color:var(--gold)">{{ user.username }}</strong></p>
+      </div>
+    </div>
+    <div style="display:flex; align-items:center; gap:10px;">
+      <div class="clock-pill"><i class="fas fa-clock"></i> <span id="live-time">--:--:--</span></div>
+      <a href="{% url 'home' %}" class="btn btn-sm"><i class="fas fa-home"></i> Home</a>
+      <a href="{% url 'logout' %}" class="btn btn-sm btn-danger"><i class="fas fa-sign-out-alt"></i> Logout</a>
+    </div>
+  </div>
+
+  <div class="tab-bar">
+    <button class="tab-btn active" data-tab="available-suits" onclick="switchTab(event,'available-suits')"><i class="fas fa-tshirt"></i> Available Suits</button>
+    <button class="tab-btn" data-tab="booking-status" onclick="switchTab(event,'booking-status')"><i class="fas fa-history"></i> Rental History & Status</button>
+    <button class="tab-btn" data-tab="book-suit" onclick="switchTab(event,'book-suit')"><i class="fas fa-plus-circle"></i> Book Suit / Items</button>
+  </div>
+
+  <div class="stats-grid">
+    <div class="stat-card">
+      <div class="stat-label">Pending</div>
+      <div class="stat-value" style="color:var(--warning)">{{ pending_count|default:0 }}</div>
+      <div class="stat-sub">Awaiting approval</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Active rentals</div>
+      <div class="stat-value" style="color:var(--info)">{{ active_count|default:0 }}</div>
+      <div class="stat-sub">Currently rented</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Overdue</div>
+      <div class="stat-value" style="color:var(--danger)">{{ overdue_count|default:0 }}</div>
+      <div class="stat-sub">Past return date</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Today's revenue</div>
+      <div class="stat-value" style="color:var(--success)">${{ today_revenue|default:"0.00" }}</div>
+      <div class="stat-sub">Collected today</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-head">
+      <h5><i class="fas fa-database"></i> Inventory & System Snapshot</h5>
+    </div>
+    <div class="card-body">
+      <div class="stats-grid" style="padding:0; border:0; background:transparent;">
+        <div class="stat-card">
+          <div class="stat-label">Inventory items</div>
+          <div class="stat-value" style="color:var(--gold)">{{ inventory_total|default:0 }}</div>
+          <div class="stat-sub">All suits in the system</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Available stock</div>
+          <div class="stat-value" style="color:var(--success)">{{ available_stock_units|default:0 }}</div>
+          <div class="stat-sub">Units ready to rent</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Dry cleaning</div>
+          <div class="stat-value" style="color:var(--warning)">{{ dry_cleaning_count|default:0 }}</div>
+          <div class="stat-sub">Returned / awaiting cleaning</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Cleaning spend</div>
+          <div class="stat-value" style="color:var(--info)">${{ monthly_cleaning_spend|default:"0.00" }}</div>
+          <div class="stat-sub">This month</div>
+        </div>
+      </div>
+
+      <div style="margin-top:1rem;">
+        <div class="sec-label"><i class="fas fa-broom"></i> Returned suits waiting for dry cleaning</div>
+        {% if dry_cleaning_queue %}
+        <div class="table-wrap">
+          <table class="tbl">
+            <thead>
+              <tr><th>Suit</th><th>Customer</th><th>Returned</th><th>Amount</th></tr>
+            </thead>
+            <tbody>
+              {% for req in dry_cleaning_queue %}
+              <tr>
+                <td>{{ req.suit.suit_name|default:"Suit" }}</td>
+                <td>{{ req.name }}</td>
+                <td>{{ req.return_date|date:"M d, Y"|default:"Pending" }}</td>
+                <td>${{ req.total_amount|floatformat:2 }}</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        {% else %}
+        <div class="empty"><i class="fas fa-check-circle"></i><p>No returned suits currently need dry cleaning.</p></div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <div id="available-suits" class="tab-panel active">
+    <div class="card">
+      <div class="card-head">
+        <h5><i class="fas fa-shirt"></i> Available Suits Showroom</h5>
+        <span class="badge badge-success">{{ available_suits|length }} Suits Ready</span>
+      </div>
+      <div class="card-body">
+        {% if available_suits %}
+        <div style="display:grid; grid-template-columns:repeat(auto-fill, minmax(240px, 1fr)); gap:1.5rem;">
+          {% for suit in available_suits %}
+          <div class="suit-card">
+            {% if suit.image %}
+              <a href="{% url 'suit_profile' suit.id %}"><img src="{{ suit.image.url }}" class="suit-card-img" alt="{{ suit.suit_name }}"></a>
+            {% else %}
+              <div class="suit-card-noimg"><i class="fas fa-image" style="font-size:2.5rem; opacity:0.15;"></i></div>
+            {% endif %}
+            <div style="padding:1.2rem;">
+              <h6 style="margin:0 0 0.5rem; font-size:1rem; font-weight:600; color:#ffffff;"><a href="{% url 'suit_profile' suit.id %}" style="color:inherit; text-decoration:none;">{{ suit.suit_name }}</a></h6>
+              <p class="muted-text" style="margin:0 0 1rem; font-size:0.8rem; line-height:1.4;">{{ suit.description|default:"No description available."|truncatewords:20 }}</p>
+
+              <div style="display:flex; justify-content:space-between; align-items:center; background:rgba(0,0,0,0.4); padding:8px 12px; border-radius:8px; margin-bottom:1rem; border:1px solid var(--border);">
+                <div>
+                  <span class="muted-text" style="font-size:0.65rem; text-transform:uppercase; display:block;">Stock</span>
+                  <strong style="font-size:1.1rem; color:var(--gold);">{{ suit.quantity }} Qty</strong>
+                  <div class="muted-text" style="font-size:0.75rem; margin-top:4px;">Collection: <span class="badge badge-gold">{{ suit.collection }}</span></div>
+                </div>
+                <div style="text-align:right;">
+                  <span class="muted-text" style="font-size:0.65rem; text-transform:uppercase; display:block;">Rate</span>
+                  <strong style="font-size:1.1rem; color:var(--success);">${{ suit.price_per_day }}</strong>
+                  <div class="muted-text" style="font-size:0.75rem; margin-top:4px;">Size: {{ suit.size }} · Color: {{ suit.color }}</div>
+                </div>
+              </div>
+
+              {% if suit.damage_notes %}
+                <div style="margin-bottom:0.75rem; color:#f8d7da; font-size:0.82rem;">Damage: {{ suit.damage_notes }}</div>
+              {% endif %}
+
+              <div style="display:flex; gap:8px;">
+                <button class="btn btn-gold" style="flex:1; justify-content:center; font-weight:700;" onclick="preselectSuit('{{ suit.id }}', '{{ suit.price_per_day }}')">
+                  <i class="fas fa-shopping-bag"></i> Book
+                </button>
+               
+              </div>
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+        {% else %}
+        <div class="empty"><i class="fas fa-exclamation-circle"></i><p>No available suits found in the showroom inventory.</p></div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <div id="booking-status" class="tab-panel">
+    <div class="card">
+      <div class="card-head"><h5><i class="fas fa-calendar-check"></i> Active & Pending Bookings Log</h5></div>
+      <div class="card-body" style="padding:0;">
+        <div class="table-wrap">
+          <table class="tbl">
+            <thead>
+              <tr><th>Customer</th><th>Suit</th><th>Return Date</th><th>Days Left</th><th>Amount</th><th style="text-align:right;">Status</th></tr>
+            </thead>
+            <tbody>
+              {% for req in active_rentals %}
+              <tr>
+                <td><div class="cname">{{ req.name }}</div><div class="cphone">{{ req.phone }}</div></td>
+                <td>{{ req.suit.suit_name|default:"Accessories Only" }}</td>
+                <td>{{ req.end_time|date:"M d, Y" }}</td>
+                <td>
+                  {% if req.is_overdue %}
+                    <span style="color:var(--danger); font-weight:600;">{{ req.remaining_time_display }}</span>
+                  {% else %}
+                    {{ req.remaining_time_display }}
+                  {% endif %}
+                </td>
+                <td>${{ req.total_amount|floatformat:2 }}</td>
+                <td style="text-align:right;">
+                  {% if req.is_overdue %}
+                    <span class="badge badge-danger"><i class="fas fa-clock"></i> Overdue</span>
+                  {% else %}
+                    <span class="badge badge-success"><i class="fas fa-check"></i> On time</span>
+                  {% endif %}
+                </td>
+              </tr>
+              {% empty %}
+              <tr>
+                <td colspan="6" style="text-align:center; color:var(--muted); padding:1rem;">No active rentals found.</td>
+              </tr>
+              {% endfor %}
+              {% for req in pending_requests %}
+              <tr>
+                <td><div class="cname">{{ req.name }}</div><div class="cphone">{{ req.phone }}</div></td>
+                <td>{{ req.suit.suit_name|default:"Accessories Only" }}</td>
+                <td>&mdash;</td>
+                <td>&mdash;</td>
+                <td>${{ req.total_amount|floatformat:2 }}</td>
+                <td style="text-align:right;"><span class="badge badge-warning">Pending</span></td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="book-suit" class="tab-panel">
+    <div class="card" style="max-width:850px;">
+      <div class="card-head"><h5><i class="fas fa-plus-circle"></i> Create New Rental Form</h5></div>
+      <div class="card-body">
+        <form method="POST" action="{% url 'create_rental' %}" id="newRentalForm" onsubmit="return validateForm()">
+          {% csrf_token %}
+          <input type="hidden" name="selected_items" id="selectedItemsInput" value="">
+
+          <input type="hidden" name="customer_user_id" value="{{ prefill_customer_id|default:'' }}">
+          <div class="sec-label"><i class="fas fa-user"></i> Customer Information</div>
+          <div class="form-grid">
+            <div class="form-group">
+              <label class="form-label">First name *</label>
+              <input type="text" name="first_name" class="form-input" value="{{ prefill_first_name|default:'' }}" required>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Father's name *</label>
+              <input type="text" name="father_name" class="form-input" value="{{ prefill_father_name|default:'' }}" required>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Phone number *</label>
+              <input type="tel" name="phone" class="form-input" placeholder="+252..." value="{{ prefill_phone|default:'' }}" required>
+            </div>
+          </div>
+          <div class="form-grid">
+            <div class="form-group">
+              <label class="form-label">Second person name</label>
+              <input type="text" name="grandfather_name" class="form-input">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Second phone</label>
+              <input type="tel" name="alt_phone" class="form-input">
+            </div>
+            <div class="form-group">
+              <label class="form-label">District / City *</label>
+              <input type="text" name="present_address" class="form-input" placeholder="Enter district or city" value="{{ prefill_present_address|default:'' }}" required>
+            </div>
+          </div>
+
+          <div class="sec-label"><i class="fas fa-id-card"></i> ID Verification</div>
+          <div class="form-group">
+            <label style="display:flex; align-items:center; gap:8px; font-size:0.85rem; cursor:pointer;">
+              <input type="checkbox" name="has_national_id" id="hasNationalId" onchange="toggleIdFields()" style="width:16px; height:16px; accent-color:var(--gold);">
+              <span>Customer has a national ID or official document</span>
+            </label>
+          </div>
+          <div id="idFields" style="display:none;" class="form-grid">
+            <div class="form-group">
+              <label class="form-label">ID type</label>
+              <select name="id_type" class="form-input">
+                <option value="national">National ID</option>
+                <option value="passport">Passport</option>
+                <option value="drivers">Driver's license</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label">ID number</label>
+              <input type="text" name="id_number" class="form-input">
+            </div>
+          </div>
+
+          <div class="sec-label"><i class="fas fa-tshirt"></i> Rental Details</div>
+          <div class="form-grid">
+            <div class="form-group">
+              <label class="form-label">Suit (Drop-down - Optional)</label>
+              <select name="suit_id" id="suitSelect" class="form-input" onchange="updatePrice()">
+                <option value="">-- No Suit Selected (Accessories Only) --</option>
+                {% for suit in available_suits %}
+                <option value="{{ suit.id }}" data-price="{{ suit.price_per_day }}">{{ suit.suit_name }} — ${{ suit.price_per_day }}/day</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Suit Quantity</label>
+              <input type="number" name="quantity" id="qtyInput" class="form-input" min="1" max="5" value="1" oninput="calculateTotal()">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Rental days *</label>
+              <input type="number" name="days" class="form-input" min="1" max="30" value="1" id="rentalDays" oninput="calculateTotal(); calculateEndDate()" required>
+            </div>
+          </div>
+
+          <div class="form-grid">
+            <div class="form-group">
+              <label class="form-label">Start date *</label>
+              <input type="date" name="start_date" class="form-input" id="startDate" onchange="calculateEndDate(); handleStartDateChange();" required>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Return date *</label>
+              <input type="date" name="end_date" class="form-input" id="endDate" onchange="handleEndDateChange();" required>
+            </div>
+          </div>
+
+          <div class="sec-label"><i class="fas fa-plus"></i> Optional Accessories (Agab Dheeri ah)</div>
+          <div style="display: flex; flex-direction: column; gap: 0.2rem; margin-bottom: 1.5rem;">
+            
+            <div class="accessory-row" id="row_tie">
+              <label style="display:flex; align-items:center; gap:8px; font-size:0.85rem; cursor:pointer;">
+                <input type="checkbox" name="addons[]" value="tie" onchange="toggleAccessoryRow('tie')">
+                <span>Tie (Gravati)</span>
+              </label>
+              <input type="number" name="addon_price_tie" id="addon_price_tie" class="form-input btn-sm" placeholder="Price/day" min="0" step="0.01" disabled>
+              <input type="text" name="tie_size" id="tie_size" class="form-input btn-sm" placeholder="Size (e.g. Standard)" disabled>
+              <input type="text" name="tie_color" id="tie_color" class="form-input btn-sm" placeholder="Color" disabled>
+            </div>
+
+            <div class="accessory-row" id="row_shirt">
+              <label style="display:flex; align-items:center; gap:8px; font-size:0.85rem; cursor:pointer;">
+                <input type="checkbox" name="addons[]" value="shirt" onchange="toggleAccessoryRow('shirt')">
+                <span>Shirt (Shaadh)</span>
+              </label>
+              <input type="number" name="addon_price_shirt" id="addon_price_shirt" class="form-input btn-sm" placeholder="Price/day" min="0" step="0.01" disabled>
+              <input type="text" name="shirt_size" id="shirt_size" class="form-input btn-sm" placeholder="Size (e.g. M, L, XL)" disabled>
+              <input type="text" name="shirt_color" id="shirt_color" class="form-input btn-sm" placeholder="Color" disabled>
+            </div>
+
+            <div class="accessory-row" id="row_belt">
+              <label style="display:flex; align-items:center; gap:8px; font-size:0.85rem; cursor:pointer;">
+                <input type="checkbox" name="addons[]" value="belt" onchange="toggleAccessoryRow('belt')">
+                <span>Belt (Suun)</span>
+              </label>
+              <input type="number" name="addon_price_belt" id="addon_price_belt" class="form-input btn-sm" placeholder="Price/day" min="0" step="0.01" disabled>
+              <input type="text" name="belt_size" id="belt_size" class="form-input btn-sm" placeholder="Size" disabled>
+              <input type="text" name="belt_color" id="belt_color" class="form-input btn-sm" placeholder="Color" disabled>
+            </div>
+
+            <div class="accessory-row" id="row_shoes">
+              <label style="display:flex; align-items:center; gap:8px; font-size:0.85rem; cursor:pointer;">
+                <input type="checkbox" name="addons[]" value="shoes" onchange="toggleAccessoryRow('shoes')">
+                <span>Shoes (Kabaha)</span>
+              </label>
+              <input type="number" name="addon_price_shoes" id="addon_price_shoes" class="form-input btn-sm" placeholder="Price/day" min="0" step="0.01" disabled>
+              <input type="text" name="shoes_size" id="shoes_size" class="form-input btn-sm" placeholder="Size (e.g. 41, 42)" disabled>
+              <input type="text" name="shoes_color" id="shoes_color" class="form-input btn-sm" placeholder="Color" disabled>
+            </div>
+
+          </div>
+
+          <div class="sec-label"><i class="fas fa-receipt"></i> Payment</div>
+          <div class="pay-box">
+            <div class="pay-row"><span>Price per day (Suit)</span><span id="pricePerDay">$0.00</span></div>
+            <div class="pay-row"><span>Accessories per day</span><span id="accPricePerDay">$0.00</span></div>
+            <div class="pay-row"><span>Suit Quantity</span><span id="displayQuantity">1</span></div>
+            <div class="pay-row"><span>Days</span><span id="displayDays">1 day</span></div>
+            <div class="pay-row"><span>Subtotal</span><strong id="subtotal" style="color: #ffffff;">$0.00</strong></div>
+            <div class="pay-row">
+              <span>Payment method</span>
+              <select name="payment_method" class="form-input" style="width:150px; padding:0.35rem 0.6rem;">
+                <option value="cash">Cash</option>
+                <option value="zaad">Zaad</option>
+                <option value="sahal">Somtel</option>
+                <option value="bank">Bank transfer</option>
+              </select>
+            </div>
+            <div class="pay-row" style="flex-direction:column; align-items:flex-start; gap:0.3rem;">
+              <span>Amount paid now</span>
+              <input type="number" name="amount_paid" class="form-input" min="0" step="0.01" value="0" placeholder="0.00" style="width:120px; text-align:right; padding:0.35rem 0.6rem;" id="paidInput" oninput="calculateBalance()">
+              <small style="color: rgba(255,255,255,0.6); font-size:0.78rem;">Enter 0 if the customer will pay later.</small>
+            </div>
+            <div class="pay-row pay-total"><span>Total due</span><strong id="totalDue">$0.00</strong></div>
+            <div class="pay-row" id="balanceRow" style="display:none;">
+              <span style="font-size:0.78rem;">Remaining balance</span>
+              <strong id="balanceDue" style="color:var(--danger)">$0.00</strong>
+            </div>
+          </div>
+
+          <div class="form-group" style="margin-top:1rem;">
+            <label class="form-label">Notes (sizing, damage, special requests)</label>
+            <textarea name="notes" class="form-input" rows="2" placeholder="e.g. small alteration needed..."></textarea>
+          </div>
+
+          <div style="display:flex; gap:10px;">
+            <button type="button" class="btn" style="flex:1; justify-content:center;" onclick="document.getElementById('newRentalForm').reset(); resetAccessories(); initDates(); calculateTotal();">Cancel</button>
+            <button type="submit" class="btn btn-gold" style="flex:2; justify-content:center; padding:0.65rem;">
+              <i class="fas fa-check"></i> Confirm Rental
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+  function getTodayString() {
+    const d = new Date();
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  }
+
+  function initDates() {
+    const todayStr = getTodayString();
+    const startDateInput = document.getElementById('startDate');
+    const endDateInput = document.getElementById('endDate');
+    
+    if(startDateInput) {
+      startDateInput.setAttribute('min', todayStr);
+      startDateInput.value = todayStr;
+    }
+    if(endDateInput) {
+      endDateInput.setAttribute('min', todayStr);
+    }
+    calculateEndDate();
+  }
+
+  document.addEventListener("DOMContentLoaded", function() {
+    initDates();
+    setInterval(() => {
+      const timeSpan = document.getElementById('live-time');
+      if(timeSpan) {
+        timeSpan.textContent = new Date().toLocaleTimeString();
+      }
+    }, 1000);
+  });
+
+  function handleStartDateChange() {
+    const startDateInput = document.getElementById('startDate');
+    const endDateInput = document.getElementById('endDate');
+    if(startDateInput.value) {
+      endDateInput.setAttribute('min', startDateInput.value);
+    }
+    calculateEndDate();
+  }
+
+  function handleEndDateChange() {
+    const startInput = document.getElementById('startDate').value;
+    const endInput = document.getElementById('endDate').value;
+    
+    if (startInput && endInput) {
+      const start = new Date(startInput);
+      const end = new Date(endInput);
+      const diffTime = end - start;
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+      
+      if (diffDays >= 1) {
+        document.getElementById('rentalDays').value = diffDays;
+      } else {
+        document.getElementById('rentalDays').value = 1;
+        calculateEndDate();
+      }
+      calculateTotal();
+    }
+  }
+
+  function switchTab(evt, tabId) {
+    const panels = document.querySelectorAll('.tab-panel');
+    const buttons = document.querySelectorAll('.tab-btn');
+    panels.forEach(p => p.classList.remove('active'));
+    buttons.forEach(b => b.classList.remove('active'));
+    document.getElementById(tabId).classList.add('active');
+    if(evt) evt.currentTarget.classList.add('active');
+  }
+
+  function switchTabByName(tabId) {
+    const panels = document.querySelectorAll('.tab-panel');
+    const buttons = document.querySelectorAll('.tab-btn');
+    panels.forEach(p => p.classList.remove('active'));
+    buttons.forEach(b => b.classList.remove('active'));
+    document.getElementById(tabId).classList.add('active');
+    const targetBtn = document.querySelector(`[data-tab="${tabId}"]`);
+    if(targetBtn) targetBtn.classList.add('active');
+  }
+
+  function preselectSuit(id, price) {
+    const suitSelect = document.getElementById('suitSelect');
+    const selectedItemsInput = document.getElementById('selectedItemsInput');
+    if(suitSelect) {
+      suitSelect.value = id;
+      if(selectedItemsInput) selectedItemsInput.value = id;
+      switchTabByName('book-suit');
+      updatePrice();
+    }
+  }
+
+  function toggleIdFields() {
+    const checkbox = document.getElementById('hasNationalId');
+    const fields = document.getElementById('idFields');
+    fields.style.display = checkbox.checked ? 'grid' : 'none';
+  }
+
+  function updatePrice() {
+    const select = document.getElementById('suitSelect');
+    const selectedItemsInput = document.getElementById('selectedItemsInput');
+    const priceDisplay = document.getElementById('pricePerDay');
+    
+    if(!select.value) {
+      if(selectedItemsInput) selectedItemsInput.value = '';
+      priceDisplay.textContent = '$0.00';
+      calculateTotal();
+      return;
+    }
+    const price = parseFloat(select.options[select.selectedIndex].dataset.price);
+    if(selectedItemsInput) selectedItemsInput.value = select.value;
+    priceDisplay.textContent = '$' + price.toFixed(2);
+    calculateTotal();
+  }
+
+  function toggleAccessoryRow(item) {
+    const row = document.getElementById('row_' + item);
+    const sizeInput = document.getElementById(item + '_size');
+    const colorInput = document.getElementById(item + '_color');
+    const priceInput = document.getElementById('addon_price_' + item);
+    const checkbox = row.querySelector('input[type="checkbox"]');
+
+    if(checkbox.checked) {
+      row.classList.add('selected');
+      sizeInput.removeAttribute('disabled');
+      colorInput.removeAttribute('disabled');
+      priceInput.removeAttribute('disabled');
+      sizeInput.setAttribute('required', 'required');
+      colorInput.setAttribute('required', 'required');
+      priceInput.setAttribute('required', 'required');
+    } else {
+      row.classList.remove('selected');
+      sizeInput.setAttribute('disabled', 'disabled');
+      colorInput.setAttribute('disabled', 'disabled');
+      priceInput.setAttribute('disabled', 'disabled');
+      sizeInput.removeAttribute('required');
+      colorInput.removeAttribute('required');
+      priceInput.removeAttribute('required');
+      sizeInput.value = '';
+      colorInput.value = '';
+      priceInput.value = '';
+    }
+    calculateTotal();
+  }
+
+  function resetAccessories() {
+    ['tie', 'shirt', 'belt', 'shoes'].forEach(item => {
+      const row = document.getElementById('row_' + item);
+      const sizeInput = document.getElementById(item + '_size');
+      const colorInput = document.getElementById(item + '_color');
+      const priceInput = document.getElementById('addon_price_' + item);
+      row.classList.remove('selected');
+      sizeInput.setAttribute('disabled', 'disabled');
+      colorInput.setAttribute('disabled', 'disabled');
+      priceInput.setAttribute('disabled', 'disabled');
+      sizeInput.value = '';
+      colorInput.value = '';
+      priceInput.value = '';
+    });
+  }
+
+  function getAccessoryPrice(item) {
+    const input = document.getElementById('addon_price_' + item);
+    if (!input) return 0;
+    const value = parseFloat(input.value);
+    return (!isNaN(value) && value > 0) ? value : 0;
+  }
+
+  function calculateTotal() {
+    const select = document.getElementById('suitSelect');
+    const suitPrice = (select && select.value) ? parseFloat(select.options[select.selectedIndex].dataset.price) : 0;
+    const qty = (select && select.value) ? (parseInt(document.getElementById('qtyInput').value) || 1) : 0;
+    
+    let accPricePerDay = 0;
+    const checkboxes = document.querySelectorAll('input[name="addons[]"]:checked');
+    checkboxes.forEach(cb => {
+      accPricePerDay += getAccessoryPrice(cb.value);
+    });
+
+    const days = parseInt(document.getElementById('rentalDays').value) || 1;
+    
+    const suitSubtotal = suitPrice * qty * days;
+    const accSubtotal = accPricePerDay * days;
+    const subtotal = suitSubtotal + accSubtotal;
+    
+    document.getElementById('accPricePerDay').textContent = '$' + accPricePerDay.toFixed(2);
+    document.getElementById('displayQuantity').textContent = (qty > 0) ? qty : '0';
+    document.getElementById('displayDays').textContent = days + (days > 1 ? ' days' : ' day');
+    document.getElementById('subtotal').textContent = '$' + subtotal.toFixed(2);
+    document.getElementById('totalDue').textContent = '$' + subtotal.toFixed(2);
+    
+    calculateBalance();
+  }
+
+  function calculateEndDate() {
+    const startInput = document.getElementById('startDate').value;
+    const daysInput = parseInt(document.getElementById('rentalDays').value) || 1;
+    if(!startInput) return;
+    
+    const startDate = new Date(startInput);
+    startDate.setDate(startDate.getDate() + daysInput);
+    document.getElementById('endDate').value = startDate.toISOString().split('T')[0];
+  }
+
+  function calculateBalance() {
+    const totalStr = document.getElementById('totalDue').textContent.replace('$', '');
+    const total = parseFloat(totalStr) || 0;
+    const paid = parseFloat(document.getElementById('paidInput').value) || 0;
+    const row = document.getElementById('balanceRow');
+
+    if (paid > total) {
+      row.style.display = 'flex';
+      document.getElementById('balanceDue').textContent = '-$' + (paid - total).toFixed(2);
+      document.getElementById('balanceDue').style.color = '#e05c5c';
+      return;
+    }
+
+    const balance = total - paid;
+    if (balance > 0) {
+      row.style.display = 'flex';
+      document.getElementById('balanceDue').textContent = '$' + balance.toFixed(2);
+      document.getElementById('balanceDue').style.color = 'var(--danger)';
+    } else {
+      row.style.display = 'none';
+    }
+  }
+
+  function validateForm() {
+    const suitSelect = document.getElementById('suitSelect');
+    const addonsChecked = document.querySelectorAll('input[name="addons[]"]:checked').length;
+    const totalDue = parseFloat(document.getElementById('totalDue').textContent.replace('$', '')) || 0;
+    const paidAmount = parseFloat(document.getElementById('paidInput').value) || 0;
+
+    if ((!suitSelect || !suitSelect.value) && addonsChecked === 0) {
+      alert("Fadlan dooro ugu yaraan hal Suit ama hal Shay oo agab ah si aad u kireyso!");
+      return false;
+    }
+
+    if (paidAmount > totalDue) {
+      alert("Amount paid cannot exceed the total rental amount.");
+      return false;
+    }
+
+    return true;
+  }
+</script>
+{% endblock %}

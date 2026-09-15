@@ -1,0 +1,508 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="so">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Admin - Suit Rental{% endblock %}</title>
+    
+    <!-- Google Fonts: Inter & Playfair Display oo siiya muuqaal casri ah oo qaali ah -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Playfair+Display:wght@600;700;800&display=swap" rel="stylesheet">
+    
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <style>
+        :root {
+            --gold: #d4af37;
+            --gold-light: #f3e5ab;
+            --gold-dim: rgba(212, 175, 55, 0.05);
+            --gold-glow: rgba(212, 175, 55, 0.15);
+            --bg: #09090e;
+            --surface: #000000;
+            --surface-hover: #161629;
+            --border: rgba(255, 255, 255, 0.05);
+            --text-main: #ffffff;
+            --text-muted: #ffffff;
+            --success: #2ecc71;
+            --danger: #e74c3c;
+            --warning: #f39c12;
+            --radius: 12px;
+            --sidebar-width: 270px;
+            --transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+        }
+
+        body {
+            background: var(--bg);
+            color: var(--text-main);
+            font-family: 'Inter', system-ui, -apple-system, sans-serif;
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        /* ── SIDEBAR PREMIUM STYLING ── */
+        .sidebar {
+            width: var(--sidebar-width);
+            height: 100vh;
+            position: fixed;
+            top: 0;
+            left: 0;
+            background: var(--surface);
+            padding: 30px 0 20px;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            z-index: 1040;
+            transition: var(--transition);
+            border-right: 1px solid var(--border);
+            box-shadow: 15px 0 35px rgba(0,0,0,0.4);
+        }
+
+        .sidebar-brand {
+            padding: 0 24px;
+            font-family: 'Playfair Display', serif;
+            font-weight: 700;
+            font-size: 1.35rem;
+            letter-spacing: 1px;
+            color: var(--gold);
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 30px;
+        }
+
+        .sidebar-brand i {
+            filter: drop-shadow(0 0 8px var(--gold-glow));
+        }
+
+        .sidebar-menu {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            padding: 0 16px;
+            flex-grow: 1;
+            overflow-y: auto;
+        }
+
+        /* Custom Scrollbar ee Sidebar-ka hoose */
+        .sidebar-menu::-webkit-scrollbar { width: 4px; }
+        .sidebar-menu::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.05); border-radius: 10px; }
+
+        .sidebar-menu a {
+            display: flex;
+            align-items: center;
+            color: var(--text-muted);
+            text-decoration: none;
+            padding: 12px 16px;
+            border-radius: var(--radius);
+            font-size: 0.92rem;
+            font-weight: 500;
+            transition: var(--transition);
+        }
+
+        .sidebar-menu a i {
+            margin-right: 12px;
+            width: 22px;
+            font-size: 1.1rem;
+            transition: var(--transition);
+        }
+
+        .sidebar-menu a:hover {
+            background: var(--gold-dim);
+            color: var(--gold-light);
+            padding-left: 20px; /* Saamaynta dhaqaaqa smooth-ka ah */
+        }
+
+        .sidebar-menu a:hover i {
+            color: var(--gold);
+            transform: scale(1.1);
+        }
+
+        .sidebar-menu a.active {
+            background: linear-gradient(90deg, var(--gold-dim) 0%, rgba(212,175,55,0.01) 100%);
+            color: var(--gold-light);
+            font-weight: 600;
+            border-left: 4px solid var(--gold);
+            border-top-left-radius: 0;
+            border-bottom-left-radius: 0;
+        }
+
+        .sidebar-menu a.active i {
+            color: var(--gold);
+        }
+
+        /* ── SIDEBAR FOOTER & PROFILE ── */
+        .sidebar-footer {
+            padding: 20px 16px 0;
+            border-top: 1px solid var(--border);
+            margin: 0 16px;
+        }
+
+        .user-profile-box {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            background: rgba(255, 255, 255, 0.02);
+            padding: 12px;
+            border-radius: var(--radius);
+            border: 1px solid var(--border);
+            transition: var(--transition);
+        }
+
+        .user-profile-box:hover {
+            background: rgba(255, 255, 255, 0.04);
+            border-color: rgba(212, 175, 55, 0.2);
+        }
+
+        .user-info {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .user-info i {
+            color: var(--gold);
+            font-size: 1.5rem;
+        }
+
+        .user-meta h6 {
+            margin: 0;
+            font-size: 0.88rem;
+            font-weight: 600;
+            color: var(--text-main);
+        }
+
+        .user-meta small {
+            color: var(--text-muted);
+            font-size: 0.78rem;
+            display: block;
+            margin-top: 2px;
+        }
+
+        /* ── MAIN CONTAINER & CONTENT AREA ── */
+        .main-container {
+            margin-left: var(--sidebar-width);
+            padding: 40px;
+            min-height: 100vh;
+            transition: var(--transition);
+        }
+
+        /* Animation marka boggaw la furayo */
+        .main-container > * {
+            animation: fadeInAndSlide 0.45s cubic-bezier(0.16, 1, 0.3, 1) both;
+        }
+
+        @keyframes fadeInAndSlide {
+            from { opacity: 0; transform: translateY(15px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* ── ALERTS (NOTIFICATIONS) ── */
+        .alert {
+            border-radius: var(--radius);
+            font-size: 0.9rem;
+            font-weight: 500;
+            box-shadow: 0 8px 20px rgba(0,0,0,0.15);
+        }
+
+        /* ── GLOBAL FORM CONTROLS & DROPDOWNS ── */
+        select,
+        .form-select,
+        .filter-input,
+        .form-input,
+        input[type="text"],
+        input[type="search"],
+        input[type="date"],
+        input[type="month"],
+        input[type="tel"],
+        input[type="number"],
+        textarea {
+            background: rgba(255, 255, 255, 0.06);
+            color: var(--text-main);
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            border-radius: 12px;
+            transition: var(--transition);
+        }
+
+        select option,
+        .form-select option,
+        .filter-input option {
+            background: var(--surface);
+            color: var(--text-main);
+        }
+
+        select:focus,
+        .form-select:focus,
+        .filter-input:focus,
+        .form-input:focus,
+        textarea:focus {
+            outline: none;
+            background: rgba(255,255,255,0.1);
+            border-color: rgba(212, 175, 55, 0.35);
+            box-shadow: 0 0 0 3px rgba(212, 175, 55, 0.12);
+        }
+
+        .dropdown-menu,
+        .admin-dropdown-menu,
+        .user-dropdown-menu,
+        .dropdown-menu.show,
+        .dropdown-menu-end,
+        .dropdown-item,
+        .admin-dropdown-item,
+        .user-dropdown-item {
+            background: rgba(15, 15, 26, 0.98) !important;
+            color: var(--text-main) !important;
+            border: 1px solid rgba(255,255,255,0.08) !important;
+        }
+
+        .dropdown-menu .dropdown-item,
+        .admin-dropdown-menu .admin-dropdown-item,
+        .user-dropdown-menu .user-dropdown-item,
+        .dropdown-item:hover,
+        .admin-dropdown-item:hover,
+        .user-dropdown-item:hover {
+            background: rgba(255,255,255,0.08) !important;
+            color: var(--text-main) !important;
+        }
+
+        .dropdown-divider {
+            border-color: rgba(255,255,255,0.08) !important;
+        }
+
+        .bg-white,
+        .modal-content.bg-white,
+        .card.bg-white,
+        .bg-light {
+            color: #111 !important;
+        }
+
+        /* ── MOBILE ACTIONS TOOLBAR ── */
+        .mobile-header {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 65px;
+            background: var(--surface);
+            z-index: 1030;
+            padding: 0 20px;
+            align-items: center;
+            justify-content: space-between;
+            border-bottom: 1px solid var(--border);
+            box-shadow: 0 4px 20px rgba(0,0,0,0.2);
+        }
+
+        .menu-toggle {
+            background: var(--gold-dim);
+            color: var(--gold);
+            border: 1px solid rgba(212, 175, 55, 0.2);
+            padding: 8px 14px;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: var(--transition);
+        }
+
+        .menu-toggle:hover {
+            background: rgba(212, 175, 55, 0.15);
+        }
+
+        .sidebar-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: rgba(0, 0, 0, 0.7);
+            backdrop-filter: blur(5px);
+            z-index: 1035;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+
+        /* ── RESPONSIVE BREAKPOINTS (RESPONSIVE DESIGN) ── */
+        @media (max-width: 991px) {
+            .sidebar {
+                transform: translateX(-100%);
+            }
+            .sidebar.active {
+                transform: translateX(0);
+            }
+            .main-container {
+                margin-left: 0;
+                padding: 95px 20px 30px; /* Meel banaan oo mobile-ka ah */
+            }
+            .mobile-header {
+                display: flex;
+            }
+            .sidebar-overlay.active {
+                display: block;
+                opacity: 1;
+            }
+        }
+    </style>
+    {% block extra_head %}{% endblock %}
+</head>
+<body>
+
+<!-- Mobile Header Layout: Kaliya wuxuu ka muuqanayaa Telefoonada/Tablets-ka -->
+<div class="mobile-header">
+    <div style="font-family: 'Playfair Display', serif; font-weight: 700; color: var(--gold); font-size: 1.15rem;">
+        <i class="fa-solid fa-tie me-2"></i>ROYAL RENTAL SUITS
+    </div>
+    <button class="menu-toggle" id="menuToggleBtn">
+        <i class="fa-solid fa-bars-staggered"></i>
+    </button>
+</div>
+
+<!-- Muraayada madow ee gadaal ka daboosha app-ka marka sidebar-ku furmo mobile-ka -->
+<div class="sidebar-overlay" id="sidebarOverlay"></div>
+
+<!-- SIDEBAR MAAMULKA -->
+<div class="sidebar" id="sidebarApp">
+    <div class="sidebar-brand">
+        <i class="fa-solid fa-tie"></i>
+        <span>ROYAL RENTAL SUITS</span>
+    </div>
+
+    <nav class="sidebar-menu">
+        {% if request.user.profile.is_reception or request.user.profile.is_cashier %}
+            <a href="{% url 'reception_dashboard' %}" class="{% if request.resolver_match.url_name == 'reception_dashboard' %}active{% endif %}"><i class="fa-solid fa-chart-pie"></i> Reception Dashboard</a>
+            <a href="{% url 'reception_requests' %}" class="{% if request.resolver_match.url_name == 'reception_requests' %}active{% endif %}"><i class="fa-solid fa-hand-holding-dollar"></i> Manage Requests</a>
+            <a href="{% url 'reception_reception' %}" class="{% if request.resolver_match.url_name == 'reception_reception' %}active{% endif %}"><i class="fa-solid fa-concierge-bell"></i> Reception Desk</a>
+            {% if request.user.profile.is_reception %}
+                <a href="{% url 'reception_inventory' %}" class="{% if request.resolver_match.url_name == 'reception_inventory' %}active{% endif %}"><i class="fa-solid fa-warehouse"></i> Reception Inventory</a>
+            {% endif %}
+            <a href="{% url 'reception_reports' %}" class="nav-link {% if request.resolver_match.url_name == 'reception_reports' %}active{% endif %}"><i class="fa-solid fa-chart-line"></i> Business Reports</a>
+            <a href="{% url 'reception_payments' %}" class="{% if request.resolver_match.url_name == 'reception_payments' %}active{% endif %}"><i class="fa-solid fa-receipt"></i> Payments</a>
+            <a href="{% url 'laundry_backlog' %}" class="{% if request.resolver_match.url_name == 'laundry_backlog' %}active{% endif %}"><i class="fas fa-broom me-2"></i> Laundry Backlog</a>
+            <a href="{% url 'home' %}"><i class="fa-solid fa-arrow-up-right-from-square"></i> View Website</a>
+            <a href="{% url 'logout' %}" class="text-danger"><i class="fa-solid fa-right-from-bracket"></i> Logout</a>
+        {% else %}
+            <a href="{% url 'dashboard' %}" class="{% if request.resolver_match.url_name == 'dashboard' %}active{% endif %}"><i class="fa-solid fa-gauge"></i> Admin Dashboard</a>
+            <a href="{% url 'reception_dashboard' %}" class="{% if request.resolver_match.url_name == 'reception_dashboard' %}active{% endif %}"><i class="fa-solid fa-chart-pie"></i> Reception Dashboard</a>
+            <a href="{% url 'reception_requests' %}" class="{% if request.resolver_match.url_name == 'reception_requests' %}active{% endif %}"><i class="fa-solid fa-hand-holding-dollar"></i> Manage Requests</a>
+            <a href="{% url 'reception_reception' %}" class="{% if request.resolver_match.url_name == 'reception_reception' %}active{% endif %}"><i class="fa-solid fa-concierge-bell"></i> Reception Desk</a>
+            <a href="{% url 'reception_reports' %}" class="nav-link {% if request.resolver_match.url_name == 'reception_reports' %}active{% endif %}"><i class="fa-solid fa-chart-line"></i> Business Reports</a>
+            <a href="{% url 'reception_inventory' %}" class="{% if request.resolver_match.url_name == 'reception_inventory' %}active{% endif %}"><i class="fa-solid fa-warehouse"></i> Reception Inventory</a>
+            <a href="{% url 'reception_payments' %}" class="{% if request.resolver_match.url_name == 'reception_payments' %}active{% endif %}"><i class="fa-solid fa-receipt"></i> Payments</a>
+            <a href="{% url 'laundry_backlog' %}" class="{% if request.resolver_match.url_name == 'laundry_backlog' %}active{% endif %}"><i class="fas fa-broom me-2"></i> Laundry Backlog</a>
+            <a href="{% url 'logout' %}" class="text-danger"><i class="fa-solid fa-right-from-bracket"></i> Logout</a>
+        {% endif %}
+    </nav>
+
+    <div class="sidebar-footer">
+        <div class="user-profile-box">
+            <div class="user-info">
+                <i class="fa-solid fa-circle-user"></i>
+                <div class="user-meta">
+                    <h6>{% if request.user.profile.is_reception or request.user.profile.is_cashier %}Staff Panel{% else %}Admin Suite{% endif %}</h6>
+                    <small>{{ request.user.username|default:"Staff Member" }}</small>
+                </div>
+            </div>
+            <div class="position-relative ms-2">
+                <a href="{% if request.user.profile.is_reception or request.user.profile.is_cashier %}{% url 'reception_requests' %}{% else %}{% url 'requests' %}{% endif %}" class="p-0 text-decoration-none">
+                    <i class="fa-regular fa-bell text-white opacity-75"></i>
+                    {% if pending > 0 %}
+                        <span class="position-absolute top-0 start-100 translate-middle p-1 bg-danger border border-light rounded-circle"></span>
+                    {% endif %}
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- QAYBTA DHEXE EE KOODHKA (MAIN CONTENT) -->
+<div class="main-container">
+    {% if messages %}
+        <div class="container-fluid p-0 mb-4">
+            {% for message in messages %}
+                <div class="alert alert-{% if message.tags == 'error' %}danger{% else %}{{ message.tags|default:'info' }}{% endif %} alert-dismissible fade show border-0 text-white" role="alert" style="background: rgba(255,255,255,0.04); backdrop-filter: blur(10px); border-left: 4px solid var(--gold) !important;">
+                    <i class="fa-solid fa-circle-info text-gold me-2"></i>
+                    {{ message }}
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="alert"></button>
+                </div>
+            {% endfor %}
+        </div>
+    {% endif %}
+
+    {% block content %}{% endblock %}
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script src="{% static 'js/form-validation.js' %}"></script>
+
+<!-- For any field -->
+<input type="tel" id="phone" oninput="onlyNumbers(this); validatePhone(this)">
+<span class="validation-feedback" id="phoneFeedback"></span>
+<div class="validation-message" id="phoneMessage"></div>
+
+<!-- 1. Maareynta Drawer-ka Mobile-ka (Slide-in Menu) -->
+<script>
+    const menuToggleBtn = document.getElementById('menuToggleBtn');
+    const sidebarApp = document.getElementById('sidebarApp');
+    const sidebarOverlay = document.getElementById('sidebarOverlay');
+
+    function toggleSidebar() {
+        sidebarApp?.classList.toggle('active');
+        sidebarOverlay?.classList.toggle('active');
+    }
+
+    menuToggleBtn?.addEventListener('click', toggleSidebar);
+    sidebarOverlay?.addEventListener('click', toggleSidebar);
+
+    // 2. Xogta lala wadaagayo Modal-ka Nadiifinta (Laundry/Expense Modal)
+    document.addEventListener("DOMContentLoaded", function() {
+        const completionModal = document.getElementById('completionModal');
+        if (completionModal) {
+            completionModal.addEventListener('show.bs.modal', function (event) {
+                // Badhanka la gujiyey ee shaqada kiciyey
+                const button = event.relatedTarget; 
+                
+                // Ka soo saar xogta ku dhex jirtay badhanka (Attributes)
+                const suitId = button.getAttribute('data-suit-id');
+                const suitName = button.getAttribute('data-suit-name');
+                
+                // Ku shub xogtaas gudaha sanduuqyada Modal-ka rasmiga ah
+                document.getElementById('modalSuitName').textContent = suitName;
+                document.getElementById('modalSuitId').value = suitId;
+            });
+        }
+    });
+
+    // 3. Ka hortagga cilladaha cache-ka ee browser-yada (Back/Forward state reload)
+    window.addEventListener('pageshow', function(event) {
+        if (event.persisted || (window.performance && window.performance.navigation.type === 2)) {
+            window.location.reload();
+        }
+    });
+
+    document.addEventListener('DOMContentLoaded', function () {
+        const today = new Date();
+        const yyyy = today.getFullYear();
+        const mm = String(today.getMonth() + 1).padStart(2, '0');
+        const dd = String(today.getDate()).padStart(2, '0');
+        const todayStr = `${yyyy}-${mm}-${dd}`;
+
+        document.querySelectorAll('input[type="date"]').forEach(function (input) {
+            if (input.dataset.allowPast === 'true') {
+                return;
+            }
+
+            input.setAttribute('min', todayStr);
+
+            if (!input.value) {
+                input.value = todayStr;
+            } else if (input.value < todayStr) {
+                input.value = todayStr;
+            }
+        });
+    });
+
+</script>
+{% block extra_js %}{% endblock %}
+</body>
+</html>

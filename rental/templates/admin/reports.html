@@ -1,0 +1,1220 @@
+{% extends "rental/base.html" %}
+{% block title %}Business Reports | Suit Luxe{% endblock %}
+{% block page_title %}Business Reports{% endblock %}
+
+{% block content %}
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=Cormorant+Garamond:wght@500;600;700&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+    :root {
+        --gold: #c9a84c;
+        --gold-light: #e8c96a;
+        --gold-dim: rgba(201,168,76,0.12);
+        --bg: #0f0f1a;
+        --border: rgba(255,255,255,0.07);
+        --text-main: #f0ede8;
+        --text-muted: rgba(240,237,232,0.5);
+        --success: #4caf82;
+        --danger: #e05c5c;
+        --warning: #e0a040;
+        --radius: 16px;
+    }
+
+    body { background: var(--bg); }
+
+    .rep-wrap { padding: 30px 0 60px; position: relative; z-index: 1; }
+
+    /* ══ HEADER (upgraded) ══ */
+    .rep-page-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        flex-wrap: wrap;
+        gap: 14px;
+        margin-bottom: 32px;
+        padding: 26px 30px;
+        background: linear-gradient(135deg, rgba(201,168,76,0.08), rgba(255,255,255,0.02));
+        border: 1px solid rgba(201,168,76,0.18);
+        border-radius: var(--radius);
+        position: relative;
+        overflow: hidden;
+    }
+
+    .rep-page-header::before {
+        content: '';
+        position: absolute;
+        top: -60%; right: -10%;
+        width: 260px; height: 260px;
+        background: radial-gradient(circle, rgba(201,168,76,0.18), transparent 70%);
+        pointer-events: none;
+    }
+
+    .rep-page-header h2 {
+        font-family: 'Playfair Display', 'Cormorant Garamond', serif;
+        font-size: 2.4rem;
+        font-weight: 700;
+        letter-spacing: 0.4px;
+        margin: 0;
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        background: linear-gradient(135deg, var(--gold-light), var(--gold) 65%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+    }
+
+    .rep-page-header h2 i {
+        color: var(--gold);
+        font-size: 1.7rem;
+        -webkit-text-fill-color: var(--gold);
+    }
+
+    .rep-page-header p {
+        font-family: 'DM Sans', sans-serif;
+        color: var(--text-muted);
+        font-size: 0.86rem;
+        letter-spacing: 0.3px;
+        margin: 6px 0 0;
+    }
+
+    .section-label {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        font-family: 'DM Sans', sans-serif;
+        font-size: 0.7rem;
+        letter-spacing: 2.5px;
+        text-transform: uppercase;
+        color: var(--gold);
+        font-weight: 700;
+        margin-bottom: 16px;
+    }
+
+    .section-label::after {
+        content: '';
+        flex: 1;
+        height: 1px;
+        background: linear-gradient(90deg, rgba(201,168,76,0.3), transparent);
+    }
+
+    .quick-action-card {
+        background: rgba(255,255,255,0.03);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        padding: 24px;
+        text-align: center;
+        transition: all 0.3s;
+        backdrop-filter: blur(12px);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 12px;
+        text-decoration: none;
+        color: var(--text-main);
+        position: relative;
+        overflow: hidden;
+        height: 100%;
+        width: 100%;
+        font-family: inherit;
+        cursor: pointer;
+    }
+
+    .quick-action-card::before {
+        content: '';
+        position: absolute;
+        top: 0; left: 0; right: 0;
+        height: 2px;
+        background: var(--action-color, var(--gold));
+        transform: scaleX(0);
+        transition: transform 0.3s;
+    }
+
+    .quick-action-card:hover::before { transform: scaleX(1); }
+
+    .quick-action-card:hover {
+        transform: translateY(-5px);
+        border-color: var(--action-color, var(--gold));
+        box-shadow: 0 10px 30px rgba(0,0,0,0.25);
+        color: var(--text-main);
+    }
+
+    .quick-action-card i {
+        font-size: 1.8rem;
+        color: var(--action-color, var(--gold));
+        transition: transform 0.3s;
+    }
+
+    .quick-action-card:hover i { transform: scale(1.15); }
+
+    .quick-action-card span {
+        font-size: 0.85rem;
+        font-weight: 600;
+        letter-spacing: 0.5px;
+    }
+
+    .stat-card {
+        background: rgba(255,255,255,0.04);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        padding: 22px;
+        position: relative;
+        overflow: hidden;
+        transition: all 0.3s ease;
+        backdrop-filter: blur(12px);
+        height: 100%;
+    }
+
+    .stat-card::before {
+        content: '';
+        position: absolute;
+        top: 0; left: 0; right: 0;
+        height: 2px;
+        background: var(--card-accent, var(--gold));
+    }
+
+    .stat-card:hover {
+        transform: translateY(-5px);
+        border-color: var(--card-accent, var(--gold));
+        box-shadow: 0 14px 38px rgba(0,0,0,0.3);
+    }
+
+    .stat-icon {
+        width: 42px; height: 42px;
+        border-radius: 12px;
+        display: flex; align-items: center; justify-content: center;
+        font-size: 16px;
+        margin-bottom: 14px;
+    }
+
+    .stat-label {
+        font-size: 0.67rem;
+        text-transform: uppercase;
+        letter-spacing: 1.8px;
+        color: var(--text-muted);
+        font-weight: 600;
+        margin-bottom: 4px;
+    }
+
+    .stat-value {
+        font-family: 'Cormorant Garamond', serif;
+        font-size: 2.6rem;
+        line-height: 1;
+        margin-bottom: 5px;
+    }
+
+    .stat-sub {
+        font-size: 0.75rem;
+        color: var(--text-muted);
+    }
+
+    .coll-card {
+        background: rgba(255,255,255,0.03);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        padding: 24px;
+        transition: all 0.3s;
+        backdrop-filter: blur(12px);
+        height: 100%;
+    }
+
+    .coll-card:hover {
+        transform: translateY(-4px);
+        box-shadow: 0 14px 36px rgba(0,0,0,0.28);
+    }
+
+    .coll-num {
+        font-family: 'Cormorant Garamond', serif;
+        font-size: 3rem;
+        line-height: 1;
+        margin: 10px 0 6px;
+    }
+
+    .coll-label {
+        font-size: 0.67rem;
+        text-transform: uppercase;
+        letter-spacing: 1.8px;
+        color: var(--text-muted);
+        font-weight: 600;
+        margin-bottom: 6px;
+    }
+
+    .coll-sub {
+        font-size: 0.77rem;
+        color: var(--text-muted);
+    }
+
+    .req-card {
+        background: rgba(255,255,255,0.03);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        padding: 18px 14px;
+        text-align: center;
+        transition: all 0.25s;
+        backdrop-filter: blur(12px);
+        height: 100%;
+    }
+
+    .req-card:hover {
+        transform: translateY(-4px);
+        border-color: var(--req-color, var(--gold));
+        box-shadow: 0 10px 28px rgba(0,0,0,0.25);
+    }
+
+    .req-label {
+        font-size: 0.62rem;
+        text-transform: uppercase;
+        letter-spacing: 2px;
+        color: var(--text-muted);
+        font-weight: 700;
+        margin-bottom: 8px;
+    }
+
+    .req-num {
+        font-family: 'Cormorant Garamond', serif;
+        font-size: 2.4rem;
+        line-height: 1;
+        color: var(--req-color, var(--gold));
+    }
+
+    .perf-card {
+        background: rgba(255,255,255,0.03);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        padding: 28px;
+        transition: all 0.3s;
+        backdrop-filter: blur(12px);
+        height: 100%;
+    }
+
+    .perf-card:hover {
+        transform: translateY(-4px);
+        box-shadow: 0 14px 36px rgba(0,0,0,0.28);
+    }
+
+    .perf-label {
+        font-size: 0.67rem;
+        text-transform: uppercase;
+        letter-spacing: 2px;
+        color: var(--text-muted);
+        font-weight: 700;
+        margin-bottom: 10px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .perf-value {
+        font-family: 'Cormorant Garamond', serif;
+        font-size: 3rem;
+        line-height: 1;
+        margin-bottom: 6px;
+    }
+
+    .perf-sub {
+        font-size: 0.78rem;
+        color: var(--text-muted);
+    }
+
+    .gold-progress {
+        height: 6px;
+        background: rgba(255,255,255,0.06);
+        border-radius: 10px;
+        overflow: hidden;
+    }
+
+    .gold-progress-bar {
+        height: 100%;
+        background: linear-gradient(90deg, var(--gold), var(--gold-light));
+        border-radius: 10px;
+        transition: width 1s ease;
+    }
+
+    .table-card {
+        background: rgba(255,255,255,0.03);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        overflow: hidden;
+        backdrop-filter: blur(12px);
+    }
+
+    .table-card-header {
+        padding: 22px 26px;
+        border-bottom: 1px solid var(--border);
+        background: rgba(0,0,0,0.2);
+    }
+
+    .table-card-header h4 {
+        font-family: 'Cormorant Garamond', serif;
+        font-size: 1.25rem;
+        color: var(--text-main);
+        margin: 0;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+
+    .table-card-header h4 i { color: var(--gold); }
+    .table-card-header p { color: var(--text-muted); font-size: 0.78rem; margin: 3px 0 0; }
+
+    .rep-table {
+        width: 100%;
+        border-collapse: separate;
+        border-spacing: 0 5px;
+        padding: 14px 16px 10px;
+    }
+
+    .rep-table thead th {
+        color: var(--text-muted);
+        font-size: 0.67rem;
+        text-transform: uppercase;
+        letter-spacing: 1.5px;
+        font-weight: 600;
+        padding: 7px 14px;
+        background: transparent;
+        border: none;
+        white-space: nowrap;
+    }
+
+    .rep-table tbody tr {
+        background: rgba(255,255,255,0.025);
+        transition: all 0.2s;
+    }
+
+    .rep-table tbody tr:hover { background: var(--gold-dim); }
+
+    .rep-table tbody td {
+        padding: 13px 14px;
+        border: none;
+        color: var(--text-main);
+        font-size: 0.86rem;
+        vertical-align: middle;
+        white-space: nowrap;
+    }
+
+    .rep-table tbody td:first-child { border-radius: 10px 0 0 10px; }
+    .rep-table tbody td:last-child { border-radius: 0 10px 10px 0; }
+
+    .badge-active { background:rgba(76,130,175,0.12); border:1px solid rgba(76,130,175,0.3); color:#6ab0e8; padding:4px 11px; border-radius:20px; font-size:0.72rem; font-weight:700; }
+    .badge-returned { background:rgba(76,175,130,0.12); border:1px solid rgba(76,175,130,0.3); color:var(--success); padding:4px 11px; border-radius:20px; font-size:0.72rem; font-weight:700; }
+    .badge-rejected { background:rgba(224,92,92,0.12); border:1px solid rgba(224,92,92,0.3); color:var(--danger); padding:4px 11px; border-radius:20px; font-size:0.72rem; font-weight:700; }
+
+    .amount-cell { color: var(--success); font-weight: 700; }
+
+    .activity-tabs {
+        display: flex;
+        gap: 6px;
+        background: rgba(0,0,0,0.25);
+        padding: 4px;
+        border-radius: 10px;
+        border: 1px solid var(--border);
+    }
+
+    .tab-btn {
+        background: transparent;
+        border: none;
+        color: var(--text-muted);
+        padding: 6px 14px;
+        border-radius: 8px;
+        font-size: 0.72rem;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.2s;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+    }
+
+    .tab-btn:hover { color: var(--text-main); }
+
+    .tab-btn.active {
+        background: var(--gold-dim);
+        color: var(--gold);
+        border: 1px solid rgba(201,168,76,0.2);
+    }
+
+    .ledger-search {
+        background: rgba(255,255,255,0.05);
+        border: 1px solid var(--border);
+        color: var(--text-main);
+        padding: 8px 14px;
+        border-radius: 8px;
+        font-size: 0.85rem;
+        min-width: 200px;
+        font-family: 'DM Sans', sans-serif;
+        color-scheme: dark;
+    }
+
+    .ledger-search:focus {
+        outline: none;
+        border-color: var(--gold);
+    }
+
+    /* ══ DROPDOWN TEXT BLACK FIX ══ */
+    select.ledger-search,
+    select.form-select {
+        color: #000000 !important;
+        background-color: #ffffff !important;
+        border-color: rgba(201, 168, 76, 0.4) !important;
+        background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3e%3cpath fill='none' stroke='%23000000' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M2 5l6 6 6-6'/%3e%3c/svg%3e") !important;
+    }
+
+    select.ledger-search option,
+    select.form-select option {
+        color: #000000 !important;
+        background-color: #ffffff !important;
+    }
+
+    .filter-label {
+        font-size: 0.72rem;
+        text-transform: uppercase;
+        letter-spacing: 1.5px;
+        color: var(--text-muted);
+        font-weight: 600;
+        margin-bottom: 8px;
+        display: block;
+        font-family: 'DM Sans', sans-serif;
+    }
+
+    .empty-state {
+        text-align: center;
+        padding: 56px 20px;
+        color: var(--text-muted);
+    }
+
+    .empty-state i {
+        font-size: 3.5rem;
+        color: rgba(201,168,76,0.1);
+        margin-bottom: 12px;
+        display: block;
+    }
+
+    ::-webkit-scrollbar { width: 4px; height: 4px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: rgba(201,168,76,0.2); border-radius: 4px; }
+
+    /* ══ EXPENSE MODAL ══ */
+    .expense-modal-overlay {
+        display: none;
+        position: fixed;
+        top: 0; left: 0; right: 0; bottom: 0;
+        background: rgba(5,5,10,0.72);
+        backdrop-filter: blur(4px);
+        z-index: 1000;
+        align-items: center;
+        justify-content: center;
+        padding: 20px;
+    }
+
+    .expense-modal-overlay.open { display: flex; }
+
+    .expense-modal {
+        background: #14141f;
+        border: 1px solid rgba(201,168,76,0.25);
+        border-radius: var(--radius);
+        width: 100%;
+        max-width: 480px;
+        max-height: 90vh;
+        overflow-y: auto;
+        box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+    }
+
+    .expense-modal-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 20px 24px;
+        border-bottom: 1px solid var(--border);
+    }
+
+    .expense-modal-header h4 {
+        font-family: 'Cormorant Garamond', serif;
+        color: var(--text-main);
+        font-size: 1.35rem;
+        margin: 0;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+
+    .expense-modal-header h4 i { color: var(--gold); }
+
+    .modal-close-btn {
+        background: rgba(255,255,255,0.05);
+        border: 1px solid var(--border);
+        color: var(--text-muted);
+        width: 32px; height: 32px;
+        border-radius: 8px;
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+
+    .modal-close-btn:hover { color: var(--danger); border-color: rgba(224,92,92,0.3); }
+
+    .expense-modal-body { padding: 22px 24px; }
+
+    .form-group { margin-bottom: 16px; }
+
+    .form-group textarea.ledger-search { font-family: 'DM Sans', sans-serif; }
+
+    .expense-modal-footer {
+        display: flex;
+        justify-content: flex-end;
+        gap: 10px;
+        padding: 16px 24px;
+        border-top: 1px solid var(--border);
+    }
+</style>
+
+<div class="rep-wrap">
+    <div class="container-fluid px-4">
+
+        <!-- ══ PAGE HEADER (upgraded) ══ -->
+        <div class="rep-page-header">
+            <div>
+                <h2>
+                    <i class="fa-solid fa-chart-bar"></i>
+                    Business Reports
+                </h2>
+                <p>Complete overview of inventory, financials, and operational performance</p>
+            </div>
+            <div style="text-align: right; display: flex; flex-direction: column; gap: 8px; align-items: flex-end;">
+                <div style="font-size: 0.95rem; color: var(--text-main); display: none; align-items: center; gap: 8px;">
+                    <i class="fa-solid fa-calendar-days" style="color: var(--gold);"></i>
+                    <strong>{{ now|date:'M d, Y' }}</strong>
+                </div>
+                {% if selected_period != 'all' or month_range or request.GET.date_from or request.GET.date_to %}
+                <div style="font-size: 0.78rem; color: var(--text-muted); background: rgba(201,168,76,0.1); border: 1px solid rgba(201,168,76,0.3); border-radius: 6px; padding: 6px 12px;">
+                    <strong style="color: var(--gold);">Active Filter:</strong>
+                    {% if selected_period != 'all' %}{{ selected_period|upper }}{% endif %}
+                    {% if month_range %}<span style="margin-left: 8px;">12-25 ({{ month_range }})</span>{% endif %}
+                    {% if request.GET.date_from or request.GET.date_to %}
+                        <span style="margin-left: 8px;">{{ request.GET.date_from|default:"…" }} → {{ request.GET.date_to|default:"…" }}</span>
+                    {% endif %}
+                    <a href="{% url 'reports' %}" style="margin-left: 10px; color: var(--gold); text-decoration: none; font-weight: 600;">✕</a>
+                </div>
+                {% else %}
+                <div style="font-size: 0.78rem; color: var(--text-muted);">
+                    <i class="fa-solid fa-check-circle" style="color: var(--success); margin-right: 4px;"></i>No filters applied
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- ══ QUICK ACTIONS ══ -->
+        <div class="section-label mt-2">
+            <i class="fa-solid fa-bolt" style="color:var(--gold)"></i>
+            Quick Actions
+        </div>
+
+        <div class="row g-3 mb-4">
+            <div class="col-md-4 col-sm-12">
+                <button type="button" class="quick-action-card" style="--action-color: #e05c5c;" onclick="openExpenseModal()">
+                    <i class="fa-solid fa-file-invoice-dollar"></i>
+                    <span>Record Expense</span>
+                </button>
+            </div>
+            <div class="col-md-4 col-sm-6">
+                <a href="{% url 'create_rental' %}" class="quick-action-card" style="--action-color: #6ab0e8;">
+                    <i class="fa-solid fa-plus-circle"></i>
+                    <span>New Rental</span>
+                </a>
+            </div>
+            <div class="col-md-4 col-sm-6">
+                <a href="{% url 'download_report' %}" class="quick-action-card" style="--action-color: #c9a84c;">
+                    <i class="fa-solid fa-file-export"></i>
+                    <span>Export Reports</span>
+                </a>
+            </div>
+        </div>
+
+        <!-- ══ CUSTOM DATE RANGE REPORT (NEW) ══ -->
+        <div class="section-label mt-2">
+            <i class="fa-solid fa-calendar-week" style="color:var(--gold)"></i>
+            Date Range Filter
+        </div>
+
+        <div class="table-card mb-4" style="padding: 24px 26px;">
+            <form method="get" id="dateFilterForm" style="display:flex; gap:18px; flex-wrap:wrap; align-items:flex-end;">
+                <div>
+                    <label class="filter-label" for="dateFromFilter"><i class="fa-solid fa-calendar-day"></i> From Date</label>
+                    <input type="date" name="from_date" id="dateFromFilter" class="ledger-search"
+                           value="{{ from_date|default:'' }}">
+                </div>
+                <div>
+                    <label class="filter-label" for="dateToFilter"><i class="fa-solid fa-calendar-day"></i> To Date</label>
+                    <input type="date" name="to_date" id="dateToFilter" class="ledger-search"
+                           value="{{ to_date|default:'' }}">
+                </div>
+                <button type="submit" class="tab-btn" style="background: rgba(201,168,76,0.15); border-color: rgba(201,168,76,0.3); color: var(--gold); cursor:pointer; padding: 9px 18px; border:1px solid rgba(201,168,76,0.3);">
+                    <i class="fa-solid fa-filter me-2"></i> Filter
+                </button>
+                <a href="{% url 'reports' %}" class="tab-btn" style="text-decoration:none; padding: 9px 18px; background: rgba(76,175,130,0.15); border-color: rgba(76,175,130,0.3); color: var(--success);">
+                    <i class="fa-solid fa-arrows-rotate me-2"></i> Reset
+                </a>
+                <a href="{% url 'download_report' %}?type=expenses{% if from_date %}&from_date={{ from_date }}{% endif %}{% if to_date %}&to_date={{ to_date }}{% endif %}" class="tab-btn" style="text-decoration:none; padding: 9px 18px; background: rgba(106,176,232,0.15); border-color: rgba(106,176,232,0.3); color: #6ab0e8;">
+                    <i class="fa-solid fa-download me-2"></i> Export
+                </a>
+            </form>
+
+            <div id="dateFilterError" style="display:none; margin-top:14px; padding:10px 14px; background: rgba(224,92,92,0.1); border:1px solid rgba(224,92,92,0.3); border-radius:8px; color: var(--danger); font-size:0.85rem;">
+                <i class="fa-solid fa-triangle-exclamation me-2"></i><span id="dateFilterErrorText"></span>
+            </div>
+
+            {% if date_range_error %}
+            <div style="margin-top:14px; padding:10px 14px; background: rgba(224,92,92,0.1); border:1px solid rgba(224,92,92,0.3); border-radius:8px; color: var(--danger); font-size:0.85rem;">
+                <i class="fa-solid fa-triangle-exclamation me-2"></i>{{ date_range_error }}
+            </div>
+            {% endif %}
+
+            {% if from_date or to_date %}
+            <div style="margin-top:16px; padding-top:16px; border-top:1px solid var(--border);">
+                <div style="font-size:0.82rem; color:var(--text-muted);">
+                    <strong style="color:var(--gold);">Active Filter:</strong>
+                    {% if from_date %}<strong>{{ from_date }}</strong>{% endif %}
+                    {% if from_date and to_date %}→{% endif %}
+                    {% if to_date %}<strong>{{ to_date }}</strong>{% endif %}
+                    <a href="{% url 'reports' %}" style="margin-left:12px; color:var(--gold); text-decoration:none;">Clear</a>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- ══ SUIT INVENTORY ══ -->
+        <div class="section-label mt-2">
+            <i class="fa-solid fa-shirt" style="color:var(--gold)"></i>
+            Suit Inventory
+        </div>
+
+        <div class="row g-3 mb-4">
+            <div class="col-lg-4 col-md-6">
+                <div class="stat-card" style="--card-accent:#c9a84c">
+                    <div class="stat-icon" style="background:rgba(201,168,76,0.12);color:var(--gold)">
+                        <i class="fa-solid fa-shirt"></i>
+                    </div>
+                    <div class="stat-label">Total Catalog Items</div>
+                    <div class="stat-value" style="color:var(--gold)">{{ total_suits|default:"0" }}</div>
+                    <div class="stat-sub">Unique suit types in the catalog</div>
+                </div>
+            </div>
+            <div class="col-lg-4 col-md-6">
+                <div class="stat-card" style="--card-accent:#4caf82">
+                    <div class="stat-icon" style="background:rgba(76,175,130,0.1);color:var(--success)">
+                        <i class="fa-solid fa-boxes-stacked"></i>
+                    </div>
+                    <div class="stat-label">Physical Stock</div>
+                    <div class="stat-value" style="color:var(--success)">{{ total_quantity|default:"0" }}</div>
+                    <div class="stat-sub">Units available across inventory</div>
+                </div>
+            </div>
+            <div class="col-lg-4 col-md-12">
+                <div class="stat-card" style="--card-accent:#6ab0e8">
+                    <div class="stat-icon" style="background:rgba(76,130,175,0.1);color:#6ab0e8">
+                        <i class="fa-solid fa-circle-check"></i>
+                    </div>
+                    <div class="stat-label">Available Right Now</div>
+                    <div class="stat-value" style="color:#6ab0e8">{{ available_quantity|default:"0" }}</div>
+                    <div class="stat-sub">Ready to rent immediately</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row g-3 mb-4">
+            <div class="col-lg-6">
+                <div class="perf-card" style="min-height: 100%;">
+                    <div class="perf-label">
+                        <i class="fa-solid fa-coins" style="color:var(--gold)"></i>
+                        Daily Revenue Potential
+                    </div>
+                    <div class="perf-value" style="color:var(--gold)">${{ revenue_potential|default:"0"|floatformat:2 }}</div>
+                    <div class="perf-sub">Estimated earning potential from the current inventory mix</div>
+                </div>
+            </div>
+            <div class="col-lg-6">
+                <div class="perf-card" style="min-height: 100%;">
+                    <div class="perf-label">
+                        <i class="fa-solid fa-layer-group" style="color:#6ab0e8"></i>
+                        Collection Segment Mix
+                    </div>
+                    <div class="perf-sub" style="margin-bottom: 16px;">Breakdown of catalog stock by collection tier</div>
+                    <div class="gold-progress" style="margin-bottom: 12px;">
+                        <div class="gold-progress-bar" data-width="{{ luxury_mix_pct|default:0 }}" style="width: 0%;"></div>
+                    </div>
+                    <div class="row g-2 text-center">
+                        <div class="col-4">
+                            <div style="color:var(--gold); font-weight:700;">Luxury ({{ luxury_mix_pct|default:0 }}%)</div>
+                            <div style="color:var(--text-muted);">{{ luxury_units|default:"0" }} units</div>
+                        </div>
+                        <div class="col-4">
+                            <div style="color:#6ab0e8; font-weight:700;">Standard ({{ standard_mix_pct|default:0 }}%)</div>
+                            <div style="color:var(--text-muted);">{{ standard_units|default:"0" }} units</div>
+                        </div>
+                        <div class="col-4">
+                            <div style="color:var(--success); font-weight:700;">Budget ({{ budget_mix_pct|default:0 }}%)</div>
+                            <div style="color:var(--text-muted);">{{ budget_units|default:"0" }} units</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ══ COLLECTION BREAKDOWN ══ -->
+        <div class="section-label mt-2">
+            <i class="fa-solid fa-layer-group" style="color:var(--gold)"></i>
+            Collection Breakdown
+        </div>
+
+        <div class="row g-3 mb-4">
+            <div class="col-md-4">
+                <div class="coll-card" style="border-top:2px solid rgba(201,168,76,0.4)">
+                    <div style="display:flex;align-items:center;gap:9px">
+                        <div style="width:36px;height:36px;border-radius:10px;background:rgba(201,168,76,0.12);display:flex;align-items:center;justify-content:center;color:var(--gold);font-size:14px">
+                            <i class="fa-solid fa-gem"></i>
+                        </div>
+                        <div class="coll-label" style="margin:0">Luxury Collection</div>
+                    </div>
+                    <div class="coll-num" style="color:var(--gold)">{{ luxury_count|default:"0" }}</div>
+                    <div class="coll-sub">Premium suit types</div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="coll-card" style="border-top:2px solid rgba(106,176,232,0.4)">
+                    <div style="display:flex;align-items:center;gap:9px">
+                        <div style="width:36px;height:36px;border-radius:10px;background:rgba(76,130,175,0.1);display:flex;align-items:center;justify-content:center;color:#6ab0e8;font-size:14px">
+                            <i class="fa-solid fa-star"></i>
+                        </div>
+                        <div class="coll-label" style="margin:0">Standard Collection</div>
+                    </div>
+                    <div class="coll-num" style="color:#6ab0e8">{{ standard_count|default:"0" }}</div>
+                    <div class="coll-sub">Regular suit types</div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="coll-card" style="border-top:2px solid rgba(76,175,130,0.4)">
+                    <div style="display:flex;align-items:center;gap:9px">
+                        <div style="width:36px;height:36px;border-radius:10px;background:rgba(76,175,130,0.1);display:flex;align-items:center;justify-content:center;color:var(--success);font-size:14px">
+                            <i class="fa-solid fa-tag"></i>
+                        </div>
+                        <div class="coll-label" style="margin:0">Budget Collection</div>
+                    </div>
+                    <div class="coll-num" style="color:var(--success)">{{ budget_count|default:"0" }}</div>
+                    <div class="coll-sub">Affordable suit types</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ══ RENTAL REQUESTS ══ -->
+        <div class="section-label mt-2">
+            Rental Requests
+        </div>
+
+        <div class="row g-3 mb-4">
+            <div class="col-md-2 col-sm-4 col-6">
+                <div class="req-card" style="--req-color:var(--gold)">
+                    <div class="req-label">Total</div>
+                    <div class="req-num">{{ total_requests|default:"0" }}</div>
+                </div>
+            </div>
+            <div class="col-md-2 col-sm-4 col-6">
+                <div class="req-card" style="--req-color:var(--warning)">
+                    <div class="req-label">Pending</div>
+                    <div class="req-num">{{ pending_requests|default:"0" }}</div>
+                </div>
+            </div>
+            <div class="col-md-2 col-sm-4 col-6">
+                <div class="req-card" style="--req-color:#6ab0e8">
+                    <div class="req-label">Approved</div>
+                    <div class="req-num">{{ approved_requests|default:"0" }}</div>
+                </div>
+            </div>
+            <div class="col-md-2 col-sm-4 col-6">
+                <div class="req-card" style="--req-color:#a78bfa">
+                    <div class="req-label">Active</div>
+                    <div class="req-num">{{ active_requests|default:"0" }}</div>
+                </div>
+            </div>
+            <div class="col-md-2 col-sm-4 col-6">
+                <div class="req-card" style="--req-color:var(--success)">
+                    <div class="req-label">Returned</div>
+                    <div class="req-num">{{ returned_requests|default:"0" }}</div>
+                </div>
+            </div>
+            <div class="col-md-2 col-sm-4 col-6">
+                <div class="req-card" style="--req-color:var(--danger)">
+                    <div class="req-label">Rejected</div>
+                    <div class="req-num">{{ rejected_requests|default:"0" }}</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ══ FINANCIAL & PERFORMANCE ══ -->
+        <div class="section-label mt-2">
+            <i class="fa-solid fa-chart-line" style="color:var(--gold)"></i>
+            Financial & Performance
+        </div>
+
+        <div class="row g-3 mb-4">
+            <div class="col-md-4">
+                <div class="perf-card">
+                    <div class="perf-label">
+                        <i class="fa-solid fa-dollar-sign" style="color:var(--success)"></i>
+                        Total Revenue
+                    </div>
+                    <div class="perf-value" style="color:var(--success)">
+                        ${{ revenue|default:"0"|floatformat:2 }}
+                    </div>
+                    <div class="perf-sub">From active and returned rentals</div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="perf-card">
+                    <div class="perf-label">
+                        <i class="fa-solid fa-file-invoice-dollar" style="color:var(--danger)"></i>
+                        Total Expenses
+                    </div>
+                    <div class="perf-value" style="color:var(--danger)">
+                        ${{ total_expenses|default:"0"|floatformat:2 }}
+                    </div>
+                    <div class="perf-sub">All operational costs</div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="perf-card">
+                    <div class="perf-label">
+                        <i class="fa-solid fa-coins" style="color:var(--gold)"></i>
+                        Net Profit
+                    </div>
+                    <div class="perf-value" style="color:var(--gold)">
+                        ${{ net_profit|default:"0"|floatformat:2 }}
+                    </div>
+                    <div class="perf-sub">Revenue minus expenses</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Utilization -->
+        <div class="row g-3 mb-4">
+            <div class="col-md-12">
+                <div class="perf-card">
+                    <div class="perf-label">
+                        <i class="fa-solid fa-chart-pie" style="color:#6ab0e8"></i>
+                        Inventory Utilization Rate
+                    </div>
+                    <div class="perf-sub">Stock in use vs available</div>
+                    <div class="gold-progress" style="margin-top: 12px;">
+                        <div class="gold-progress-bar" data-utilization="{{ utilization_rate|default:'0' }}"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+      
+
+            <!-- Active Filters Display -->
+            {% if selected_period or request.GET.month_range or request.GET.date_from or request.GET.date_to %}
+            <div style="margin-top:16px; padding-top:16px; border-top:1px solid var(--border);">
+                <div style="font-size:0.82rem; color:var(--text-muted);">
+                    <strong style="color:var(--gold);">Active Filters:</strong>
+                    {% if selected_period %}Period: <strong>{{ selected_period|upper }}</strong>{% endif %}
+                    {% if request.GET.month_range %} | Month Range: <strong>12th - 25th ({{ request.GET.month_range }})</strong>{% endif %}
+                    {% if request.GET.date_from or request.GET.date_to %} | Custom Range: <strong>{{ request.GET.date_from|default:"…" }} → {{ request.GET.date_to|default:"…" }}</strong>{% endif %}
+                    <a href="{% url 'reports' %}" style="margin-left:12px; color:var(--gold); text-decoration:none;">Clear Filters</a>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- ══ COMPLETE HISTORY & ACTIVITY ══ -->
+        <div class="section-label mt-2">
+            <i class="fa-solid fa-clock-rotate-left" style="color:var(--gold)"></i>
+            Complete History & Activity
+        </div>
+
+        <div class="table-card">
+            <div class="table-card-header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
+                <div>
+                    <h4>
+                        <i class="fa-solid fa-list-ul"></i>
+                        Aggregated Activity Log
+                    </h4>
+                    <p>Comprehensive history of all transactions, expenses, and rentals (today or earlier only — future entries are hidden).</p>
+                </div>
+                <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+                    <input type="text" id="ledgerSearch" class="ledger-search" placeholder="Search ledger..." onkeyup="filterLedger()">
+                    <div class="activity-tabs">
+                        <button type="button" class="tab-btn active" data-tab="all">All</button>
+                        <button type="button" class="tab-btn" data-tab="transaction">Transactions</button>
+                        <button type="button" class="tab-btn" data-tab="expense">Expenses</button>
+                    </div>
+                </div>
+            </div>
+
+            {% if all_activities %}
+            <div style="overflow-x:auto">
+                <table class="rep-table" id="activityTable">
+                    <thead>
+                        <tr>
+                            <th>Date & Time</th>
+                            <th>Type</th>
+                            <th>Category</th>
+                            <th>Description</th>
+                            <th style="text-align:right">Amount</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for activity in all_activities %}
+                        {% if activity.date|date:"Y-m-d" <= now|date:"Y-m-d" %}
+                        <tr data-type="{{ activity.type|lower }}"
+                            data-date="{{ activity.date|date:'Y-m-d' }}"
+                            data-search="{{ activity.description|lower }} {{ activity.category|lower }} {{ activity.date|date:'Y-m-d' }}">
+                            <td style="color:var(--text-muted); font-size:0.82rem;">
+                                {{ activity.date|date:"M d, Y H:i" }}
+                            </td>
+                            <td>
+                                {% if activity.type|lower == 'expense' %}
+                                    <span class="badge-rejected">Expense</span>
+                                {% elif activity.type|lower == 'transaction' or activity.type|lower == 'payment' %}
+                                    <span class="badge-returned">Transaction</span>
+                                {% elif activity.type|lower == 'rental' %}
+                                    <span class="badge-active">Rental</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <span style="background: rgba(255,255,255,0.05); border: 1px solid var(--border); padding: 3px 8px; border-radius: 6px; font-size: 0.72rem; font-weight: 600;">
+                                    {{ activity.category|default:"N/A" }}
+                                </span>
+                            </td>
+                            <td style="max-width: 300px; white-space: normal; line-height: 1.4;">
+                                {{ activity.description }}
+                            </td>
+                            <td style="text-align:right;">
+                                {% if activity.type|lower == 'expense' %}
+                                    <span style="color:var(--danger); font-weight:700;">-${{ activity.amount|floatformat:2 }}</span>
+                                {% else %}
+                                    <span class="amount-cell">+${{ activity.amount|floatformat:2 }}</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endif %}
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <div class="empty-state">
+                <i class="fa-solid fa-inbox"></i>
+                <p style="font-weight:600;margin-bottom:4px">No activity recorded yet</p>
+                <p style="font-size:0.82rem">All business transactions will appear here.</p>
+            </div>
+            {% endif %}
+        </div>
+
+    </div>
+</div>
+
+<!-- ══ EXPENSE MODAL (functional) ══ -->
+<div class="expense-modal-overlay" id="expenseModal">
+    <div class="expense-modal">
+        <div class="expense-modal-header">
+            <h4><i class="fa-solid fa-file-invoice-dollar"></i> Record New Expense</h4>
+            <button type="button" class="modal-close-btn" onclick="closeExpenseModal()">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
+        </div>
+        <form method="post" action="{% url 'add_expense' %}" id="expenseForm">
+            {% csrf_token %}
+            <div class="expense-modal-body">
+
+                <div class="form-group">
+                    <label class="filter-label">Category</label>
+                    <select name="category" class="ledger-search" style="width:100%;" required>
+                        <option value="">-- Select Category --</option>
+                        <option value="Maintenance">Maintenance</option>
+                        <option value="Utilities">Utilities</option>
+                        <option value="Salaries">Salaries</option>
+                        <option value="Dry Cleaning">Dry Cleaning</option>
+                        <option value="Supplies">Supplies</option>
+                        <option value="Rent">Rent</option>
+                        <option value="Other">Other</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label class="filter-label">Description</label>
+                    <textarea name="description" class="ledger-search" style="width:100%; min-height:70px; resize:vertical;" required placeholder="e.g. Suit dry-cleaning payment for July batch"></textarea>
+                </div>
+
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <div class="form-group">
+                            <label class="filter-label">Amount ($)</label>
+                            <input type="number" name="amount" class="ledger-search" style="width:100%;" step="0.01" min="0.01" required placeholder="0.00">
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="form-group">
+                            <label class="filter-label">Expense Date</label>
+                            <input type="date" name="expense_date" id="expenseDate" class="ledger-search" style="width:100%;" required>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="expenseDateError" style="display:none; margin-top:6px; padding:10px 14px; background: rgba(224,92,92,0.1); border:1px solid rgba(224,92,92,0.3); border-radius:8px; color: var(--danger); font-size:0.83rem;">
+                    <i class="fa-solid fa-triangle-exclamation me-2"></i><span id="expenseDateErrorText"></span>
+                </div>
+
+            </div>
+            <div class="expense-modal-footer">
+                <button type="button" class="tab-btn" onclick="closeExpenseModal()" style="padding:10px 20px;">Cancel</button>
+                <button type="submit" class="tab-btn" style="background: rgba(201,168,76,0.15); border:1px solid rgba(201,168,76,0.3); color: var(--gold); padding:10px 22px; cursor:pointer;">
+                    <i class="fa-solid fa-check me-2"></i> Save Expense
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+    // Progress bar animation
+    document.querySelectorAll('.gold-progress-bar[data-utilization], .gold-progress-bar[data-width]').forEach(function (bar) {
+        var value = parseFloat(bar.dataset.utilization || bar.dataset.width || '0');
+        if (!isNaN(value)) {
+            bar.style.width = Math.max(0, Math.min(100, value)) + '%';
+        }
+    });
+
+    // ══ NEW DATE FILTER VALIDATION (allows any date) ══
+    (function () {
+        var dateFromFilter = document.getElementById('dateFromFilter');
+        var dateToFilter = document.getElementById('dateToFilter');
+        var form = document.getElementById('dateFilterForm');
+        var errorBox = document.getElementById('dateFilterError');
+        var errorText = document.getElementById('dateFilterErrorText');
+
+        function showError(msg) {
+            if (errorText) errorText.textContent = msg;
+            if (errorBox) errorBox.style.display = 'block';
+        }
+
+        function hideError() {
+            if (errorBox) errorBox.style.display = 'none';
+        }
+
+        if (form) {
+            form.addEventListener('submit', function (e) {
+                hideError();
+                var fromVal = dateFromFilter ? dateFromFilter.value : '';
+                var toVal = dateToFilter ? dateToFilter.value : '';
+
+                if (fromVal && toVal && fromVal > toVal) {
+                    e.preventDefault();
+                    showError('From date must be earlier than or equal to To date.');
+                    return;
+                }
+            });
+        }
+    })();
+
+    // Ledger filter & search
+    function filterLedger() {
+        const search = document.getElementById('ledgerSearch').value.toLowerCase();
+        const activeTab = document.querySelector('.tab-btn.active').dataset.tab;
+        const rows = document.querySelectorAll('#activityTable tbody tr');
+
+        rows.forEach(row => {
+            const type = row.dataset.type;
+            const searchData = row.dataset.search;
+
+            let show = true;
+            if (activeTab !== 'all' && type !== activeTab) show = false;
+            if (search && !searchData.includes(search)) show = false;
+
+            row.style.display = show ? '' : 'none';
+        });
+    }
+    document.addEventListener('DOMContentLoaded', filterLedger);
+
+    // Tab switching
+    document.querySelectorAll('.tab-btn[data-tab]').forEach(btn => {
+        btn.addEventListener('click', function() {
+            document.querySelectorAll('.tab-btn[data-tab]').forEach(b => b.classList.remove('active'));
+            this.classList.add('active');
+            filterLedger();
+        });
+    });
+
+    // ══ EXPENSE MODAL: open/close + date validation ══
+    (function () {
+        var today = new Date();
+        var todayStr = today.getFullYear() + '-' +
+            String(today.getMonth() + 1).padStart(2, '0') + '-' +
+            String(today.getDate()).padStart(2, '0');
+
+        var overlay = document.getElementById('expenseModal');
+        var expenseForm = document.getElementById('expenseForm');
+        var expenseDate = document.getElementById('expenseDate');
+        var errorBox = document.getElementById('expenseDateError');
+        var errorText = document.getElementById('expenseDateErrorText');
+
+        window.openExpenseModal = function () {
+            overlay.classList.add('open');
+            document.body.style.overflow = 'hidden';
+            if (expenseDate) {
+                expenseDate.setAttribute('max', todayStr);
+                if (!expenseDate.value) {
+                    expenseDate.value = todayStr; // default = today
+                }
+            }
+            hideExpenseError();
+        };
+
+        window.closeExpenseModal = function () {
+            overlay.classList.remove('open');
+            document.body.style.overflow = '';
+            hideExpenseError();
+        };
+
+        function showExpenseError(msg) {
+            errorText.textContent = msg;
+            errorBox.style.display = 'block';
+        }
+
+        function hideExpenseError() {
+            errorBox.style.display = 'none';
+        }
+
+        // Close when clicking outside the modal box
+        overlay.addEventListener('click', function (e) {
+            if (e.target === overlay) window.closeExpenseModal();
+        });
+
+        // Close on Escape key
+        document.addEventListener('keydown', function (e) {
+            if (e.key === 'Escape' && overlay.classList.contains('open')) {
+                window.closeExpenseModal();
+            }
+        });
+
+        // Block future dates client-side before submit
+        if (expenseForm) {
+            expenseForm.addEventListener('submit', function (e) {
+                hideExpenseError();
+                if (expenseDate && expenseDate.value && expenseDate.value > todayStr) {
+                    e.preventDefault();
+                    showExpenseError('Taariikhda mustaqbalka ah lama dooran karo — dooro maanta ama wax ka horeeya (' + todayStr + ').');
+                }
+            });
+        }
+
+        if (expenseDate) {
+            expenseDate.addEventListener('change', function () {
+                if (expenseDate.value > todayStr) {
+                    expenseDate.value = todayStr;
+                    showExpenseError('Taariikhda mustaqbalka ah lama dooran karo — waxaa loo beddelay maanta.');
+                } else {
+                    hideExpenseError();
+                }
+            });
+        }
+    })();
+</script>
+
+{% endblock %}

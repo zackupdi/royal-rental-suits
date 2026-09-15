@@ -1,0 +1,194 @@
+{% extends "rental/base.html" %}
+{% block title %}Record Expense | Suit Luxe{% endblock %}
+{% block page_title %}Record Business Expense{% endblock %}
+
+{% block content %}
+<style>
+    .expense-filter-card {
+        background: rgba(255,255,255,0.03);
+        border: 1px solid rgba(255,255,255,0.07);
+        border-radius: 16px;
+        padding: 24px;
+        margin-bottom: 24px;
+    }
+    
+    .filter-section-title {
+        font-size: 0.85rem;
+        font-weight: 600;
+        color: #c9a84c;
+        text-transform: uppercase;
+        margin-bottom: 12px;
+        letter-spacing: 1px;
+    }
+    
+    .filter-btn-group {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+        margin-bottom: 16px;
+    }
+    
+    .filter-btn {
+        background: rgba(255,255,255,0.05);
+        border: 1px solid rgba(255,255,255,0.1);
+        color: #f0ede8;
+        padding: 8px 16px;
+        border-radius: 8px;
+        cursor: pointer;
+        font-size: 0.85rem;
+        font-weight: 500;
+        transition: all 0.2s;
+    }
+    
+    .filter-btn:hover {
+        border-color: #c9a84c;
+        color: #c9a84c;
+    }
+    
+    .filter-btn.active {
+        background: rgba(201,168,76,0.2);
+        border-color: #c9a84c;
+        color: #c9a84c;
+    }
+</style>
+
+<div class="container py-5">
+    <div class="row justify-content-center">
+        <div class="col-lg-9">
+            <!-- Expense Filters -->
+            <div class="expense-filter-card">
+                <h5 style="color: #f0ede8; margin-bottom: 20px;">
+                    <i class="fa-solid fa-filter"></i> Filter Expenses (Optional)
+                </h5>
+                
+                <!-- Period Filter -->
+                <div class="mb-4">
+                    <div class="filter-section-title">Time Period</div>
+                    <div class="filter-btn-group">
+                        <button type="button" class="filter-btn active" onclick="setExpensePeriod('today', this)">Today</button>
+                        <button type="button" class="filter-btn" onclick="setExpensePeriod('week', this)">This Week</button>
+                        <button type="button" class="filter-btn" onclick="setExpensePeriod('month', this)">This Month</button>
+                        <button type="button" class="filter-btn" onclick="setExpensePeriod('custom', this)">Custom Range</button>
+                    </div>
+                </div>
+                
+                <!-- Date Range for 12th-25th -->
+                <div class="mb-4">
+                    <div class="filter-section-title">Month Range (12th-25th)</div>
+                    <div class="filter-btn-group">
+                        <button type="button" class="filter-btn" onclick="setMonthRange('current', this)">Current Month</button>
+                        <button type="button" class="filter-btn" onclick="setMonthRange('last', this)">Last Month</button>
+                        <button type="button" class="filter-btn" onclick="setMonthRange('custom', this)">Custom Month</button>
+                    </div>
+                </div>
+                
+                <!-- Display Filters -->
+                <div id="selectedFilters" style="background: rgba(201,168,76,0.1); border: 1px solid rgba(201,168,76,0.3); border-radius: 8px; padding: 12px; font-size: 0.85rem; color: #f0ede8;"></div>
+            </div>
+            
+            <!-- Main Expense Form -->
+            <div class="card p-4" style="background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.08); border-radius: 22px;">
+                <div class="mb-4">
+                    <h3 class="mb-1" style="color:#f0ede8;">Record a New Expense</h3>
+                    <p class="text-muted" style="font-size:0.92rem;">Enter the expense amount, date, and a short description so it appears in the business reports.</p>
+                </div>
+
+                <form method="post" action="{% url 'add_expense' %}">
+                    {% csrf_token %}
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label text-white">Amount ($)</label>
+                            <input type="number" step="0.01" min="0.01" name="amount" class="form-control" placeholder="e.g. 45.00" required>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label text-white">Category</label>
+                            <select name="category" class="form-select" required>
+                                <option value="Operations">Operations</option>
+                                <option value="Cleaning">Cleaning</option>
+                                <option value="Maintenance">Maintenance</option>
+                                <option value="Transportation">Transportation</option>
+                                <option value="Other" selected>Other</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label text-white">Date</label>
+                        <input type="date" name="date" class="form-control" id="expenseDate" value="{{ now|date:'Y-m-d' }}" max="{{ now|date:'Y-m-d' }}" required>
+                        <small class="form-text text-muted">Only dates from today backwards are allowed</small>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label text-white">Expense Description</label>
+                        <textarea name="description" class="form-control" rows="4" placeholder="e.g. Dry cleaning tuxedo after wedding" required></textarea>
+                    </div>
+                    
+                    <div class="d-flex gap-2">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fa-solid fa-floppy-disk me-2"></i> Save Expense
+                        </button>
+                        <a href="{% url 'reports' %}" class="btn btn-outline-light">
+                            <i class="fa-solid fa-arrow-left me-2"></i> Back to Reports
+                        </a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    function setExpensePeriod(period, btn) {
+        const today = new Date();
+        const dateInput = document.getElementById('expenseDate');
+        let displayText = '';
+        
+        document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        
+        if (period === 'today') {
+            dateInput.value = today.toISOString().split('T')[0];
+            displayText = 'Expense: Today (' + today.toLocaleDateString() + ')';
+        } else if (period === 'week') {
+            const weekAgo = new Date(today.getTime() - 7*24*60*60*1000);
+            displayText = 'Expense Period: Last 7 days (' + weekAgo.toLocaleDateString() + ' - ' + today.toLocaleDateString() + ')';
+        } else if (period === 'month') {
+            const monthAgo = new Date(today.getTime() - 30*24*60*60*1000);
+            displayText = 'Expense Period: Last 30 days (' + monthAgo.toLocaleDateString() + ' - ' + today.toLocaleDateString() + ')';
+        } else if (period === 'custom') {
+            displayText = 'Custom date range selected - Pick any date up to today';
+        }
+        
+        document.getElementById('selectedFilters').textContent = displayText || 'No filter selected';
+    }
+    
+    function setMonthRange(range, btn) {
+        const today = new Date();
+        let startDate, endDate;
+        let displayText = '';
+        
+        document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        
+        if (range === 'current') {
+            startDate = new Date(today.getFullYear(), today.getMonth(), 12);
+            endDate = new Date(today.getFullYear(), today.getMonth(), 25);
+            displayText = 'Current Month Range: 12th - 25th (' + startDate.toLocaleDateString() + ' - ' + endDate.toLocaleDateString() + ')';
+        } else if (range === 'last') {
+            startDate = new Date(today.getFullYear(), today.getMonth() - 1, 12);
+            endDate = new Date(today.getFullYear(), today.getMonth() - 1, 25);
+            displayText = 'Last Month Range: 12th - 25th (' + startDate.toLocaleDateString() + ' - ' + endDate.toLocaleDateString() + ')';
+        } else if (range === 'custom') {
+            displayText = 'Custom month range - Enter date between 12th-25th of any month';
+        }
+        
+        document.getElementById('selectedFilters').textContent = displayText;
+    }
+    
+    // Set default message on load
+    window.addEventListener('load', function() {
+        document.getElementById('selectedFilters').textContent = 'Expense: Today (' + new Date().toLocaleDateString() + ')';
+    });
+</script>
+
+{% endblock %}

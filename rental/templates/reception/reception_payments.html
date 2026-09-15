@@ -1,0 +1,581 @@
+{% extends "rental/base_admin.html" %}
+{% block title %}Payments | Suit Rental{% endblock %}
+{% block page_title %}Payments{% endblock %}
+
+{% block content %}
+<style>
+  :root {
+    --gold: #c9a84c;
+    --gold-light: #e8c96a;
+    --gold-dim: rgba(201,168,76,0.10);
+    --surface: #000000;
+    --border: rgba(255,255,255,0.06);
+    --border-soft: rgba(255,255,255,0.04);
+    --text-main: #e8e6e1;
+    --text-muted: rgba(232,230,225,0.5);
+    --text-faint: rgba(232,230,225,0.32);
+    --success: #4caf82;
+    --danger: #e05c5c;
+    --warning: #e0a040;
+    --info: #6ab0e8;
+    --radius: 14px;
+    --radius-sm: 10px;
+  }
+
+  .payments-shell { padding: 0; }
+
+  .pay-container { max-width: 1360px; margin: 0 auto; }
+
+  /* ══ SECTION LABEL ══ */
+  .section-label {
+    display: flex; align-items: center; gap: 9px;
+    font-size: 0.66rem; letter-spacing: 2px; text-transform: uppercase;
+    color: var(--gold); font-weight: 700; margin: 0 0 14px;
+  }
+  .section-label::after { content:''; flex:1; height:1px; background: linear-gradient(90deg, rgba(201,168,76,0.22), transparent); }
+
+  /* ══ STAT CARDS ══ */
+  .stat-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 20px 22px;
+    position: relative;
+    overflow: hidden;
+    transition: all 0.25s ease;
+    height: 100%;
+  }
+  .stat-card::before { content:''; position:absolute; inset:0 0 auto 0; height:2px; background: var(--card-accent, var(--gold)); }
+  .stat-card:hover { transform: translateY(-2px); border-color: var(--card-accent, var(--gold)); box-shadow: 0 12px 28px rgba(0,0,0,0.3); }
+  .stat-label { font-size: 0.63rem; text-transform: uppercase; letter-spacing: 1.4px; color: var(--text-muted); font-weight: 700; margin-bottom: 7px; }
+  .stat-value { font-family: 'Cormorant Garamond', serif; font-size: 2rem; font-weight: 600; line-height: 1; margin-bottom: 5px; color: var(--text-main); }
+  .stat-sub { font-size: 0.7rem; color: var(--text-faint); }
+
+  /* ══ PANEL ══ */
+  .panel-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 22px;
+    margin-bottom: 22px;
+  }
+
+  .panel-header {
+    display: flex; justify-content: space-between; align-items: flex-start;
+    flex-wrap: wrap; gap: 12px; margin-bottom: 18px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid var(--border-soft);
+  }
+
+  .panel-header h4 {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 1.12rem; font-weight: 600;
+    color: var(--text-main); margin: 0;
+    display: flex; align-items: center; gap: 9px;
+  }
+  .panel-header h4 i { color: var(--gold); font-size: 1rem; }
+  .panel-header p { color: var(--text-faint); font-size: 0.76rem; margin: 4px 0 0; }
+
+  .live-tag {
+    display: inline-flex; align-items: center; gap: 6px;
+    background: var(--gold-dim);
+    border: 1px solid rgba(201,168,76,0.16);
+    color: var(--gold-light);
+    padding: 5px 13px;
+    border-radius: 20px;
+    font-size: 0.7rem; font-weight: 600;
+    white-space: nowrap;
+  }
+  .live-tag .dot {
+    width: 6px; height: 6px; border-radius: 50%;
+    background: var(--success);
+    box-shadow: 0 0 0 3px rgba(76,175,130,0.2);
+    animation: pulse 1.6s infinite;
+  }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+
+  /* ══ FILTER BAR ══ */
+  .filter-bar { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 4px; }
+  .filter-bar input, .filter-bar select {
+    background: rgba(255,255,255,0.04);
+    border: 1px solid var(--border);
+    color: var(--text-main);
+    padding: 9px 13px;
+    border-radius: 9px;
+    font-size: 0.83rem;
+    min-width: 150px;
+    transition: border-color 0.2s;
+  }
+  .filter-bar input:focus, .filter-bar select:focus { outline: none; border-color: var(--gold); }
+  .filter-bar select option { background: #181828; }
+
+  .btn-export {
+    background: linear-gradient(135deg, var(--gold), var(--gold-light));
+    color: #0c0c14; border: none;
+    padding: 9px 18px; border-radius: 9px;
+    font-size: 0.83rem; font-weight: 700;
+    display: inline-flex; align-items: center; gap: 7px;
+    text-decoration: none; transition: 0.2s;
+  }
+  .btn-export:hover { transform: translateY(-2px); box-shadow: 0 6px 18px rgba(201,168,76,0.3); color: #0c0c14; text-decoration: none; }
+
+  /* ══ TABLE ══ */
+  .table-card { overflow-x: auto; }
+  .rep-table { width: 100%; border-collapse: separate; border-spacing: 0 5px; }
+  .rep-table thead th {
+    color: var(--text-faint); font-size: 0.64rem; text-transform: uppercase;
+    letter-spacing: 1.3px; font-weight: 700; padding: 8px 12px; text-align: left; white-space: nowrap;
+  }
+  .rep-table tbody tr { background: rgba(255,255,255,0.018); transition: background 0.2s; }
+  .rep-table tbody tr:hover { background: var(--gold-dim); }
+  .rep-table tbody td { padding: 11px 12px; color: var(--text-main); font-size: 0.83rem; vertical-align: middle; }
+  .rep-table tbody td:first-child { border-radius: 8px 0 0 8px; }
+  .rep-table tbody td:last-child { border-radius: 0 8px 8px 0; }
+
+  .badge { display: inline-flex; align-items: center; gap: 6px; padding: 4px 11px; border-radius: 999px; font-size: 0.7rem; font-weight: 700; white-space: nowrap; }
+  .badge-paid    { background: rgba(76,175,130,0.13); color: var(--success); border: 1px solid rgba(76,175,130,0.28); }
+  .badge-partial { background: rgba(224,160,64,0.13); color: var(--warning); border: 1px solid rgba(224,160,64,0.28); }
+  .badge-unpaid  { background: rgba(224,92,92,0.13); color: var(--danger); border: 1px solid rgba(224,92,92,0.28); }
+
+  .method-badge { display: inline-flex; align-items: center; gap: 5px; padding: 4px 10px; border-radius: 999px; font-size: 0.7rem; font-weight: 700; white-space: nowrap; }
+  .method-cash  { background: rgba(76,175,130,0.12); color: var(--success); }
+  .method-zaad  { background: rgba(106,176,232,0.12); color: var(--info); }
+  .method-sahal { background: rgba(156,106,200,0.12); color: #9c6ac8; }
+  .method-bank  { background: rgba(224,160,64,0.12); color: var(--warning); }
+
+  .action-group { display: flex; gap: 6px; justify-content: flex-end; }
+  .action-btn {
+    border: 1px solid var(--border); background: rgba(255,255,255,0.03);
+    color: var(--text-main); border-radius: 8px; padding: 7px 11px;
+    font-size: 0.76rem; display: inline-flex; align-items: center; gap: 6px;
+    text-decoration: none; transition: all 0.2s; cursor: pointer;
+  }
+  .action-btn:hover { background: var(--gold-dim); color: var(--gold-light); border-color: rgba(201,168,76,0.25); text-decoration: none; }
+
+  .empty-row { text-align: center; padding: 40px 20px !important; color: var(--text-faint); }
+
+  /* ══ MARK-PAID MODAL — REDESIGN ══ */
+  .mp-modal .modal-content {
+    background: #14141f;
+    border: 1px solid rgba(201,168,76,0.2);
+    border-radius: 18px;
+    color: var(--text-main);
+    box-shadow: 0 24px 60px rgba(0,0,0,0.55);
+    overflow: hidden;
+  }
+  .mp-head {
+    padding: 20px 24px;
+    background: linear-gradient(135deg, rgba(76,175,130,0.1), rgba(76,175,130,0.02));
+    border-bottom: 1px solid var(--border-soft);
+  }
+  .mp-head h5 {
+    font-family: 'Cormorant Garamond', serif; font-size: 1.3rem;
+    color: var(--gold-light); margin: 0;
+    display: flex; align-items: center; gap: 10px;
+  }
+  .mp-summary {
+    display: flex; justify-content: space-between; align-items: center;
+    background: rgba(255,255,255,0.03);
+    border: 1px solid var(--border-soft);
+    border-radius: 12px;
+    padding: 14px 16px;
+    margin: 20px 24px 4px;
+  }
+  .mp-summary .mp-cust { font-weight: 700; color: var(--text-main); font-size: 0.9rem; }
+  .mp-summary .mp-suit { color: var(--gold); font-size: 0.78rem; margin-top: 2px; }
+  .mp-summary .mp-balance-label { font-size: 0.62rem; text-transform: uppercase; letter-spacing: 1.2px; color: var(--text-faint); text-align: right; }
+  .mp-summary .mp-balance-val { font-family: 'Cormorant Garamond', serif; font-size: 1.5rem; font-weight: 700; color: var(--warning); text-align: right; }
+
+  .mp-body { padding: 20px 24px; }
+  .mp-group { margin-bottom: 16px; }
+  .mp-group:last-child { margin-bottom: 0; }
+  .mp-label {
+    display: block; font-size: 0.7rem; text-transform: uppercase; letter-spacing: 1.2px;
+    color: var(--text-muted); font-weight: 700; margin-bottom: 7px;
+  }
+  .mp-input {
+    width: 100%; background: rgba(255,255,255,0.04);
+    border: 1px solid var(--border); border-radius: 9px;
+    padding: 11px 14px; color: var(--text-main); font-size: 0.92rem;
+    transition: 0.2s;
+  }
+  .mp-input:focus { outline: none; border-color: var(--gold); box-shadow: 0 0 0 3px rgba(201,168,76,0.1); }
+  .mp-input option { background: #181828; }
+
+  .mp-quick-row { display: flex; gap: 8px; margin-top: 9px; }
+  .mp-quick-btn {
+    flex: 1; background: rgba(201,168,76,0.08); border: 1px solid rgba(201,168,76,0.2);
+    color: var(--gold-light); font-size: 0.72rem; font-weight: 700;
+    padding: 7px 6px; border-radius: 8px; cursor: pointer; transition: 0.2s;
+  }
+  .mp-quick-btn:hover { background: rgba(201,168,76,0.18); }
+  .mp-quick-btn.full { background: rgba(76,175,130,0.1); border-color: rgba(76,175,130,0.25); color: var(--success); }
+  .mp-quick-btn.full:hover { background: rgba(76,175,130,0.2); }
+
+  .mp-footer { padding: 16px 24px; border-top: 1px solid var(--border-soft); display: flex; justify-content: flex-end; gap: 10px; background: rgba(0,0,0,0.15); }
+  .mp-btn-cancel { background: rgba(255,255,255,0.04); border: 1px solid var(--border); color: var(--text-muted); font-weight: 600; font-size: 0.83rem; padding: 9px 20px; border-radius: 99px; cursor: pointer; }
+  .mp-btn-cancel:hover { background: rgba(255,255,255,0.08); color: var(--text-main); }
+  .mp-btn-save { background: linear-gradient(135deg, var(--gold), var(--gold-light)); color: #0c0c14; font-weight: 700; font-size: 0.83rem; padding: 9px 22px; border-radius: 9px; border: none; display: inline-flex; align-items: center; gap: 8px; cursor: pointer; }
+  .mp-btn-save:hover { box-shadow: 0 6px 18px rgba(201,168,76,0.3); }
+  /* Receipt modal tweaks */
+  .receipt-modal .modal-content { background: transparent; border: none; box-shadow: none; }
+  .receipt-paper { max-width: 420px; margin: 18px auto; background: #fff; border-radius: 12px; padding: 18px; color: #111827; }
+  .damage-notes { max-height: 120px; overflow: auto; padding: 8px; border-radius: 8px; background: #f8fafc; border:1px solid rgba(148,163,184,0.08); }
+</style>
+
+<div class="payments-shell">
+  <div class="pay-container">
+
+    <!-- ══ TOP STATS ══ -->
+    <div class="row g-3 mb-4">
+      <div class="col-12 col-md-6 col-xl-3">
+        <div class="stat-card" style="--card-accent:#c9a84c;">
+          <div class="stat-label">Total Payments</div>
+          <div class="stat-value">{{ payment_count }}</div>
+          <div class="stat-sub">Processed invoices</div>
+        </div>
+      </div>
+      <div class="col-12 col-md-6 col-xl-3">
+        <div class="stat-card" style="--card-accent:#4caf82;">
+          <div class="stat-label">Revenue</div>
+          <div class="stat-value">${{ total_revenue|floatformat:2 }}</div>
+          <div class="stat-sub">Collected from rentals</div>
+        </div>
+      </div>
+      <div class="col-12 col-md-6 col-xl-3">
+        <div class="stat-card" style="--card-accent:#e05c5c;">
+          <div class="stat-label">Expenses</div>
+          <div class="stat-value">${{ total_expenses|floatformat:2 }}</div>
+          <div class="stat-sub">Operational costs logged</div>
+        </div>
+      </div>
+      <div class="col-12 col-md-6 col-xl-3">
+        <div class="stat-card" style="--card-accent:#6ab0e8;">
+          <div class="stat-label">Net Revenue</div>
+          <div class="stat-value">${{ net_revenue|floatformat:2 }}</div>
+          <div class="stat-sub">Profit after expenses</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══ DAILY WORK LEDGER ══ -->
+    <div class="panel-card">
+      <div class="panel-header">
+        <div>
+          <h4><i class="fa-solid fa-calendar-days"></i> Daily Work — Payments Ledger</h4>
+          <p>Live summary of everything processed by the reception desk.</p>
+        </div>
+        <div class="d-flex flex-wrap gap-2 align-items-center">
+          <span class="live-tag"><span class="dot"></span> Live database</span>
+          <a href="{% url 'export_payments' %}" class="btn-export">
+            <i class="fa-solid fa-download"></i> Export CSV
+          </a>
+        </div>
+      </div>
+
+      <!-- Filter Bar -->
+      <form method="get" class="filter-bar" id="ledgerFilterForm">
+        <input type="text" name="search" value="{{ request.GET.search|default:'' }}" placeholder="Search customer / receipt / suit" />
+        <select name="status">
+          <option value="">All statuses</option>
+          <option value="paid" {% if request.GET.status == 'paid' %}selected{% endif %}>Paid</option>
+          <option value="partial" {% if request.GET.status == 'partial' %}selected{% endif %}>Partial</option>
+          <option value="refunded" {% if request.GET.status == 'refunded' %}selected{% endif %}>Refunded</option>
+        </select>
+        <select name="method">
+          <option value="">All methods</option>
+          <option value="cash" {% if request.GET.method == 'cash' %}selected{% endif %}>Cash</option>
+          <option value="zaad" {% if request.GET.method == 'zaad' %}selected{% endif %}>Zaad</option>
+          <option value="sahal" {% if request.GET.method == 'sahal' %}selected{% endif %}>Sahal</option>
+          <option value="bank" {% if request.GET.method == 'bank' %}selected{% endif %}>Bank</option>
+        </select>
+        <button type="submit" class="btn-export" style="background:rgba(255,255,255,0.05);color:var(--text-main);border:1px solid var(--border);">
+          <i class="fa-solid fa-filter"></i> Apply
+        </button>
+      </form>
+    </div>
+       
+    <!-- ══ PARTIAL PAYMENTS (RECONCILIATION) ══ -->
+    <div class="panel-card">
+      <div class="panel-header">
+        <div>
+          <h4><i class="fa-solid fa-triangle-exclamation" style="color:var(--warning)"></i> Partial Payments</h4>
+          <p>Balances still owed — reconcile these before end of shift.</p>
+        </div>
+      </div>
+
+      <div class="table-card">
+        <table class="rep-table">
+          <thead>
+            <tr>
+              <th>Receipt</th>
+              <th>Customer</th>
+              <th>Total</th>
+              <th>Paid</th>
+              <th>Balance</th>
+              <th class="text-end">Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for p in payments %}
+              {% if p.status == 'partial' and p.balance_due > 0 %}
+                <tr>
+                  <td><strong>{{ p.receipt_number|default:'RCPT' }}</strong></td>
+                  <td>{{ p.customer_name }}<br><small class="text-muted">{{ p.phone }}</small></td>
+                  <td>${{ p.rental.total_amount|floatformat:2 }}</td>
+                  <td>${{ p.amount_paid|floatformat:2 }}</td>
+                  <td style="color:var(--warning); font-weight:700;">${{ p.balance_due|floatformat:2 }}</td>
+                  <td class="text-end">
+                    <button type="button" class="action-btn" data-bs-toggle="modal" data-bs-target="#markPaidModal{{ p.id }}">
+                      <i class="fa-solid fa-circle-check"></i> Mark Paid
+                    </button>
+                  </td>
+                </tr>
+              {% endif %}
+            {% empty %}
+              <tr><td colspan="6" class="empty-row">No partial payments found.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ══ FULL LEDGER TABLE ══ -->
+    <div class="panel-card">
+      <div class="panel-header">
+        <div>
+          <h4><i class="fa-solid fa-list-ul"></i> Full Payment Ledger</h4>
+          <p>Every transaction, filtered by the search bar above.</p>
+        </div>
+      </div>
+      <div class="table-card">
+        <table class="rep-table">
+          <thead>
+            <tr>
+              <th>Receipt</th>
+              <th>Customer</th>
+              <th>Suit</th>
+              <th>Cashier</th>
+              <th>Status</th>
+              <th>Total Due</th>
+              <th>Paid</th>
+              <th>Method</th>
+              <th>Payment Date</th>
+              <th class="text-end">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for payment in payments %}
+              {% with search_query=request.GET.search|default:'' status_query=request.GET.status|default:'' method_query=request.GET.method|default:'' %}
+                {% if not search_query or search_query|lower in payment.customer_name|lower or search_query|lower in payment.receipt_number|lower or search_query|lower in payment.suit_name|lower or search_query|lower in payment.phone|lower %}
+                  {% if not status_query or payment.status == status_query %}
+                    {% if not method_query or payment.payment_method == method_query %}
+                      {% if payment.balance_due > 0 %}
+                      <tr>
+                        <td><strong>{{ payment.receipt_number|default:"RCPT" }}</strong></td>
+                        <td>
+                          <div>{{ payment.customer_name }}</div>
+                          <small class="text-muted">{{ payment.phone }}</small>
+                        </td>
+                        <td>{{ payment.suit_name }}</td>
+                        <td>{{ payment.cashier.username|default:"-" }}</td>
+                        <td>
+                          {% if payment.status == 'paid' %}
+                            <span class="badge badge-paid"><i class="fa-solid fa-circle-check"></i> Paid</span>
+                          {% elif payment.status == 'partial' %}
+                            <span class="badge badge-partial"><i class="fa-solid fa-hourglass-half"></i> Partial</span>
+                          {% else %}
+                            <span class="badge badge-unpaid"><i class="fa-solid fa-circle-exclamation"></i> {{ payment.status|title }}</span>
+                          {% endif %}
+                        </td>
+                        <td>${{ payment.rental.total_amount|floatformat:2 }}</td>
+                        <td>${{ payment.amount_paid|floatformat:2 }}</td>
+                        <td>
+                          {% if payment.payment_method %}
+                            <span class="method-badge method-{{ payment.payment_method|lower }}">{{ payment.payment_method|title }}</span>
+                          {% else %}
+                            <span class="text-muted">-</span>
+                          {% endif %}
+                        </td>
+                        <td>{{ payment.payment_date|date:'M d, Y' }}</td>
+                        <td>
+                          <div class="action-group">
+                            <a href="{% url 'reception_recept_sheet' payment.rental.id %}" target="_blank" class="action-btn" style="margin-left:6px;">
+                              <i class="fa-solid fa-file-lines"></i> Receipt Sheet
+                            </a>
+                            {% if payment.status != 'paid' %}
+                              <button type="button" class="action-btn" data-bs-toggle="modal" data-bs-target="#markPaidModal{{ payment.id }}">
+                                <i class="fa-solid fa-circle-check"></i> Mark Paid
+                              </button>
+                            {% endif %}
+                          </div>
+                        </td>
+                      </tr>
+                      {% endif %}
+                    {% endif %}
+                  {% endif %}
+                {% endif %}
+              {% endwith %}
+            {% empty %}
+              <tr><td colspan="10" class="empty-row">No payment activity found.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ══ ALL MODALS ══ -->
+{% for payment in payments %}
+
+<!-- ══ MARK PAID MODAL ══ -->
+<div class="modal fade mp-modal" id="markPaidModal{{ payment.id }}" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="mp-head">
+        <h5><i class="fa-solid fa-circle-check" style="color:#4caf82;"></i> Record Rental Payment</h5>
+      </div>
+
+      <div class="mp-summary">
+        <div>
+          <div class="mp-cust">{{ payment.customer_name }}</div>
+          <div class="mp-suit"><i class="fa-solid fa-shirt"></i> {{ payment.suit_name }}</div>
+        </div>
+        <div>
+          <div class="mp-balance-label">Balance Due</div>
+          <div class="mp-balance-val">${{ payment.balance_due|floatformat:2 }}</div>
+        </div>
+      </div>
+
+      <form method="post" action="{% url 'mark_payment_as_paid' payment.id %}">
+        {% csrf_token %}
+        <div class="mp-body">
+
+          <div class="mp-group">
+            <label class="mp-label">Amount to Pay ($)</label>
+            <input type="number" step="0.01" min="0.01" name="amount" id="mpAmount{{ payment.id }}" class="mp-input" value="{{ payment.balance_due|default:0 }}" required>
+            <div class="mp-quick-row">
+              <button type="button" class="mp-quick-btn" data-payment-id="{{ payment.id }}" data-balance="{{ payment.balance_due|default:0 }}" onclick="setMpAmountFromButton(this, 0.25)">25%</button>
+              <button type="button" class="mp-quick-btn" data-payment-id="{{ payment.id }}" data-balance="{{ payment.balance_due|default:0 }}" onclick="setMpAmountFromButton(this, 0.5)">50%</button>
+              <button type="button" class="mp-quick-btn" data-payment-id="{{ payment.id }}" data-balance="{{ payment.balance_due|default:0 }}" onclick="setMpAmountFromButton(this, 0.75)">75%</button>
+              <button type="button" class="mp-quick-btn" data-payment-id="{{ payment.id }}" data-balance="{{ payment.balance_due|default:0 }}" onclick="setMpAmountFromButton(this, 1)">Full</button>
+            </div>
+          </div>
+
+          <div class="row g-2">
+            <div class="col-12 mp-group">
+              <label class="mp-label">Method</label>
+              <select name="payment_method" class="mp-input">
+                <option value="cash" {% if payment.payment_method == 'cash' %}selected{% endif %}>Cash</option>
+                <option value="zaad" {% if payment.payment_method == 'zaad' %}selected{% endif %}>Zaad</option>
+                <option value="sahal" {% if payment.payment_method == 'sahal' %}selected{% endif %}>Sahal</option>
+                <option value="bank" {% if payment.payment_method == 'bank' %}selected{% endif %}>Bank</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="mp-group">
+            <label class="mp-label">Recorded By (Reception/Cashier)</label>
+            <input type="text" name="cashier_name" class="mp-input" value="{{ request.user.username }}" placeholder="Cashier name">
+          </div>
+
+        </div>
+        <div class="mp-footer">
+          <button type="button" class="mp-btn-cancel" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="mp-btn-save"><i class="fa-solid fa-save"></i> Save Payment</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+{% endfor %}
+
+  <!-- Per-payment Receipt Modals -->
+  {% for payment in payments %}
+  <div class="modal fade receipt-modal" id="receiptModal{{ payment.id }}" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content">
+        <div class="receipt-paper">
+          <div class="receipt-header" style="margin-bottom:12px;">
+            <div>
+              <div class="brand-title">Suit Rental</div>
+              <div class="brand-meta">123 Main Street, City<br>Phone: +252 61 234 5678</div>
+            </div>
+            <div class="receipt-meta">
+              <div><strong>Receipt No:</strong> {{ payment.receipt_number|default:'RCPT-'|add:payment.id }}</div>
+              <div><strong>Date:</strong> {{ payment.payment_date|date:'d/m/Y H:i' }}</div>
+              <div><strong>Reception:</strong> {{ payment.cashier.username|default:request.user.username }}</div>
+            </div>
+          </div>
+
+          <div class="receipt-block">
+            <h5 class="section-title">Customer</h5>
+            <div class="receipt-detail-item"><span class="receipt-detail-label">Name:</span> {{ payment.customer_name }}</div>
+            <div class="receipt-detail-item"><span class="receipt-detail-label">Phone:</span> {{ payment.phone }}</div>
+          </div>
+
+          <div class="receipt-block">
+            <h5 class="section-title">Suit Details</h5>
+            <div class="receipt-detail-item"><span class="receipt-detail-label">Suit Name:</span> {{ payment.suit_name }}</div>
+            <div class="receipt-detail-item"><span class="receipt-detail-label">Days:</span> {{ payment.rental.days_requested|default:'-' }}</div>
+            {% if payment.rental.rental_start_time %}
+            <div class="receipt-detail-item"><span class="receipt-detail-label">Rental Date:</span> {{ payment.rental.rental_start_time|date:'d/m/Y H:i' }}</div>
+            {% endif %}
+            {% if payment.rental.end_time %}
+            <div class="receipt-detail-item"><span class="receipt-detail-label">Return Date:</span> {{ payment.rental.end_time|date:'d/m/Y H:i' }}</div>
+            {% endif %}
+          </div>
+
+          <div class="receipt-block">
+            <h5 class="section-title">Price</h5>
+            <div class="receipt-detail-item"><span class="receipt-detail-label">Rental Price:</span> {{ payment.rental.total_amount|floatformat:2 }} USD</div>
+          </div>
+
+          <div class="amount-grid">
+            <div class="amount-row"><span>Paid Now</span><strong>{{ payment.amount_paid|floatformat:2 }} USD</strong></div>
+            <div class="amount-row"><span>Remaining Balance</span><strong>{{ payment.balance_due|floatformat:2 }} USD</strong></div>
+            <div class="amount-total"><span>Total Amount</span><span>{{ payment.rental.total_amount|floatformat:2 }} USD</span></div>
+          </div>
+
+          <div class="receipt-block">
+            <h5 class="section-title">Payment</h5>
+            <div class="receipt-detail-item"><span class="receipt-detail-label">Method:</span> {{ payment.payment_method|default:'Cash' }}</div>
+            <div class="receipt-detail-item"><span class="receipt-detail-label">Status:</span> {{ payment.status|title }}</div>
+          </div>
+
+          <div class="receipt-block">
+            <h5 class="section-title">Damage / Notes</h5>
+            <div class="damage-notes">{{ payment.rental.damage_notes|default:payment.rental.notes|default:'No notes recorded.' }}</div>
+          </div>
+
+          <div style="text-align:center; margin-top:12px; font-size:0.9rem; color:#334155;">Thank you for choosing Suit Rental.</div>
+
+          <div class="receipt-actions no-print" style="margin-top:14px; display:flex; justify-content:flex-end; gap:8px;">
+            <button class="btn btn-dark" onclick="(function(){window.print();})();"><i class="fa-solid fa-print me-2"></i>Print</button>
+            <button class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  {% endfor %}
+
+<script>
+  function setMpAmount(paymentId, balance, fraction) {
+    const input = document.getElementById('mpAmount' + paymentId);
+    if (!input) return;
+    const value = (parseFloat(balance) * fraction).toFixed(2);
+    input.value = value;
+  }
+
+  function setMpAmountFromButton(button, fraction) {
+    const paymentId = button.dataset.paymentId;
+    const balance = button.dataset.balance;
+    setMpAmount(paymentId, balance, fraction);
+  }
+</script>
+
+{% endblock %}

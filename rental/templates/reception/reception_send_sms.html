@@ -1,0 +1,22 @@
+{% extends "rental/base_admin.html" %}
+{% block title %}Send SMS | Reception{% endblock %}
+{% block page_title %}Send SMS to Customer{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+  <div class="card p-4">
+    <h4>Send SMS to {{ req.name }} ({{ req.phone }})</h4>
+    <form method="post">
+      {% csrf_token %}
+      <div class="mb-3">
+        <label class="form-label">Message</label>
+        <textarea name="message" class="form-control" rows="5">{{ default_message }}</textarea>
+      </div>
+      <div>
+        <button class="btn btn-primary">Send SMS</button>
+        <a href="{% url 'customer_detail' req.name %}" class="btn btn-secondary ms-2">Back</a>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

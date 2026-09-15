@@ -1,0 +1,13 @@
+{% extends "rental/base_admin.html" %}
+{% block title %}Confirm Delete Suit{% endblock %}
+{% block content %}
+<div class="container-fluid">
+  <h1>Confirm Delete Suit</h1>
+  <p>Are you sure you want to delete {{ suit.suit_name }}?</p>
+  <form method="post">
+    {% csrf_token %}
+    <button type="submit" class="btn btn-danger">Delete Suit</button>
+    <a href="{% url 'reception_inventory' %}" class="btn btn-secondary">Cancel</a>
+  </form>
+</div>
+{% endblock %}
