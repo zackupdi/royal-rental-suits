@@ -11,6 +11,7 @@ https://docs.djangoproject.com/en/5.1/ref/settings/
 """
 
 from pathlib import Path
+import os
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -45,6 +46,8 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
 
     'rental',
+    'cloudinary',
+    'cloudinary_storage',
 ]
 LOGIN_URL = '/admin-login/'
 SESSION_EXPIRE_AT_BROWSER_CLOSE = True
@@ -138,6 +141,15 @@ STATIC_ROOT = BASE_DIR / 'staticfiles'
 
 MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
+
+# Use Cloudinary for media file storage when credentials are provided via env
+DEFAULT_FILE_STORAGE = "cloudinary_storage.storage.MediaCloudinaryStorage"
+
+CLOUDINARY_STORAGE = {
+    "CLOUD_NAME": os.environ.get("CLOUDINARY_CLOUD_NAME"),
+    "API_KEY": os.environ.get("CLOUDINARY_API_KEY"),
+    "API_SECRET": os.environ.get("CLOUDINARY_API_SECRET"),
+}
 
 # Email settings - Gmail SMTP Configuration (Temporary: Using Console Backend for testing)
 EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'  # Shows emails in console
