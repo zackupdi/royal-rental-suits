@@ -151,6 +151,16 @@ CLOUDINARY_STORAGE = {
     "API_SECRET": os.environ.get("CLOUDINARY_API_SECRET"),
 }
 
+# Configure Django storages backends: media -> Cloudinary, static files -> local staticfiles
+STORAGES = {
+    "default": {
+        "BACKEND": "cloudinary_storage.storage.MediaCloudinaryStorage",
+    },
+    "staticfiles": {
+        "BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage",
+    },
+}
+
 # Email settings - Gmail SMTP Configuration (Temporary: Using Console Backend for testing)
 EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'  # Shows emails in console
 EMAIL_HOST = 'smtp.gmail.com'
