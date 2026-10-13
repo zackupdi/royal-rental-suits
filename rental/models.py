@@ -1,12 +1,16 @@
 from django.db import models
-from django.db.models import Sum
+from django.db import transaction
+from django.db.models import Q, Sum
+from django.db.models.signals import post_save
+from django.dispatch import receiver
 from django.utils import timezone
 from django.contrib.auth.models import User
+from django.core.exceptions import ValidationError
 from datetime import timedelta
 from math import ceil
 import datetime
 from django.core.validators import MinValueValidator, MaxValueValidator
-from decimal import Decimal
+from decimal import Decimal, ROUND_HALF_UP
 
 
 class Suit(models.Model):
@@ -126,7 +130,14 @@ class Suit(models.Model):
 
     @property
     def available_quantity(self):
-        return self.quantity
+        return max(self.quantity - self.held_quantity, 0)
+
+    @property
+    def held_quantity(self):
+        held = self.suitrequest_set.filter(status="Reserved").filter(
+            Q(due_date__isnull=True) | Q(due_date__gt=timezone.now())
+        ).aggregate(total=Sum("quantity_requested"))["total"]
+        return held or 0
 
     @property
     def next_available_time(self):
@@ -144,13 +155,7 @@ class Suit(models.Model):
 
     @property
     def is_available_for_booking(self):
-        if self.is_retired:
-            return False
-        if self.status == "Available":
-            return self.quantity > 0
-        if self.status == "Dry Cleaning":
-            return self.quantity > 1
-        return False
+        return not self.is_retired and self.available_quantity > 0
 
     def refresh_rental_end_time(self):
         active_request = self.suitrequest_set.filter(status="Active", end_time__isnull=False).order_by('end_time').first()
@@ -237,18 +242,42 @@ class ContactMessage(models.Model):
 
 class DryCleaning(models.Model):
     STATUS_CHOICES = [
-        ('pending', 'Pending Admin Review'),
+        ('pending', 'Pending Admin Approval'),
         ('approved', 'Approved by Admin'),
         ('rejected', 'Rejected by Admin'),
+        ('sent_to_laundry', 'Sent to Laundry'),
+        ('in_laundry', 'In Laundry'),
+        ('completed', 'Cleaning Completed'),
+        ('returned', 'Returned to Inventory'),
     ]
     
     suit = models.ForeignKey('Suit', on_delete=models.CASCADE, related_name='dry_cleanings')
+    rental_request = models.ForeignKey('SuitRequest', on_delete=models.SET_NULL, null=True, blank=True, related_name='dry_cleanings')
+    requested_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='dry_cleaning_requests')
+    approved_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='approved_dry_cleanings')
     amount = models.DecimalField(max_digits=10, decimal_places=2)
     paid = models.BooleanField(default=False)
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
     date = models.DateField(default=timezone.now)
     notes = models.CharField(max_length=255, blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
+    requested_at = models.DateTimeField(default=timezone.now)
+    approved_at = models.DateTimeField(null=True, blank=True)
+    sent_to_laundry_at = models.DateTimeField(null=True, blank=True)
+    completed_at = models.DateTimeField(null=True, blank=True)
+    returned_at = models.DateTimeField(null=True, blank=True)
+
+    @property
+    def requested_by_display(self):
+        if not self.requested_by:
+            return "Staff"
+        return self.requested_by.get_full_name() or self.requested_by.username
+
+    @property
+    def approved_by_display(self):
+        if not self.approved_by:
+            return "Admin"
+        return self.approved_by.get_full_name() or self.approved_by.username
 
     class Meta:
         ordering = ['-created_at']
@@ -259,6 +288,20 @@ class DryCleaning(models.Model):
 
 class SuitRequest(models.Model):
     DEFAULT_RENTAL_DURATION_MINUTES = 24 * 60
+    WORKFLOW_STATUS_CHOICES = [
+        ("request", "Codsi"),
+        ("pending", "Sugaya"),
+        ("waiting", "Hakad / Sugitaan"),
+        ("rented", "La kiraystay"),
+        ("returned", "La soo celiyay"),
+        ("completed", "Dhammaaday"),
+        ("cancelled", "La joojiyay"),
+        ("expired", "Waqtigii wuu dhacay"),
+    ]
+    BOOKING_TYPE_CHOICES = [
+        ("rental", "Kiro"),
+        ("reservation", "Boos sii qabsasho"),
+    ]
 
     user = models.ForeignKey(User, on_delete=models.CASCADE, null=True, blank=True)
     suit = models.ForeignKey(Suit, on_delete=models.CASCADE)
@@ -276,9 +319,40 @@ class SuitRequest(models.Model):
 
     request_date = models.DateTimeField(default=timezone.now)
 
+    requested_start_date = models.DateField(null=True, blank=True)
+    requested_end_date = models.DateField(null=True, blank=True)
+    booking_type = models.CharField(
+        max_length=12,
+        choices=BOOKING_TYPE_CHOICES,
+        default="rental",
+    )
+    workflow_status = models.CharField(
+        max_length=12,
+        choices=WORKFLOW_STATUS_CHOICES,
+        default="request",
+        db_index=True,
+    )
+    waiting_deadline = models.DateTimeField(null=True, blank=True)
+
     rental_start_time = models.DateTimeField(null=True, blank=True)
     end_time = models.DateTimeField(null=True, blank=True)
     return_date = models.DateTimeField(null=True, blank=True)
+    RETURN_CONDITION_CHOICES = [
+        ("good", "Good"),
+        ("damaged", "Damaged"),
+    ]
+    return_condition = models.CharField(
+        max_length=20,
+        choices=RETURN_CONDITION_CHOICES,
+        default="good",
+    )
+    returned_by = models.ForeignKey(
+        User,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="processed_rental_returns",
+    )
     total_amount = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
 
     days_requested = models.IntegerField(default=1, validators=[MinValueValidator(1), MaxValueValidator(7)])  # Allow up to 7 days
@@ -287,6 +361,7 @@ class SuitRequest(models.Model):
     due_date = models.DateTimeField(null=True, blank=True)
     quantity_requested = models.IntegerField(default=1, validators=[MinValueValidator(1), MaxValueValidator(5)])  # Allow up to 5 suits
     notes = models.TextField(blank=True, null=True)
+    rejected_reason = models.CharField(max_length=255, blank=True)
 
     @property
     def start_time(self):
@@ -379,11 +454,14 @@ class SuitRequest(models.Model):
         if overdue_seconds <= 0:
             return Decimal('0.00')
 
-        overdue_minutes = ceil(overdue_seconds / 60)
-        if overdue_minutes <= 0:
-            return Decimal('0.00')
-
-        return Decimal(overdue_minutes).quantize(Decimal('0.01'))
+        policy = RentalPolicy.get_solo()
+        overdue_hours = Decimal(overdue_seconds) / Decimal(3600)
+        if policy.partial_hour_policy == "round_up":
+            overdue_hours = Decimal(ceil(overdue_hours))
+        return (policy.late_fee_per_hour * overdue_hours).quantize(
+            Decimal("0.01"),
+            rounding=ROUND_HALF_UP,
+        )
 
     @property
     def overdue_hours(self):
@@ -414,6 +492,10 @@ class SuitRequest(models.Model):
     @property
     def late_fee(self):
         if self.status == 'Returned' and self.return_date:
+            try:
+                return self.late_fee_transaction.amount
+            except LateFeeTransaction.DoesNotExist:
+                pass
             return self._calculate_late_fee(self.return_date)
         if self.status == 'Active' and self.end_time:
             return self._calculate_late_fee(timezone.now())
@@ -458,52 +540,224 @@ class SuitRequest(models.Model):
         requested_days = self.days_requested or self.rent_days or 1
         return current_time + timedelta(days=requested_days)
 
-    def start_rental(self, start_time=None):
+    @staticmethod
+    def _reserved_quantity(
+        suit_id,
+        exclude_request_id=None,
+        requested_start_date=None,
+        requested_end_date=None,
+    ):
+        reservations = SuitRequest.objects.filter(
+            suit_id=suit_id,
+            status="Reserved",
+        ).filter(Q(due_date__isnull=True) | Q(due_date__gt=timezone.now()))
+        if requested_start_date and requested_end_date:
+            reservations = reservations.filter(
+                Q(
+                    requested_start_date__lte=requested_end_date,
+                    requested_end_date__gte=requested_start_date,
+                )
+                | Q(requested_start_date__isnull=True)
+                | Q(requested_end_date__isnull=True)
+            )
+        if exclude_request_id is not None:
+            reservations = reservations.exclude(pk=exclude_request_id)
+        return reservations.aggregate(total=Sum("quantity_requested"))["total"] or 0
+
+    def reserve_inventory(self, expires_at, performed_by=None):
+        if timezone.is_naive(expires_at):
+            expires_at = timezone.make_aware(expires_at, timezone.get_current_timezone())
+
+        with transaction.atomic():
+            rental = SuitRequest.objects.select_for_update().get(pk=self.pk)
+            if rental.status == "Reserved" and (
+                rental.due_date is None or rental.due_date > timezone.now()
+            ):
+                self.refresh_from_db()
+                return False
+            if rental.status not in {"Pending", "Approved", "Reserved"}:
+                raise ValidationError("Only pending or approved requests can reserve inventory.")
+
+            suit = Suit.objects.select_for_update().get(pk=rental.suit_id)
+            quantity = rental.quantity_requested or 0
+            requested_start_date = rental.requested_start_date or timezone.localdate()
+            requested_end_date = rental.requested_end_date or (
+                requested_start_date + timedelta(days=(rental.days_requested or 1))
+            )
+            other_reservations = self._reserved_quantity(
+                suit.pk,
+                rental.pk,
+                requested_start_date,
+                requested_end_date,
+            )
+            if quantity < 1:
+                raise ValidationError("Reservation quantity must be greater than zero.")
+            if suit.is_retired or suit.quantity - other_reservations < quantity:
+                available = max(suit.quantity - other_reservations, 0)
+                raise ValidationError(
+                    f"Only {available} unreserved units of {suit.suit_name} are currently available."
+                )
+
+            old_workflow_status = rental.workflow_status
+            rental.status = "Reserved"
+            rental.due_date = expires_at
+            rental.workflow_status = "waiting"
+            rental.waiting_deadline = expires_at
+            rental.save(update_fields=[
+                "status", "due_date", "workflow_status", "waiting_deadline",
+            ])
+            if old_workflow_status != "waiting":
+                StatusHistory.objects.create(
+                    booking=rental,
+                    old_status=old_workflow_status,
+                    new_status="waiting",
+                    changed_by=performed_by,
+                    note="Reservation hold started.",
+                )
+            record_inventory_movement(
+                suit,
+                "reserved",
+                performed_by=performed_by,
+                rental_request=rental,
+                notes=f"Reserved {quantity} unit(s) until {expires_at.isoformat()}.",
+            )
+
+            suit.status = (
+                "Available"
+                if suit.quantity - other_reservations - quantity > 0
+                else "Reserved"
+            )
+            suit.save(update_fields=["status"])
+            self.refresh_from_db()
+            return True
+
+    def start_rental(self, start_time=None, performed_by=None):
         if start_time is None:
             start_time = timezone.now()
+        if timezone.is_naive(start_time):
+            start_time = timezone.make_aware(start_time, timezone.get_current_timezone())
 
-        if self.rent_days < 1:
-            self.rent_days = self.days_requested or 1
-        if not self.approved_at:
-            self.approved_at = start_time
-        if not self.due_date:
-            self.due_date = self._default_due_date(self.approved_at)
+        with transaction.atomic():
+            rental = SuitRequest.objects.select_for_update().get(pk=self.pk)
+            if rental.status == "Active":
+                self.refresh_from_db()
+                return False
+            if rental.status not in {"Pending", "Approved", "Reserved"}:
+                raise ValidationError("Only pending, approved, or reserved rentals can be issued.")
 
-        self.rental_start_time = start_time
-        self.end_time = self.due_date or self.rental_start_time + timedelta(minutes=self.DEFAULT_RENTAL_DURATION_MINUTES)
-        self.return_date = self.end_time
-        self.status = "Active"
-        if not self.total_amount:
-            self.total_amount = self.suit.price_per_day * self.days_requested * self.quantity_requested
-        self.save()
+            suit = Suit.objects.select_for_update().get(pk=rental.suit_id)
+            quantity = rental.quantity_requested or 0
+            requested_start_date = rental.requested_start_date or timezone.localtime(start_time).date()
+            requested_end_date = rental.requested_end_date or (
+                requested_start_date + timedelta(days=(rental.days_requested or 1))
+            )
+            other_reservations = self._reserved_quantity(
+                suit.pk,
+                rental.pk,
+                requested_start_date,
+                requested_end_date,
+            )
+            if quantity < 1:
+                raise ValidationError("Rental quantity must be greater than zero.")
+            if suit.is_retired or suit.quantity - other_reservations < quantity:
+                available = max(suit.quantity - other_reservations, 0)
+                raise ValidationError(
+                    f"Only {available} unreserved units of {suit.suit_name} are currently available."
+                )
 
-        suit = self.suit
-        suit.quantity -= self.quantity_requested
-        suit.status = "Rented"
-        suit.save()
-        suit.refresh_rental_stats()
-        suit.refresh_rental_end_time()
+            rental.rent_days = rental.days_requested or rental.rent_days or 1
+            if not rental.approved_at:
+                rental.approved_at = timezone.now()
+            rental.rental_start_time = start_time
+            rental.due_date = rental._default_due_date(start_time)
+            rental.end_time = rental.due_date
+            rental.return_date = None
+            rental.status = "Active"
+            if not rental.total_amount:
+                rental.total_amount = suit.price_per_day * rental.days_requested * quantity
+            rental.save(update_fields=[
+                "rent_days", "approved_at", "rental_start_time", "due_date",
+                "end_time", "return_date", "status", "total_amount",
+            ])
 
-    def return_suit(self):
-        self.return_date = timezone.now()
-        late_fee = self._calculate_late_fee(self.return_date)
-        self.total_amount += late_fee
-        self.status = "Returned"
-        self.save()
-
-        suit = self.suit
-        if suit:
-            if suit.should_queue_for_dry_cleaning:
-                suit.status = 'Dry Cleaning'
-            else:
-                suit.quantity += self.quantity_requested or 1
-                suit.status = 'Available'
-            suit.save(update_fields=['status', 'quantity'])
+            suit.quantity -= quantity
+            remaining_unreserved = suit.quantity - other_reservations
+            suit.status = (
+                "Available" if remaining_unreserved > 0
+                else "Reserved" if other_reservations > 0
+                else "Rented"
+            )
+            suit.save(update_fields=["quantity", "status"])
+            record_inventory_movement(
+                suit,
+                "issued",
+                quantity_delta=-quantity,
+                performed_by=performed_by,
+                rental_request=rental,
+                notes="Rental issued to customer.",
+            )
             suit.refresh_rental_stats()
-            try:
-                suit.refresh_rental_end_time()
-            except Exception:
-                pass
+            suit.refresh_rental_end_time()
+
+            self.refresh_from_db()
+            return True
+
+    def return_suit(self, performed_by=None, return_condition="good"):
+        if return_condition not in dict(self.RETURN_CONDITION_CHOICES):
+            raise ValidationError("Select a valid returned-item condition.")
+
+        with transaction.atomic():
+            rental = SuitRequest.objects.select_for_update().get(pk=self.pk)
+            if rental.status != "Active":
+                self.refresh_from_db()
+                return False
+
+            returned_at = timezone.now()
+            rental.return_date = returned_at
+            late_fee_amount = rental._calculate_late_fee(returned_at)
+            rental.total_amount += late_fee_amount
+            rental.status = "Returned"
+            rental.return_condition = return_condition
+            rental.returned_by = performed_by
+            rental.save(update_fields=[
+                "return_date", "total_amount", "status",
+                "return_condition", "returned_by",
+            ])
+            record_late_fee_transaction(
+                rental,
+                late_fee_amount,
+                returned_at,
+                performed_by=performed_by,
+            )
+
+            suit = Suit.objects.select_for_update().get(pk=rental.suit_id)
+            if suit.should_queue_for_dry_cleaning or rental.return_condition == "damaged":
+                suit.status = "Dry Cleaning"
+                movement_type = "returned_for_cleaning"
+                quantity_delta = 0
+            else:
+                suit.quantity += rental.quantity_requested or 1
+                suit.status = "Available"
+                movement_type = "returned"
+                quantity_delta = rental.quantity_requested or 1
+            suit.save(update_fields=["status", "quantity"])
+            record_inventory_movement(
+                suit,
+                movement_type,
+                quantity_delta=quantity_delta,
+                performed_by=performed_by,
+                rental_request=rental,
+                notes=(
+                    "Damaged item held out of available stock pending cleaning or repair."
+                    if rental.return_condition == "damaged"
+                    else "Customer return processed."
+                ),
+            )
+            suit.refresh_rental_stats()
+            suit.refresh_rental_end_time()
+
+            self.refresh_from_db()
+            return True
 
     @property
     def amount_paid(self):
@@ -514,6 +768,180 @@ class SuitRequest(models.Model):
     def balance_due(self):
         due = self.total_amount - self.amount_paid
         return max(due, Decimal('0.00'))
+
+
+class StatusHistory(models.Model):
+    booking = models.ForeignKey(
+        SuitRequest,
+        on_delete=models.CASCADE,
+        related_name="status_history",
+    )
+    old_status = models.CharField(max_length=12, blank=True)
+    new_status = models.CharField(max_length=12, choices=SuitRequest.WORKFLOW_STATUS_CHOICES)
+    changed_by = models.ForeignKey(
+        User,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="booking_status_changes",
+    )
+    changed_at = models.DateTimeField(default=timezone.now)
+    note = models.CharField(max_length=255, blank=True)
+
+    class Meta:
+        ordering = ["changed_at", "pk"]
+
+    def __str__(self):
+        return f"Booking #{self.booking_id}: {self.old_status} → {self.new_status}"
+
+
+class RentalPolicy(models.Model):
+    PARTIAL_HOUR_CHOICES = [
+        ("round_up", "Round up each started hour"),
+        ("prorate", "Prorate by actual overdue time"),
+    ]
+
+    late_fee_per_hour = models.DecimalField(
+        max_digits=8,
+        decimal_places=2,
+        default=Decimal("0.50"),
+        validators=[MinValueValidator(Decimal("0.00"))],
+    )
+    partial_hour_policy = models.CharField(
+        max_length=20,
+        choices=PARTIAL_HOUR_CHOICES,
+        default="round_up",
+    )
+    updated_at = models.DateTimeField(auto_now=True)
+
+    @classmethod
+    def get_solo(cls):
+        policy, _ = cls.objects.get_or_create(pk=1)
+        return policy
+
+    def __str__(self):
+        return "Rental business policy"
+
+
+class LateFeeTransaction(models.Model):
+    rental = models.OneToOneField(
+        SuitRequest,
+        on_delete=models.PROTECT,
+        related_name="late_fee_transaction",
+    )
+    amount = models.DecimalField(max_digits=10, decimal_places=2)
+    overdue_seconds = models.PositiveBigIntegerField()
+    hourly_rate = models.DecimalField(max_digits=8, decimal_places=2)
+    partial_hour_policy = models.CharField(
+        max_length=20,
+        choices=RentalPolicy.PARTIAL_HOUR_CHOICES,
+    )
+    assessed_by = models.ForeignKey(
+        User,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="assessed_late_fees",
+    )
+    assessed_at = models.DateTimeField(default=timezone.now, db_index=True)
+
+    class Meta:
+        ordering = ["-assessed_at", "-pk"]
+
+    def __str__(self):
+        return f"Late fee for rental #{self.rental_id}: ${self.amount}"
+
+
+def record_late_fee_transaction(rental, amount, actual_return, performed_by=None):
+    if amount <= 0:
+        return None
+
+    due_time = rental.due_date or rental.end_time
+    overdue_seconds = max(int((actual_return - due_time).total_seconds()), 0) if due_time else 0
+    policy = RentalPolicy.get_solo()
+    transaction_record, _ = LateFeeTransaction.objects.get_or_create(
+        rental=rental,
+        defaults={
+            "amount": amount,
+            "overdue_seconds": overdue_seconds,
+            "hourly_rate": policy.late_fee_per_hour,
+            "partial_hour_policy": policy.partial_hour_policy,
+            "assessed_by": performed_by,
+            "assessed_at": actual_return,
+        },
+    )
+    return transaction_record
+
+
+class InventoryMovement(models.Model):
+    MOVEMENT_TYPES = [
+        ("opening_balance", "Opening Balance"),
+        ("adjustment", "Stock Adjustment"),
+        ("reserved", "Reserved"),
+        ("reservation_released", "Reservation Released"),
+        ("issued", "Issued to Customer"),
+        ("returned", "Returned to Available Stock"),
+        ("returned_for_cleaning", "Returned for Cleaning"),
+        ("cleaning_completed", "Cleaning Completed"),
+    ]
+
+    suit = models.ForeignKey(
+        Suit,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="inventory_movements",
+    )
+    suit_name = models.CharField(max_length=100)
+    rental_request = models.ForeignKey(
+        SuitRequest,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="inventory_movements",
+    )
+    movement_type = models.CharField(max_length=30, choices=MOVEMENT_TYPES)
+    quantity_delta = models.IntegerField(default=0)
+    quantity_after = models.PositiveIntegerField()
+    performed_by = models.ForeignKey(
+        User,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="inventory_movements",
+    )
+    notes = models.TextField(blank=True)
+    created_at = models.DateTimeField(default=timezone.now, db_index=True)
+
+    class Meta:
+        ordering = ["-created_at", "-pk"]
+        indexes = [
+            models.Index(fields=["suit", "-created_at"]),
+            models.Index(fields=["movement_type", "-created_at"]),
+        ]
+
+    def __str__(self):
+        return f"{self.suit_name}: {self.get_movement_type_display()} ({self.quantity_delta:+d})"
+
+
+def record_inventory_movement(
+    suit,
+    movement_type,
+    quantity_delta=0,
+    performed_by=None,
+    rental_request=None,
+    notes="",
+):
+    return InventoryMovement.objects.create(
+        suit=suit,
+        suit_name=suit.suit_name,
+        rental_request=rental_request,
+        movement_type=movement_type,
+        quantity_delta=quantity_delta,
+        quantity_after=suit.quantity,
+        performed_by=performed_by,
+        notes=notes,
+    )
 
 
 class Staff(models.Model):
@@ -587,6 +1015,7 @@ class Payment(models.Model):
     rental = models.ForeignKey(SuitRequest, on_delete=models.CASCADE, related_name='payments')
     cashier = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True)
     amount_paid = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
+    idempotency_key = models.CharField(max_length=36, unique=True, null=True, blank=True)
     payment_method = models.CharField(max_length=50, blank=True, null=True)
     payment_reference = models.CharField(max_length=255, blank=True, null=True)
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='paid')
@@ -647,6 +1076,37 @@ class FavoriteSuit(models.Model):
         return f"{self.user.username} favorites {self.suit.suit_name}"
 
 
+@receiver(post_save, sender=SuitRequest)
+def create_initial_status_history(sender, instance, created, **kwargs):
+    if not created:
+        return
+
+    legacy_to_workflow = {
+        "Pending": "request",
+        "Approved": "pending",
+        "Reserved": "waiting",
+        "Active": "rented",
+        "Returned": "returned",
+        "Rejected": "cancelled",
+        # Legacy Expired means an overdue item that still needs to be returned.
+        "Expired": "rented",
+    }
+    workflow_status = instance.workflow_status
+    if workflow_status == "request" and instance.status in legacy_to_workflow:
+        workflow_status = legacy_to_workflow[instance.status]
+        SuitRequest.objects.filter(pk=instance.pk).update(workflow_status=workflow_status)
+        instance.workflow_status = workflow_status
+
+    StatusHistory.objects.create(
+        booking=instance,
+        old_status="",
+        new_status=workflow_status,
+        changed_by=None,
+        changed_at=instance.request_date,
+        note="Booking la sameeyay.",
+    )
+
+
 class Notification(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE)
     message = models.TextField()
@@ -662,6 +1122,10 @@ class Profile(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='profile')
     profile_photo = models.ImageField(upload_to='profiles/', null=True, blank=True)
     id_document = models.FileField(upload_to='ids/', null=True, blank=True)
+    customer_phone = models.CharField(max_length=20, blank=True)
+    national_id = models.CharField(max_length=50, blank=True)
+    present_address = models.CharField(max_length=255, blank=True)
+    parents_address = models.CharField(max_length=255, blank=True)
     is_cashier = models.BooleanField(default=False)
     is_reception = models.BooleanField(default=False)
     updated_at = models.DateTimeField(auto_now=True)

@@ -1,5 +1,4 @@
-{% extends "rental/base.html" %}
-{% block title %}Approve Rental Request | Suit Rental{% endblock %}
+{% extends "rental/base_admin.html" %}
 {% block page_title %}Approve Rental Request{% endblock %}
 
 {% block content %}
@@ -10,7 +9,7 @@
         --royal-gold-light: #e8c96a;
         --luxury-dark: #0f0c20;
         --surface-dark: #000000;
-        --surface-darker: #1e1e25;
+        --surface-darker: #000000;
         --panel-bg: rgba(255, 255, 255, 0.03);
         --panel-bg-hover: rgba(255, 255, 255, 0.06);
         --border-color: rgba(255, 255, 255, 0.08);
@@ -449,7 +448,7 @@
       </div>
 
       <!-- MAIN CONFIGURATION FORM -->
-      <form method="POST" action="" style="margin-top:2.5rem;" id="approvalForm">
+      <form method="POST" action="" style="margin-top:2.5rem;" id="approvalForm" novalidate>
         {% csrf_token %}
         
         <!-- ================= OPTIONAL ACCESSORIES SECTION ================= -->
@@ -460,13 +459,13 @@
           
           <!-- Shoes -->
           <div class="col-md-3 col-sm-6">
-            <input type="checkbox" name="accessories" value="shoes" id="acc_shoes" class="form-check-input d-none accessory-checkbox" data-price="5.00">
+            <input type="checkbox" name="accessories" value="shoes" id="acc_shoes" class="form-check-input d-none accessory-checkbox" data-price="{{ accessory_daily_price|floatformat:2 }}">
             <div class="accessory-wrapper">
               <label class="d-block w-100 mb-0" for="acc_shoes">
                 <div class="accessory-box text-center">
                   <i class="fas fa-shoe-prints d-block mb-1 fs-5" style="color: var(--text-muted);"></i>
                   <span class="fw-bold d-block small" style="color: var(--text-main);">Shoes</span>
-                  <small class="fw-bold" style="color: var(--success);">+$5.00/day</small>
+                  <small class="fw-bold" style="color: var(--success);">+${{ accessory_daily_price|floatformat:2 }}/day · separate charge</small>
                 </div>
               </label>
               <div class="accessory-variants">
@@ -488,13 +487,13 @@
 
           <!-- Tie -->
           <div class="col-md-3 col-sm-6">
-            <input type="checkbox" name="accessories" value="tie" id="acc_tie" class="form-check-input d-none accessory-checkbox" data-price="1.50">
+            <input type="checkbox" name="accessories" value="tie" id="acc_tie" class="form-check-input d-none accessory-checkbox" data-price="{{ accessory_daily_price|floatformat:2 }}">
             <div class="accessory-wrapper">
               <label class="d-block w-100 mb-0" for="acc_tie">
                 <div class="accessory-box text-center">
                   <i class="fas fa-user-tie d-block mb-1 fs-5" style="color: var(--text-muted);"></i>
                   <span class="fw-bold d-block small" style="color: var(--text-main);">Tie</span>
-                  <small class="fw-bold" style="color: var(--success);">+$1.50/day</small>
+                  <small class="fw-bold" style="color: var(--success);">+${{ accessory_daily_price|floatformat:2 }}/day</small>
                 </div>
               </label>
               <div class="accessory-variants">
@@ -515,13 +514,13 @@
 
           <!-- Shirt -->
           <div class="col-md-3 col-sm-6">
-            <input type="checkbox" name="accessories" value="shirt" id="acc_shirt" class="form-check-input d-none accessory-checkbox" data-price="3.00">
+            <input type="checkbox" name="accessories" value="shirt" id="acc_shirt" class="form-check-input d-none accessory-checkbox" data-price="{{ accessory_daily_price|floatformat:2 }}">
             <div class="accessory-wrapper">
               <label class="d-block w-100 mb-0" for="acc_shirt">
                 <div class="accessory-box text-center">
                   <i class="fas fa-tshirt d-block mb-1 fs-5" style="color: var(--text-muted);"></i>
                   <span class="fw-bold d-block small" style="color: var(--text-main);">Shirt</span>
-                  <small class="fw-bold" style="color: var(--success);">+$3.00/day</small>
+                  <small class="fw-bold" style="color: var(--success);">+${{ accessory_daily_price|floatformat:2 }}/day</small>
                 </div>
               </label>
               <div class="accessory-variants">
@@ -543,13 +542,13 @@
 
           <!-- Belt -->
           <div class="col-md-3 col-sm-6">
-            <input type="checkbox" name="accessories" value="belt" id="acc_belt" class="form-check-input d-none accessory-checkbox" data-price="1.00">
+            <input type="checkbox" name="accessories" value="belt" id="acc_belt" class="form-check-input d-none accessory-checkbox" data-price="{{ accessory_daily_price|floatformat:2 }}">
             <div class="accessory-wrapper">
               <label class="d-block w-100 mb-0" for="acc_belt">
                 <div class="accessory-box text-center">
                   <i class="fas fa-ring d-block mb-1 fs-5" style="color: var(--text-muted);"></i>
                   <span class="fw-bold d-block small" style="color: var(--text-main);">Belt</span>
-                  <small class="fw-bold" style="color: var(--success);">+$1.00/day</small>
+                  <small class="fw-bold" style="color: var(--success);">+${{ accessory_daily_price|floatformat:2 }}/day</small>
                 </div>
               </label>
               <div class="accessory-variants">
@@ -568,14 +567,74 @@
             </div>
           </div>
 
+          <!-- Watch -->
+          <div class="col-md-3 col-sm-6">
+            <input type="checkbox" name="accessories" value="watch" id="acc_watch" class="form-check-input d-none accessory-checkbox" data-price="{{ accessory_daily_price|floatformat:2 }}">
+            <div class="accessory-wrapper">
+              <label class="d-block w-100 mb-0" for="acc_watch">
+                <div class="accessory-box text-center">
+                  <i class="fas fa-clock d-block mb-1 fs-5" style="color: var(--text-muted);"></i>
+                  <span class="fw-bold d-block small" style="color: var(--text-main);">Watch</span>
+                  <small class="fw-bold" style="color: var(--success);">+${{ accessory_daily_price|floatformat:2 }}/day</small>
+                </div>
+              </label>
+              <div class="accessory-variants">
+                <div class="form-floating form-floating-luxury mb-2">
+                  <input type="text" name="watch_size" class="form-control form-control-sm py-1 pt-4 fs-7" placeholder="e.g. Classic">
+                  <label class="fs-7">Style / Type</label>
+                </div>
+                <div class="form-floating form-floating-luxury">
+                  <input type="text" name="watch_color" class="form-control form-control-sm py-1 pt-4 fs-7" placeholder="e.g. Black">
+                  <label class="fs-7">Color</label>
+                </div>
+              </div>
+            </div>
+          </div>
+
         </div>
         <!-- ================================================================ -->
 
         <h5 class="fw-bold mb-3 section-heading">Operational & Payment Configurations</h5>
         
         <div class="row g-3">
-          <!-- Start Date Input -->
+          <!-- Pickup / Reservation Mode -->
           <div class="col-md-6">
+            <div class="form-floating form-floating-luxury">
+              <select name="action_mode" id="actionMode" class="form-select">
+                <option value="rent_now" {% if not action_mode_default or action_mode_default == 'rent_now' %}selected{% endif %}>Rent Now</option>
+                <option value="reserve" {% if action_mode_default == 'reserve' %}selected{% endif %}>Reserve for Pickup Later (Optional)</option>
+              </select>
+              <label for="actionMode">Action Mode</label>
+            </div>
+            <small class="form-text ms-2 d-block">
+               Choose whether to start rental today or hold the request as a pickup reservation.
+            </small>
+          </div>
+
+          <!-- Reserve Duration -->
+          <div class="col-md-3">
+            <div class="form-floating form-floating-luxury">
+              <select name="reserve_duration" class="form-select">
+                <option value="24" selected>24 Hours</option>
+                <option value="48">48 Hours</option>
+                <option value="72">72 Hours</option>
+                <option value="96">96 Hours</option>
+                <option value="168">7 Days</option>
+              </select>
+              <label>Reserve Hold Duration</label>
+            </div>
+          </div>
+
+          <!-- Custom Reserve Hours -->
+          <div class="col-md-3">
+            <div class="form-floating form-floating-luxury">
+              <input type="number" name="reserve_custom_hours" id="reserveCustomHours" class="form-control" min="1" placeholder="Optional">
+              <label for="reserveCustomHours">Manual Reserve Hours</label>
+            </div>
+          </div>
+
+          <!-- Start Date Input -->
+          <div class="col-md-6" id="startDateSection">
             <div class="form-floating form-floating-luxury">
               <input type="date" name="start_date" id="startDate" class="form-control" value="{{ req.request_date|date:'Y-m-d' }}">
               <label for="startDate">Rental Release / Start Date</label>
@@ -583,6 +642,37 @@
             <small class="form-text ms-2 d-block">
                📅 Timeline Target: Expected Return Date: <strong id="expectedReturnDisplay" class="text-primary">--/--/----</strong>
             </small>
+          </div>
+
+          <!-- ID Document Type -->
+          <div class="col-md-6">
+            <div class="form-floating form-floating-luxury">
+              <select name="id_document_type" id="idDocumentType" class="form-select">
+                <option value="National ID">National ID</option>
+                <option value="Passport">Passport</option>
+                <option value="Driver's License">Driver's License</option>
+              </select>
+              <label for="idDocumentType">Customer Document Type</label>
+            </div>
+          </div>
+
+          <!-- ID Document Number -->
+          <div class="col-md-6">
+            <div class="form-floating form-floating-luxury">
+              <input type="text" name="id_document_number" class="form-control" placeholder="Enter document number">
+              <label>ID Number / Passport / License #</label>
+            </div>
+          </div>
+
+          <!-- ══ ID VERIFICATION CHECKBOX ══ -->
+          <div class="col-12 mt-2">
+            <div class="d-flex align-items-start gap-3 p-3 rounded-3" style="background: rgba(201, 162, 39, 0.06); border: 1px solid rgba(201, 162, 39, 0.25); border-radius: 12px;">
+              <input class="form-check-input mt-1" type="checkbox" name="id_verified" id="idVerified" style="width: 1.3em; height: 1.3em; cursor: pointer; accent-color: var(--royal-gold);" required>
+              <label class="form-check-label" for="idVerified" style="color: var(--text-main); font-size: 0.88rem; line-height: 1.5; cursor: pointer;">
+                <i class="fas fa-shield-alt me-2" style="color: var(--royal-gold);"></i>
+                <strong>ID Verification:</strong> I confirm that the customer's ID document has been physically presented, verified, and matches the provided registration details.
+              </label>
+            </div>
           </div>
 
           <!-- Payment Method Dropdown -->
@@ -637,29 +727,6 @@
           </div>
         </div>
 
-        <!-- ══ ID VERIFICATION CHECKBOX ══ -->
-        <div class="col-12 mt-4">
-            <div class="d-flex align-items-start gap-3 p-3 rounded-3" style="background: rgba(201, 162, 39, 0.06); border: 1px solid rgba(201, 162, 39, 0.25); border-radius: 12px;">
-              <input class="form-check-input mt-1" type="checkbox" name="id_verified" id="idVerified" style="width: 1.3em; height: 1.3em; cursor: pointer; accent-color: var(--royal-gold);" required>
-              <label class="form-check-label" for="idVerified" style="color: var(--text-main); font-size: 0.88rem; line-height: 1.5; cursor: pointer;">
-                <i class="fas fa-shield-alt me-2" style="color: var(--royal-gold);"></i>
-                <strong>ID Verification:</strong> I confirm that the customer's National ID or Driver's License has been physically presented, verified, and matches the provided registration details.
-              </label>
-            </div>
-        </div>
-
-        <!-- LIVE MATHEMATICS BALANCE BREAKDOWN BADGE -->
-        <div class="live-audit-badge d-flex justify-content-between align-items-center" id="auditBadge">
-            <div>
-                <h6 class="mb-1 fw-bold" id="auditTitle"><i class="fas fa-calculator me-2"></i>Post-Approval Ledger Status</h6>
-                <small>This amount will be automatically posted to the customer's active remaining debt file.</small>
-            </div>
-            <div class="text-end">
-                <span class="small text-uppercase fw-bold d-block" style="font-size: 0.65rem; color: var(--text-muted);">Remaining Debt Ledger</span>
-                <h4 class="fw-bold mb-0 text-danger" id="remainingDebtDisplay">${{ total_amount|floatformat:2 }}</h4>
-            </div>
-        </div>
-
         <!-- NOTES AREA -->
         <div class="form-group mt-4">
           <label class="form-label small fw-bold mb-2"><i class="fas fa-comment-alt me-1"></i> Customer's Original Request Notes</label>
@@ -668,7 +735,7 @@
 
         <!-- ACTION BUTTONS -->
         <div class="d-flex gap-3 mt-4 pt-3 border-top justify-content-end">
-          <a href="{% if back_url %}{% url back_url %}{% else %}{% if request.user.profile.is_reception or request.user.profile.is_cashier %}{% url 'reception_requests' %}{% else %}{% url 'requests' %}{% endif %}{% endif %}" class="btn btn-cancel-luxury">
+          <a href="{% if back_url %}{% url back_url %}{% else %}{% url 'reception_requests' %}{% endif %}" class="btn btn-cancel-luxury">
             <i class="fas fa-arrow-left me-1"></i> Back to Requests
           </a>
           <button type="submit" class="btn btn-approve">
@@ -681,6 +748,7 @@
 </div>
 
 <!-- LIVE MATHEMATICAL & DATE CALCULATIONS CONTROL -->
+<div id="pickupModeState" data-default="{{ pickup_mode_default|yesno:'true,false' }}" style="display:none;"></div>
 <script>
 document.addEventListener("DOMContentLoaded", function() {
     const baseSuitTotal = parseFloat(document.getElementById('grossTotalAmount').dataset.base) || 0;
@@ -690,15 +758,13 @@ document.addEventListener("DOMContentLoaded", function() {
     const grossTotalDisplay = document.getElementById('grossTotalAmount');
     const amountPaidInput = document.getElementById('amountPaid');
     const startDateInput = document.getElementById('startDate');
-    const debtDisplay = document.getElementById('remainingDebtDisplay');
     const expectedReturnDisplay = document.getElementById('expectedReturnDisplay');
     const discountPercentageInput = document.getElementById('discountPercentage');
     const discountAmountDisplay = document.getElementById('discountAmountDisplay');
     const finalAmountDisplay = document.getElementById('finalAmountDisplay');
     
-    const auditBadge = document.getElementById('auditBadge');
-    const auditTitle = document.getElementById('auditTitle');
     const accessoryCheckboxes = document.querySelectorAll('.accessory-checkbox');
+    const pickupModeDefault = document.getElementById('pickupModeState')?.dataset.default === 'true';
 
     // Dynamic Gross Total calculation based on selected accessories
     function getCalculatedGrossTotal() {
@@ -734,20 +800,8 @@ document.addEventListener("DOMContentLoaded", function() {
         
         if(finalDebt < 0) finalDebt = 0; 
 
-        debtDisplay.textContent = '$' + finalDebt.toFixed(2);
-
-        if(finalDebt === 0) {
-            auditBadge.style.background = 'rgba(76, 175, 130, 0.08)'; 
-            auditBadge.style.borderColor = 'rgba(76, 175, 130, 0.2)';
-            debtDisplay.className = 'fw-bold mb-0 text-success';
-            auditTitle.className = 'mb-1 fw-bold text-success';
-            auditTitle.innerHTML = '<i class="fas fa-check-circle me-2"></i>Account Fully Settled ($0.00 Debt)';
-        } else {
-            auditBadge.style.background = 'rgba(224, 92, 92, 0.08)'; 
-            auditBadge.style.borderColor = 'rgba(224, 92, 92, 0.2)';
-            debtDisplay.className = 'fw-bold mb-0 text-danger';
-            auditTitle.className = 'mb-1 fw-bold text-danger';
-            auditTitle.innerHTML = '<i class="fas fa-calculator me-2"></i>Post-Approval Ledger Status';
+        if (finalDebt === 0) {
+            amountPaidInput.max = finalAmountAfterDiscount.toFixed(2);
         }
     }
 
@@ -775,6 +829,31 @@ document.addEventListener("DOMContentLoaded", function() {
     startDateInput.addEventListener('change', updateExpectedReturnDate);
     discountPercentageInput.addEventListener('input', reCalculateLedger);
     
+    const actionModeSelect = document.getElementById('actionMode');
+    const startDateSection = document.getElementById('startDateSection');
+
+    function updateActionModeUI() {
+        const isReserve = actionModeSelect.value === 'reserve';
+        if (pickupModeDefault) {
+            startDateSection.style.display = 'none';
+            startDateInput.value = '';
+            expectedReturnDisplay.textContent = 'Ready for pickup now.';
+            return;
+        }
+        if (isReserve) {
+            startDateSection.style.display = 'none';
+            startDateInput.value = '';
+            expectedReturnDisplay.textContent = 'Pickup reservation will be held.';
+        } else {
+            startDateSection.style.display = 'block';
+            updateExpectedReturnDate();
+        }
+    }
+
+    actionModeSelect.addEventListener('change', function() {
+        updateActionModeUI();
+    });
+
     // Watch Accessory selection changes
     accessoryCheckboxes.forEach(checkbox => {
         checkbox.addEventListener('change', function() {
@@ -783,8 +862,8 @@ document.addEventListener("DOMContentLoaded", function() {
     });
     
     // Core setup initialization
+    updateActionModeUI();
     reCalculateLedger();
-    updateExpectedReturnDate();
 });
 </script>
 {% endblock %}

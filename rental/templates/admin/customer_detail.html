@@ -1,9 +1,15 @@
-{% extends "rental/base.html" %}
+{% extends "rental/base_admin.html" %}
 {% block title %}Customer Detail | Suit Rental{% endblock %}
 {% block page_title %}Customer Information{% endblock %}
 
 {% block content %}
 <style>
+    {% if hide_admin_sidebar %}
+    @media (min-width: 993px) {
+        .main-container { margin-left: 0; }
+    }
+    {% endif %}
+
     .back-btn {
         background:rgba(201,168,76,0.1);
         border:1px solid rgba(201,168,76,0.2);
@@ -219,12 +225,68 @@
         margin-bottom:12px;
         display:block;
     }
+    .history-alert {
+        border:1px solid rgba(224,160,64,0.3);
+        background:rgba(224,160,64,0.08);
+        color:#f1d39e;
+        border-radius:12px;
+        padding:14px 18px;
+        margin-bottom:16px;
+    }
+    .recent-rental, .rental-form-card {
+        background:rgba(255,255,255,0.03);
+        border:1px solid rgba(255,255,255,0.07);
+        border-radius:16px;
+        padding:18px 22px;
+        margin-bottom:20px;
+    }
+    .rental-form-grid {
+        display:grid;
+        grid-template-columns:repeat(auto-fit,minmax(210px,1fr));
+        gap:14px;
+    }
+    .rental-form-card label {
+        display:block;
+        color:rgba(240,237,232,0.7);
+        font-size:.78rem;
+        font-weight:600;
+        margin-bottom:6px;
+    }
+    .rental-form-card input, .rental-form-card select, .rental-form-card textarea {
+        width:100%;
+        background:rgba(255,255,255,.05);
+        color:#f0ede8;
+        border:1px solid rgba(255,255,255,.12);
+        border-radius:9px;
+        padding:10px 12px;
+    }
+    .rental-form-card select option { background:#181828; color:#f0ede8; }
+    .rental-form-card input:focus, .rental-form-card select:focus, .rental-form-card textarea:focus {
+        outline:none;
+        border-color:var(--gold);
+        box-shadow:0 0 0 3px rgba(201,168,76,.12);
+    }
+    .payment-history { color:rgba(240,237,232,.72); font-size:.76rem; line-height:1.6; }
+    .payment-history small { display:block; white-space:nowrap; }
+    @media (max-width: 768px) {
+        .customer-card { grid-template-columns:1fr; padding:18px; gap:16px; }
+        .customer-image { width:88px; height:88px; }
+        .customer-name { font-size:1.6rem; }
+        .customer-detail-row { align-items:flex-start; flex-direction:column; gap:2px; }
+        .history-header { padding:16px; }
+        .rep-table { min-width:900px; }
+        .rental-form-card { padding:16px; }
+    }
 </style>
 
 <div class="container-fluid px-0">
     <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:20px;">
-        <a href="{% if request.user.profile.is_reception or request.user.profile.is_cashier %}{% url 'reception_requests' %}{% else %}{% url 'requests' %}{% endif %}" class="back-btn"><i class="fa-solid fa-arrow-left"></i>Back to Requests</a>
-        {% if customer_user %}
+        {% if is_reception_user or show_new_rent_form %}
+        <a href="{% url 'manage_users' %}" class="back-btn"><i class="fa-solid fa-arrow-left"></i>Customer Directory</a>
+        {% else %}
+        <a href="{% url 'requests' %}" class="back-btn"><i class="fa-solid fa-arrow-left"></i>Back to Requests</a>
+        {% endif %}
+        {% if customer_user and can_manage_customer_rentals and not show_new_rent_form %}
         <a href="{% url 'new_rent_for_customer' customer_user.id %}" class="back-btn" style="background:rgba(76,175,130,0.12);border-color:rgba(76,175,130,0.22);color:var(--success)"><i class="fa-solid fa-plus-circle"></i>New Rent</a>
         {% endif %}
     </div>
@@ -247,8 +309,44 @@
                 <label><i class="fa-solid fa-id-card me-2" style="color:var(--gold)"></i>ID</label>
                 <value>{{ customer_id|default:"Not provided" }}</value>
             </div>
+            {% if customer_present_address %}
+            <div class="customer-detail-row">
+                <label><i class="fa-solid fa-location-dot me-2" style="color:var(--gold)"></i>Address</label>
+                <value>{{ customer_present_address }}</value>
+            </div>
+            {% endif %}
+            {% if customer_parents_address %}
+            <div class="customer-detail-row">
+                <label><i class="fa-solid fa-house me-2" style="color:var(--gold)"></i>Alternate</label>
+                <value>{{ customer_parents_address }}</value>
+            </div>
+            {% endif %}
+            {% if customer_user.email %}
+            <div class="customer-detail-row">
+                <label><i class="fa-solid fa-envelope me-2" style="color:var(--gold)"></i>Email</label>
+                <value>{{ customer_user.email }}</value>
+            </div>
+            {% endif %}
         </div>
     </div>
+
+    {% if latest_rental %}
+    <div class="recent-rental">
+        <strong style="color:var(--gold)"><i class="fa-solid fa-clock-rotate-left me-2"></i>Most Recent Rental</strong>
+        <div style="margin-top:8px">
+            {{ latest_rental.suit.suit_name }} · {{ latest_rental.request_date|date:"M d, Y" }}
+            · {{ latest_rental.status }}
+            {% if latest_rental.due_date or latest_rental.end_time %}
+                · Due {{ latest_rental.due_date|default:latest_rental.end_time|date:"M d, Y H:i" }}
+            {% endif %}
+        </div>
+    </div>
+    {% else %}
+    <div class="recent-rental">
+        <strong style="color:var(--gold)"><i class="fa-solid fa-circle-info me-2"></i>New Customer</strong>
+        <div style="margin-top:8px">No previous rentals are recorded for this customer.</div>
+    </div>
+    {% endif %}
 
     <div class="stats-grid">
         <div class="stat-card" style="--card-accent:var(--gold)">
@@ -268,14 +366,43 @@
             <div class="stat-value">{{ pending_rentals }}</div>
         </div>
         <div class="stat-card" style="--card-accent:#4caf82">
-            <div class="stat-label">Total Spent</div>
+            <div class="stat-label">Total Rental Value</div>
             <div class="stat-value">${{ total_spent|floatformat:2 }}</div>
+        </div>
+        <div class="stat-card" style="--card-accent:var(--danger)">
+            <div class="stat-label">Overdue</div>
+            <div class="stat-value">{{ overdue_rentals }}</div>
+        </div>
+        <div class="stat-card" style="--card-accent:var(--warning)">
+            <div class="stat-label">Outstanding</div>
+            <div class="stat-value">${{ total_balance_due|floatformat:2 }}</div>
         </div>
     </div>
 
+    {% if active_rentals %}
+    <div class="history-alert" role="status">
+        <strong><i class="fa-solid fa-triangle-exclamation me-2"></i>Unreturned suit</strong>
+        <span> This customer has {{ active_rentals }} active rental{{ active_rentals|pluralize }}. A new rental is still allowed when stock is available.</span>
+        {% for rental in active_rental_records %}
+        <div style="margin-top:8px">
+            {{ rental.suit.suit_name }} · Due
+            {% if rental.due_date %}{{ rental.due_date|date:"M d, Y H:i" }}{% elif rental.end_time %}{{ rental.end_time|date:"M d, Y H:i" }}{% else %}not set{% endif %}
+            · Balance ${{ rental.history_balance_due|floatformat:2 }}
+            {% if rental.is_overdue %}<strong style="color:#ff9b9b"> · Overdue</strong>{% endif %}
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+    {% if total_balance_due %}
+    <div class="history-alert" role="status">
+        <strong><i class="fa-solid fa-wallet me-2"></i>Outstanding payment</strong>
+        <span> Current rental balances total ${{ total_balance_due|floatformat:2 }}. This balance remains attached to the existing rentals and will not be transferred to a new rental.</span>
+    </div>
+    {% endif %}
+
     <div class="history-card">
         <div class="history-header">
-            <h4><i class="fa-solid fa-clock-rotate-left"></i> Rental History</h4>
+            <h4><i class="fa-solid fa-clock-rotate-left"></i> Complete Rental History</h4>
         </div>
         {% if requests %}
         <div style="overflow-x:auto">
@@ -285,10 +412,10 @@
                         <th>#</th>
                         <th>Suit</th>
                         <th>Qty</th>
-                        <th>Days</th>
                         <th>Status</th>
-                        <th>Date</th>
-                        <th>Amount</th>
+                        <th>Rental Dates</th>
+                        <th>Total</th>
+                        <th>Payments & Balance</th>
                         <th>Actions</th>
                     </tr>
                 </thead>
@@ -298,24 +425,43 @@
                         <td>{{ req.id }}</td>
                         <td style="font-weight:600">{{ req.suit.suit_name }}</td>
                         <td><span class="status-badge">{{ req.quantity_requested }}</span></td>
-                        <td>{{ req.days_requested }} days</td>
                         <td>
                             <span class="status-badge {% if req.status == 'Active' %}active{% elif req.status == 'Returned' %}returned{% elif req.status == 'Pending' %}pending{% elif req.status == 'Rejected' %}rejected{% endif %}">
                                 {{ req.status }}
                             </span>
+                            {% if req.is_overdue %}<div class="status-badge rejected" style="display:inline-block;margin-top:6px">Overdue</div>{% endif %}
                         </td>
-                        <td>{{ req.request_date|date:"M d, Y" }}</td>
+                        <td>
+                            <div>Booked {{ req.request_date|date:"M d, Y" }}</div>
+                            {% if req.rental_start_time %}<small>Start {{ req.rental_start_time|date:"M d, Y H:i" }}</small>{% endif %}
+                            {% if req.due_date or req.end_time %}<small>Due {{ req.due_date|default:req.end_time|date:"M d, Y H:i" }}</small>{% endif %}
+                            {% if req.return_date %}<small>Returned {{ req.return_date|date:"M d, Y H:i" }} · {{ req.get_return_condition_display }}</small>{% endif %}
+                        </td>
                         <td style="color:var(--success);font-weight:700">${{ req.total_amount|floatformat:2 }}</td>
                         <td>
+                            <div style="font-weight:700">Paid ${{ req.history_amount_paid|floatformat:2 }}</div>
+                            {% if req.history_balance_due %}
+                            <div style="color:#f1c77d;font-weight:700">Balance ${{ req.history_balance_due|floatformat:2 }}</div>
+                            {% endif %}
+                            <div class="payment-history">
+                                {% for payment in req.history_payments %}
+                                <small>${{ payment.amount_paid|floatformat:2 }} · {{ payment.payment_date|date:"M d, Y" }} · {{ payment.payment_method|default:"Payment" }} · {{ payment.get_status_display }}</small>
+                                {% empty %}
+                                <small>No payment recorded</small>
+                                {% endfor %}
+                            </div>
+                        </td>
+                        <td>
                             {% if req.status == 'Active' %}
+                            {% if not is_reception_user %}
                             <div style="display:flex;gap:8px;flex-wrap:wrap">
                                 <a href="{% url 'send_return_reminder' req.id %}" class="btn btn-sm btn-warning" title="Send email reminder" style="background:rgba(33,150,243,0.15);color:#2196F3;border:1px solid rgba(33,150,243,0.3);padding:6px 10px;border-radius:6px;font-size:0.75rem;text-decoration:none;display:inline-flex;align-items:center;gap:4px">
                                     <i class="fa-solid fa-envelope"></i> Email
                                 </a>
-                                <a href="{% url 'reception_send_sms' req.id %}" class="btn btn-sm btn-info" title="Send SMS reminder" style="background:rgba(76,175,80,0.15);color:#4CAF50;border:1px solid rgba(76,175,80,0.3);padding:6px 10px;border-radius:6px;font-size:0.75rem;text-decoration:none;display:inline-flex;align-items:center;gap:4px">
-                                    <i class="fa-solid fa-message"></i> SMS
-                                </a>
                             </div>
+                            {% else %}
+                            <span style="color:rgba(240,237,232,0.6);font-size:0.75rem">Unreturned</span>
+                            {% endif %}
                             {% elif req.status == 'Pending' %}
                             <span style="color:rgba(240,237,232,0.6);font-size:0.75rem">Awaiting approval</span>
                             {% elif req.status == 'Returned' %}
@@ -337,5 +483,173 @@
         </div>
         {% endif %}
     </div>
+
+    {% if show_new_rent_form %}
+    <section class="rental-form-card mt-4" id="new-rental-form" aria-labelledby="new-rental-heading">
+        <div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-3">
+            <div>
+                <h3 id="new-rental-heading" style="color:var(--gold);font-family:'Cormorant Garamond',serif;margin:0">New Rental for {{ customer_name }}</h3>
+                <p class="mb-0 mt-1" style="color:rgba(240,237,232,.65)">This transaction will be saved separately and linked to this customer account.</p>
+            </div>
+            <a class="back-btn mb-0" href="{% url 'customer_detail_by_user' customer_user.id %}"><i class="fa-solid fa-clock-rotate-left"></i>View Full History</a>
+        </div>
+        <form method="post" action="{% url 'create_rental' %}" id="repeatRentalForm">
+            {% csrf_token %}
+            <input type="hidden" name="repeat_rental_submission" value="1">
+            <input type="hidden" name="customer_user_id" value="{{ prefill_customer_id }}">
+            <input type="hidden" name="rental_submission_token" value="{{ rental_submission_token }}">
+
+            <h4 style="font-size:.95rem;color:var(--gold);margin:18px 0 12px">Customer Information</h4>
+            <div class="rental-form-grid">
+                <div>
+                    <label for="repeat-first-name">First name</label>
+                    <input id="repeat-first-name" name="first_name" value="{{ rental_form_values.first_name|default:prefill_first_name }}" autocomplete="given-name" required>
+                </div>
+                <div>
+                    <label for="repeat-father-name">Father's name</label>
+                    <input id="repeat-father-name" name="father_name" value="{{ rental_form_values.father_name|default:prefill_father_name }}" autocomplete="family-name">
+                </div>
+                <div>
+                    <label for="repeat-grandfather-name">Additional name</label>
+                    <input id="repeat-grandfather-name" name="grandfather_name" value="{{ rental_form_values.grandfather_name|default:'' }}">
+                </div>
+                <div>
+                    <label for="repeat-phone">Phone</label>
+                    <input id="repeat-phone" name="phone" type="tel" value="{{ rental_form_values.phone|default:prefill_phone }}" autocomplete="tel" required>
+                </div>
+                <div>
+                    <label for="repeat-present-address">Address</label>
+                    <input id="repeat-present-address" name="present_address" value="{{ rental_form_values.present_address|default:prefill_present_address }}" autocomplete="street-address">
+                </div>
+                <div>
+                    <label for="repeat-parents-address">Alternate address</label>
+                    <input id="repeat-parents-address" name="parents_address" value="{{ rental_form_values.parents_address|default:prefill_parents_address }}">
+                </div>
+            </div>
+
+            <div class="mt-3 mb-3">
+                <label class="d-flex align-items-center gap-2" for="repeat-has-id" style="cursor:pointer">
+                    <input id="repeat-has-id" type="checkbox" name="has_national_id" value="1" {% if prefill_national_id or rental_form_values.has_national_id %}checked{% endif %} style="width:auto">
+                    Customer has a national ID
+                </label>
+                <div class="mt-2">
+                    <label for="repeat-national-id">National ID / document number</label>
+                    <input id="repeat-national-id" name="id_number" value="{{ rental_form_values.id_number|default:prefill_national_id }}">
+                </div>
+            </div>
+
+            <h4 style="font-size:.95rem;color:var(--gold);margin:20px 0 12px">Rental Details</h4>
+            <div class="rental-form-grid">
+                <div>
+                    <label for="repeat-suit">Available suit</label>
+                    <select id="repeat-suit" name="suit_id" required>
+                        <option value="">Select a suit</option>
+                        {% for suit in available_suits %}
+                        <option value="{{ suit.pk }}" data-price="{{ suit.price_per_day }}" {% if rental_form_values.suit_id == suit.pk|stringformat:"s" %}selected{% endif %}>
+                            {{ suit.suit_name }} · {{ suit.booking_available_quantity }} available · ${{ suit.price_per_day }}/day
+                        </option>
+                        {% endfor %}
+                    </select>
+                    {% if not available_suits %}
+                    <small style="color:#f1c77d">No suits are currently available. Please check inventory.</small>
+                    {% endif %}
+                </div>
+                <div>
+                    <label for="repeat-quantity">Quantity</label>
+                    <input id="repeat-quantity" type="number" name="quantity" min="1" max="5" value="{{ rental_form_values.quantity|default:'1' }}" required>
+                </div>
+                <div>
+                    <label for="repeat-days">Rental duration</label>
+                    <select id="repeat-days" name="days" required>
+                        {% for days, hours in rental_day_options %}
+                        <option value="{{ days }}" {% if rental_form_values.days == days|stringformat:"s" %}selected{% endif %}>{{ days }} day{{ days|pluralize }} ({{ hours }} hours)</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div>
+                    <label for="repeat-start-date">Start date</label>
+                    <input id="repeat-start-date" type="date" name="start_date" value="{{ rental_form_values.start_date|default:default_start_date }}" required>
+                </div>
+                <div>
+                    <label for="repeat-end-date">Return date</label>
+                    <input id="repeat-end-date" type="date" name="end_date" value="{{ rental_form_values.end_date|default:default_end_date }}" required>
+                </div>
+            </div>
+
+            <div class="mt-3 p-3" style="background:rgba(201,168,76,.07);border:1px solid rgba(201,168,76,.18);border-radius:10px">
+                <div class="d-flex justify-content-between gap-3">
+                    <span>Estimated rental total</span>
+                    <strong id="repeat-total" style="color:var(--gold)">$0.00</strong>
+                </div>
+            </div>
+
+            <h4 style="font-size:.95rem;color:var(--gold);margin:20px 0 12px">Payment for this rental</h4>
+            <div class="rental-form-grid">
+                <div>
+                    <label for="repeat-amount-paid">Amount received now</label>
+                    <input id="repeat-amount-paid" type="number" name="amount_paid" min="0" step="0.01" value="{{ rental_form_values.amount_paid|default:'0' }}">
+                </div>
+                <div>
+                    <label for="repeat-payment-method">Payment method</label>
+                    <select id="repeat-payment-method" name="payment_method">
+                        <option value="cash" {% if rental_form_values.payment_method == "cash" %}selected{% endif %}>Cash</option>
+                        <option value="zaad" {% if rental_form_values.payment_method == "zaad" %}selected{% endif %}>Zaad</option>
+                        <option value="edahab" {% if rental_form_values.payment_method == "edahab" %}selected{% endif %}>eDahab</option>
+                        <option value="bank" {% if rental_form_values.payment_method == "bank" %}selected{% endif %}>Bank transfer</option>
+                    </select>
+                </div>
+                <div>
+                    <label for="repeat-payment-reference">Payment reference</label>
+                    <input id="repeat-payment-reference" name="payment_reference" value="{{ rental_form_values.payment_reference|default:'' }}">
+                </div>
+            </div>
+            <div class="mt-3">
+                <label for="repeat-notes">Notes</label>
+                <textarea id="repeat-notes" name="notes" rows="2">{{ rental_form_values.notes|default:'' }}</textarea>
+            </div>
+            <div class="d-flex justify-content-end mt-4">
+                <button id="repeat-submit" type="submit" class="back-btn mb-0" style="background:linear-gradient(135deg,#c9a84c,#e8c96a);color:#0d1b2a;border:0">
+                    <i class="fa-solid fa-check"></i>Create Rental
+                </button>
+            </div>
+        </form>
+    </section>
+    <script>
+        (() => {
+            const form = document.getElementById("repeatRentalForm");
+            const suit = document.getElementById("repeat-suit");
+            const quantity = document.getElementById("repeat-quantity");
+            const days = document.getElementById("repeat-days");
+            const startDate = document.getElementById("repeat-start-date");
+            const endDate = document.getElementById("repeat-end-date");
+            const total = document.getElementById("repeat-total");
+            const submit = document.getElementById("repeat-submit");
+
+            const calculateTotal = () => {
+                const selected = suit.options[suit.selectedIndex];
+                const price = Number(selected?.dataset.price || 0);
+                total.textContent = `$${(price * Number(quantity.value || 1) * Number(days.value || 1)).toFixed(2)}`;
+            };
+            const updateEndDate = () => {
+                if (!startDate.value) return;
+                const end = new Date(`${startDate.value}T12:00:00`);
+                end.setDate(end.getDate() + Number(days.value || 1));
+                endDate.value = `${end.getFullYear()}-${String(end.getMonth() + 1).padStart(2, "0")}-${String(end.getDate()).padStart(2, "0")}`;
+            };
+
+            suit.addEventListener("change", calculateTotal);
+            quantity.addEventListener("input", calculateTotal);
+            days.addEventListener("change", () => { calculateTotal(); updateEndDate(); });
+            startDate.addEventListener("change", updateEndDate);
+            form.addEventListener("submit", (event) => {
+                if (!form.checkValidity()) return;
+                submit.disabled = true;
+                submit.setAttribute("aria-disabled", "true");
+                submit.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>Creating rental…';
+            });
+            calculateTotal();
+        })();
+    </script>
+    {% endif %}
 </div>
 {% endblock %}

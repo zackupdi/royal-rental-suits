@@ -1,5 +1,5 @@
-{% extends "rental/base.html" %}
-{% block title %}Admin Desk | Royal Suit Rental{% endblock %}
+{% extends "rental/base_admin.html" %}
+{% block title %}Create Booking | Royal Suit Rental{% endblock %}
 
 {% block content %}
 <style>
@@ -162,7 +162,7 @@
   .suit-card-noimg i { font-size: 2.5rem; color: var(--gold); opacity: 0.3; }
 
   .accessory-row {
-    display: grid; grid-template-columns: 240px 1fr 1fr 1fr; gap: 0.75rem; align-items: center;
+    display: grid; grid-template-columns: 240px 120px 1fr 1fr; gap: 0.75rem; align-items: center;
     background: rgba(255,255,255,0.02); padding: 0.5rem 0.8rem; border-radius: var(--radius-sm);
     margin-bottom: 0.5rem; border: 1px solid transparent;
   }
@@ -185,7 +185,7 @@
     <div class="rec-title">
       <i class="fas fa-concierge-bell"></i>
       <div>
-        <h1>Reception Desk</h1>
+        <h1>Create Booking</h1>
         <p class="muted-text">Royal Suit Rental &middot; Logged in as <strong style="color:var(--gold)">{{ user.username }}</strong></p>
       </div>
     </div>
@@ -448,16 +448,20 @@
               <label class="form-label">District / City *</label>
               <input type="text" name="present_address" class="form-input" placeholder="Enter district or city" value="{{ prefill_present_address|default:'' }}" required>
             </div>
+            <div class="form-group">
+              <label class="form-label">Parent / Alternate address</label>
+              <input type="text" name="parents_address" class="form-input" value="{{ prefill_parents_address|default:'' }}">
+            </div>
           </div>
 
           <div class="sec-label"><i class="fas fa-id-card"></i> ID Verification</div>
           <div class="form-group">
             <label style="display:flex; align-items:center; gap:8px; font-size:0.85rem; cursor:pointer;">
-              <input type="checkbox" name="has_national_id" id="hasNationalId" onchange="toggleIdFields()" style="width:16px; height:16px; accent-color:var(--gold);">
+              <input type="checkbox" name="has_national_id" id="hasNationalId" onchange="toggleIdFields()" {% if prefill_national_id %}checked{% endif %} style="width:16px; height:16px; accent-color:var(--gold);">
               <span>Customer has a national ID or official document</span>
             </label>
           </div>
-          <div id="idFields" style="display:none;" class="form-grid">
+          <div id="idFields" style="display:{% if prefill_national_id %}grid{% else %}none{% endif %};" class="form-grid">
             <div class="form-group">
               <label class="form-label">ID type</label>
               <select name="id_type" class="form-input">
@@ -469,7 +473,7 @@
             </div>
             <div class="form-group">
               <label class="form-label">ID number</label>
-              <input type="text" name="id_number" class="form-input">
+              <input type="text" name="id_number" class="form-input" value="{{ prefill_national_id|default:'' }}">
             </div>
           </div>
 
@@ -490,7 +494,11 @@
             </div>
             <div class="form-group">
               <label class="form-label">Rental days *</label>
-              <input type="number" name="days" class="form-input" min="1" max="30" value="1" id="rentalDays" oninput="calculateTotal(); calculateEndDate()" required>
+              <select name="days" class="form-input" id="rentalDays" onchange="calculateTotal(); calculateEndDate()" required>
+                {% for duration_days, duration_hours in rental_day_options %}
+                <option value="{{ duration_days }}">{{ duration_days }} Day{{ duration_days|pluralize }} ({{ duration_hours }} Hours)</option>
+                {% endfor %}
+              </select>
             </div>
           </div>
 
@@ -513,7 +521,7 @@
                 <input type="checkbox" name="addons[]" value="tie" onchange="toggleAccessoryRow('tie')">
                 <span>Tie (Gravati)</span>
               </label>
-              <input type="number" name="addon_price_tie" id="addon_price_tie" class="form-input btn-sm" placeholder="Price/day" min="0" step="0.01" disabled>
+              <span>${{ accessory_daily_price|floatformat:2 }}/day</span>
               <input type="text" name="tie_size" id="tie_size" class="form-input btn-sm" placeholder="Size (e.g. Standard)" disabled>
               <input type="text" name="tie_color" id="tie_color" class="form-input btn-sm" placeholder="Color" disabled>
             </div>
@@ -523,7 +531,7 @@
                 <input type="checkbox" name="addons[]" value="shirt" onchange="toggleAccessoryRow('shirt')">
                 <span>Shirt (Shaadh)</span>
               </label>
-              <input type="number" name="addon_price_shirt" id="addon_price_shirt" class="form-input btn-sm" placeholder="Price/day" min="0" step="0.01" disabled>
+              <span>${{ accessory_daily_price|floatformat:2 }}/day</span>
               <input type="text" name="shirt_size" id="shirt_size" class="form-input btn-sm" placeholder="Size (e.g. M, L, XL)" disabled>
               <input type="text" name="shirt_color" id="shirt_color" class="form-input btn-sm" placeholder="Color" disabled>
             </div>
@@ -533,9 +541,19 @@
                 <input type="checkbox" name="addons[]" value="belt" onchange="toggleAccessoryRow('belt')">
                 <span>Belt (Suun)</span>
               </label>
-              <input type="number" name="addon_price_belt" id="addon_price_belt" class="form-input btn-sm" placeholder="Price/day" min="0" step="0.01" disabled>
+              <span>${{ accessory_daily_price|floatformat:2 }}/day</span>
               <input type="text" name="belt_size" id="belt_size" class="form-input btn-sm" placeholder="Size" disabled>
               <input type="text" name="belt_color" id="belt_color" class="form-input btn-sm" placeholder="Color" disabled>
+            </div>
+
+            <div class="accessory-row" id="row_watch">
+              <label style="display:flex; align-items:center; gap:8px; font-size:0.85rem; cursor:pointer;">
+                <input type="checkbox" name="addons[]" value="watch" onchange="toggleAccessoryRow('watch')">
+                <span>Watch (Saacad)</span>
+              </label>
+              <span>${{ accessory_daily_price|floatformat:2 }}/day</span>
+              <input type="text" name="watch_size" id="watch_size" class="form-input btn-sm" placeholder="Style / Type" disabled>
+              <input type="text" name="watch_color" id="watch_color" class="form-input btn-sm" placeholder="Color" disabled>
             </div>
 
             <div class="accessory-row" id="row_shoes">
@@ -543,7 +561,7 @@
                 <input type="checkbox" name="addons[]" value="shoes" onchange="toggleAccessoryRow('shoes')">
                 <span>Shoes (Kabaha)</span>
               </label>
-              <input type="number" name="addon_price_shoes" id="addon_price_shoes" class="form-input btn-sm" placeholder="Price/day" min="0" step="0.01" disabled>
+              <span>${{ accessory_daily_price|floatformat:2 }}/day · separately charged</span>
               <input type="text" name="shoes_size" id="shoes_size" class="form-input btn-sm" placeholder="Size (e.g. 41, 42)" disabled>
               <input type="text" name="shoes_color" id="shoes_color" class="form-input btn-sm" placeholder="Color" disabled>
             </div>
@@ -554,6 +572,7 @@
           <div class="pay-box">
             <div class="pay-row"><span>Price per day (Suit)</span><span id="pricePerDay">$0.00</span></div>
             <div class="pay-row"><span>Accessories per day</span><span id="accPricePerDay">$0.00</span></div>
+            <div class="pay-row"><span>Shoes per day (separate)</span><span id="shoePricePerDay">$0.00</span></div>
             <div class="pay-row"><span>Suit Quantity</span><span id="displayQuantity">1</span></div>
             <div class="pay-row"><span>Days</span><span id="displayDays">1 day</span></div>
             <div class="pay-row"><span>Subtotal</span><strong id="subtotal" style="color: #ffffff;">$0.00</strong></div>
@@ -716,53 +735,39 @@
     const row = document.getElementById('row_' + item);
     const sizeInput = document.getElementById(item + '_size');
     const colorInput = document.getElementById(item + '_color');
-    const priceInput = document.getElementById('addon_price_' + item);
     const checkbox = row.querySelector('input[type="checkbox"]');
 
     if(checkbox.checked) {
       row.classList.add('selected');
       sizeInput.removeAttribute('disabled');
       colorInput.removeAttribute('disabled');
-      priceInput.removeAttribute('disabled');
       sizeInput.setAttribute('required', 'required');
       colorInput.setAttribute('required', 'required');
-      priceInput.setAttribute('required', 'required');
     } else {
       row.classList.remove('selected');
       sizeInput.setAttribute('disabled', 'disabled');
       colorInput.setAttribute('disabled', 'disabled');
-      priceInput.setAttribute('disabled', 'disabled');
       sizeInput.removeAttribute('required');
       colorInput.removeAttribute('required');
-      priceInput.removeAttribute('required');
       sizeInput.value = '';
       colorInput.value = '';
-      priceInput.value = '';
     }
     calculateTotal();
   }
 
   function resetAccessories() {
-    ['tie', 'shirt', 'belt', 'shoes'].forEach(item => {
+    ['tie', 'shirt', 'belt', 'watch', 'shoes'].forEach(item => {
       const row = document.getElementById('row_' + item);
       const sizeInput = document.getElementById(item + '_size');
       const colorInput = document.getElementById(item + '_color');
-      const priceInput = document.getElementById('addon_price_' + item);
+      const checkbox = row.querySelector('input[type="checkbox"]');
       row.classList.remove('selected');
+      checkbox.checked = false;
       sizeInput.setAttribute('disabled', 'disabled');
       colorInput.setAttribute('disabled', 'disabled');
-      priceInput.setAttribute('disabled', 'disabled');
       sizeInput.value = '';
       colorInput.value = '';
-      priceInput.value = '';
     });
-  }
-
-  function getAccessoryPrice(item) {
-    const input = document.getElementById('addon_price_' + item);
-    if (!input) return 0;
-    const value = parseFloat(input.value);
-    return (!isNaN(value) && value > 0) ? value : 0;
   }
 
   function calculateTotal() {
@@ -771,18 +776,24 @@
     const qty = (select && select.value) ? (parseInt(document.getElementById('qtyInput').value) || 1) : 0;
     
     let accPricePerDay = 0;
+    let shoePricePerDay = 0;
     const checkboxes = document.querySelectorAll('input[name="addons[]"]:checked');
     checkboxes.forEach(cb => {
-      accPricePerDay += getAccessoryPrice(cb.value);
+      if (cb.value === 'shoes') {
+        shoePricePerDay += {{ accessory_daily_price|floatformat:2 }};
+      } else {
+        accPricePerDay += {{ accessory_daily_price|floatformat:2 }};
+      }
     });
 
     const days = parseInt(document.getElementById('rentalDays').value) || 1;
     
     const suitSubtotal = suitPrice * qty * days;
-    const accSubtotal = accPricePerDay * days;
+    const accSubtotal = (accPricePerDay + shoePricePerDay) * qty * days;
     const subtotal = suitSubtotal + accSubtotal;
     
     document.getElementById('accPricePerDay').textContent = '$' + accPricePerDay.toFixed(2);
+    document.getElementById('shoePricePerDay').textContent = '$' + shoePricePerDay.toFixed(2);
     document.getElementById('displayQuantity').textContent = (qty > 0) ? qty : '0';
     document.getElementById('displayDays').textContent = days + (days > 1 ? ' days' : ' day');
     document.getElementById('subtotal').textContent = '$' + subtotal.toFixed(2);

@@ -12,7 +12,7 @@ from django.conf import settings
 from django.shortcuts import render, redirect, get_object_or_404
 from django.urls import reverse
 from django.core.paginator import Paginator
-from django.contrib.auth import authenticate, login, logout
+from django.contrib.auth import authenticate, login, logout, update_session_auth_hash
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.models import User
 from django.contrib import messages
@@ -20,19 +20,96 @@ from django import forms
 from django.core.exceptions import ValidationError
 from django.core.validators import validate_email
 from django.db import IntegrityError, transaction
-from django.db.models import Q, Sum, Count
+from django.db.models import F, IntegerField, OuterRef, Q, Subquery, Sum, Value, Count
+from django.db.models.functions import Coalesce, TruncDate
 from django.utils import timezone
 from django.views.decorators.cache import never_cache
-from django.utils.dateparse import parse_date
+from django.views.decorators.http import require_POST
+from django.utils.dateparse import parse_date, parse_datetime
 from django.core.mail import send_mail
 from django.template.loader import render_to_string
 from datetime import datetime, time, timedelta, date
 from decimal import Decimal, InvalidOperation
+from uuid import UUID, uuid4
 
 from . import views_public
 from .forms import validate_image_upload
-from .models import Suit, SuitRequest, Payment, Expense, Notification, FavoriteSuit, Profile, ContactMessage, Staff, Payroll, DryCleaning
+from .models import Suit, SuitRequest, Payment, Expense, Notification, FavoriteSuit, Profile, ContactMessage, Staff, Payroll, DryCleaning, InventoryMovement, RentalPolicy, record_inventory_movement, record_late_fee_transaction
 from .sms import send_sms
+from .workflow import (
+    LABELS as WORKFLOW_LABELS,
+    WorkflowError,
+    allowed_next,
+    build_steps,
+    change_status,
+    expire_overdue,
+    is_staff_user,
+    record_status_change,
+    user_bookings,
+    validate_booking_dates,
+)
+
+ACCESSORY_DAILY_PRICE = Decimal("5.00")
+ACCESSORY_TYPES = ("tie", "shirt", "belt", "watch", "shoes")
+
+
+def _available_inventory_queryset(queryset=None):
+    reservations = SuitRequest.objects.filter(
+        suit_id=OuterRef("pk"),
+        status="Reserved",
+    ).filter(
+        Q(due_date__isnull=True) | Q(due_date__gt=timezone.now())
+    ).order_by().values("suit_id").annotate(
+        total=Sum("quantity_requested")
+    ).values("total")
+    return (
+        (queryset if queryset is not None else Suit.objects.all())
+        .annotate(
+            _held_units=Coalesce(
+                Subquery(reservations, output_field=IntegerField()),
+                Value(0),
+            )
+        )
+        .annotate(_available_units=F("quantity") - F("_held_units"))
+        .filter(_available_units__gt=0)
+        .exclude(condition_grade="retired")
+    )
+
+
+def _set_inventory_quantity(request, suit, raw_quantity):
+    try:
+        quantity = int(raw_quantity)
+    except (TypeError, ValueError):
+        messages.error(request, "Enter a valid whole-number stock quantity.")
+        return False
+
+    if quantity < 0:
+        messages.error(request, "Stock quantity cannot be negative.")
+        return False
+
+    with transaction.atomic():
+        locked_suit = Suit.objects.select_for_update().get(pk=suit.pk)
+        held_quantity = locked_suit.held_quantity
+        if quantity < held_quantity:
+            messages.error(
+                request,
+                f"Stock cannot be reduced below the {held_quantity} unit(s) currently reserved.",
+            )
+            return False
+
+        quantity_delta = quantity - locked_suit.quantity
+        if quantity_delta:
+            locked_suit.quantity = quantity
+            locked_suit.save(update_fields=["quantity"])
+            record_inventory_movement(
+                locked_suit,
+                "adjustment",
+                quantity_delta=quantity_delta,
+                performed_by=request.user,
+                notes="Manual inventory quantity adjustment.",
+            )
+        suit.quantity = quantity
+    return True
 
 
 def get_user_profile(user):
@@ -43,46 +120,54 @@ def get_user_profile(user):
 
 
 def is_cashier(user):
-    if not user.is_authenticated:
+    if not user.is_authenticated or not user.is_staff or user.is_superuser:
         return False
     profile = get_user_profile(user)
-    return bool(
-        (user.is_staff and profile and profile.is_cashier) or
-        user.groups.filter(name="Cashier").exists()
-    )
+    return bool(profile and profile.is_cashier)
 
 
 def is_reception(user):
-    if not user.is_authenticated:
+    if not user.is_authenticated or not user.is_staff or user.is_superuser:
         return False
     profile = get_user_profile(user)
     return bool(
-        (user.is_staff and profile and profile.is_reception) or
-        user.groups.filter(name="Reception").exists()
+        (profile and profile.is_reception)
+        or user.groups.filter(name="Reception").exists()
     )
 
 
 def is_admin(user):
     if not user.is_authenticated:
         return False
+    if user.is_superuser:
+        return True
+    if not user.is_staff:
+        return False
+
     profile = get_user_profile(user)
-    return bool(
-        (user.is_staff and profile and not profile.is_cashier and not profile.is_reception) or
-        user.groups.filter(name="Admin").exists()
-    )
+    if (
+        (profile and (profile.is_cashier or profile.is_reception)) or
+        user.groups.filter(name__in=("Cashier", "Reception")).exists()
+    ):
+        return False
+
+    return True
 
 
 def is_reception_or_cashier_or_admin(user):
-    return is_reception(user) or is_cashier(user) or is_admin(user)
+    return is_admin(user)
 
 
 def is_cashier_or_admin(user):
-    return is_cashier(user) or is_admin(user)
+    return is_admin(user)
 
 
 def is_reception_or_admin(user):
-    """Return True if user is reception staff or admin."""
-    return is_reception(user) or is_admin(user)
+    return is_admin(user)
+
+
+def _can_manage_customer_rentals(user):
+    return is_admin(user) or is_reception(user)
 
 
 def validate_name_input(value, field_name='name'):
@@ -110,18 +195,23 @@ def validate_national_id(national_id):
     return national_id
 
 
+def parse_historical_date(value, field_name="date"):
+    """Parse a date used for historical records and reject dates after today."""
+    if not value:
+        return None, None
+
+    parsed_date = parse_date(value)
+    if parsed_date is None:
+        return None, f"Enter a valid {field_name}."
+    if parsed_date > timezone.localdate():
+        return None, f"{field_name.capitalize()} cannot be in the future."
+    return parsed_date, None
+
+
 @login_required
 def payments(request):
-    """Dispatch to the appropriate payments view based on user role.
-
-    - Admin users see the admin payments view.
-    - Reception/cashier users see the reception payments view.
-    """
     if is_admin(request.user):
         return admin_payments(request)
-
-    if is_reception_or_cashier_or_admin(request.user):
-        return reception_payments(request)
 
     messages.error(request, "Access denied.")
     return redirect("home")
@@ -251,12 +341,9 @@ def logout_view(request):
 @never_cache
 @login_required
 def dashboard(request):
-    if not request.user.is_authenticated or not request.user.is_staff:
+    if not is_admin(request.user):
         messages.error(request, "Access denied. Admin only.")
         return redirect("home")
-
-    if is_reception(request.user) or is_cashier(request.user):
-        return redirect("reception_dashboard")
 
     selected_period = request.GET.get("period", "monthly").lower()
     if selected_period not in {"daily", "weekly", "monthly", "yearly"}:
@@ -297,8 +384,8 @@ def dashboard(request):
         elif selected_status == "returned":
             requests_qs = requests_qs.filter(status="Returned")
         elif selected_status == "available":
-            suits_qs = suits_qs.filter(status="Available")
-            requests_qs = requests_qs.filter(suit__status="Available")
+            suits_qs = _available_inventory_queryset(suits_qs)
+            requests_qs = requests_qs.filter(suit__in=suits_qs)
         elif selected_status == "dry-cleaning":
             suits_qs = suits_qs.filter(status="Dry Cleaning")
             requests_qs = requests_qs.filter(suit__status="Dry Cleaning")
@@ -396,7 +483,7 @@ def dashboard(request):
         "total_suits_count": suits_qs.count(),
         "total_quantity": suits_qs.aggregate(total=Sum('quantity'))['total'] or 0,
         "available_quantity": suits_qs.filter(status="Available").aggregate(total=Sum('quantity'))['total'] or 0,
-        "available_suits_count": suits_qs.filter(status="Available").count(),
+        "available_suits_count": _available_inventory_queryset(suits_qs).count(),
         "booked_suits": requests_qs.filter(status="Active").aggregate(total=Sum('quantity_requested'))['total'] or 0,
         "total_requests": requests_qs.count(),
         "pending_requests": pending_requests[:5],
@@ -442,12 +529,13 @@ def dashboard(request):
 
 @login_required
 def cashier_dashboard(request):
-    return redirect("reception_dashboard")
+    return redirect("dashboard")
 
 
+@login_required
 def reception_dashboard(request):
-    if not is_reception_or_admin(request.user):
-        messages.error(request, "Access denied. Reception/Admin only.")
+    if not (is_reception(request.user) or is_cashier(request.user)):
+        messages.error(request, "Access denied. Reception staff only.")
         return redirect("dashboard")
 
     suits_qs = Suit.objects.all()
@@ -467,7 +555,7 @@ def reception_dashboard(request):
         "active_count": active_rentals.count(),
         "overdue_count": len(overdue_requests),
         "total_suits_count": suits_qs.count(),
-        "available_suits_count": suits_qs.filter(status="Available").count(),
+        "available_suits_count": _available_inventory_queryset(suits_qs).count(),
         "cleaning_count": cleaning_count,
         "today_revenue": today_revenue,
     }
@@ -477,15 +565,17 @@ def reception_dashboard(request):
 
 @login_required
 def reception_home(request):
-    if not is_reception_or_admin(request.user):
-        messages.error(request, "Access denied. Reception/Admin only.")
-        return redirect("home")
+    if not (is_reception(request.user) or is_cashier(request.user)):
+        messages.error(request, "Access denied. Reception staff only.")
+        return redirect("dashboard")
 
     pending_count = SuitRequest.objects.filter(status="Pending").count()
     active_rentals = SuitRequest.objects.filter(status="Active").order_by("-request_date")
     overdue_requests = [r for r in active_rentals if r.is_overdue]
     total_suits = Suit.objects.count()
-    available_count = Suit.objects.filter(status="Available").aggregate(total=Sum('quantity'))['total'] or 0
+    available_count = _available_inventory_queryset().aggregate(
+        total=Sum("_available_units")
+    )["total"] or 0
 
     context = {
         'pending_count': pending_count,
@@ -501,9 +591,9 @@ def reception_home(request):
 
 @login_required
 def reception_profile(request):
-    if not is_reception_or_admin(request.user):
-        messages.error(request, "Access denied. Reception/Admin only.")
-        return redirect("home")
+    if not (is_reception(request.user) or is_cashier(request.user)):
+        messages.error(request, "Access denied. Reception staff only.")
+        return redirect("dashboard")
 
     profile = get_user_profile(request.user)
     return render(request, "reception/reception_profile.html", {
@@ -518,7 +608,7 @@ def _build_booking_desk_context():
     overdue_requests = [r for r in active_rentals if r.is_overdue]
 
     today = timezone.now().date()
-    available_suits = Suit.objects.filter(quantity__gt=0, status="Available").order_by("suit_name")
+    available_suits = _available_inventory_queryset().order_by("suit_name")
     returned_requests = SuitRequest.objects.filter(status="Returned").select_related("suit").order_by("-return_date")
     today_new_rentals = SuitRequest.objects.filter(request_date__date=today).count()
     today_returns = SuitRequest.objects.filter(status="Returned", return_date__date=today).count()
@@ -526,7 +616,9 @@ def _build_booking_desk_context():
     pending_balances = SuitRequest.objects.filter(status="Active", is_paid=False).aggregate(total=Sum('total_amount'))['total'] or 0
     net_today = today_revenue
     inventory_total = Suit.objects.count()
-    available_stock_units = Suit.objects.filter(status="Available").aggregate(total=Sum('quantity'))['total'] or 0
+    available_stock_units = _available_inventory_queryset().aggregate(
+        total=Sum("_available_units")
+    )["total"] or 0
     dry_cleaning_count = Suit.objects.filter(status="Dry Cleaning").count() + returned_requests.count()
     monthly_cleaning_spend = Expense.objects.filter(expense_date__year=today.year, expense_date__month=today.month).aggregate(total=Sum('amount'))['total'] or 0
     recent_expenses = Expense.objects.order_by("-expense_date")[:5]
@@ -539,6 +631,7 @@ def _build_booking_desk_context():
         'active_count': active_rentals.count(),
         'overdue_count': len(overdue_requests),
         'available_suits': available_suits,
+        'rental_day_options': [(days, days * 24) for days in range(1, 31)],
         'today_new_rentals': today_new_rentals,
         'today_returns': today_returns,
         'today_revenue': today_revenue,
@@ -555,18 +648,21 @@ def _build_booking_desk_context():
 
 @login_required
 def reception_reception(request):
-    if not is_reception_or_admin(request.user):
-        messages.error(request, "Access denied. Reception/Admin only.")
-        return redirect("home")
+    if not (is_reception(request.user) or is_cashier(request.user)):
+        messages.error(request, "Access denied. Reception staff only.")
+        return redirect("dashboard")
 
     prefill = request.session.pop("prefill_customer", None) or {}
     context = _build_booking_desk_context()
     context.update({
+        "accessory_daily_price": ACCESSORY_DAILY_PRICE,
         "prefill_first_name": prefill.get("first_name", ""),
         "prefill_father_name": prefill.get("father_name", ""),
         "prefill_grandfather_name": prefill.get("grandfather_name", ""),
         "prefill_phone": prefill.get("phone", ""),
         "prefill_present_address": prefill.get("present_address", ""),
+        "prefill_parents_address": prefill.get("parents_address", ""),
+        "prefill_national_id": prefill.get("national_id", ""),
         "prefill_customer_id": prefill.get("customer_id", ""),
     })
     return render(request, "reception/reception.html", context)
@@ -574,18 +670,21 @@ def reception_reception(request):
 
 @login_required
 def admin_booking(request):
-    if not is_reception_or_admin(request.user):
-        messages.error(request, "Access denied. Reception/Admin only.")
-        return redirect("home")
+    if not is_admin(request.user):
+        messages.error(request, "Access denied. Admin only.")
+        return redirect("dashboard" if is_reception(request.user) or is_cashier(request.user) else "home")
 
     prefill = request.session.pop("prefill_customer", None) or {}
     context = _build_booking_desk_context()
     context.update({
+        "accessory_daily_price": ACCESSORY_DAILY_PRICE,
         "prefill_first_name": prefill.get("first_name", ""),
         "prefill_father_name": prefill.get("father_name", ""),
         "prefill_grandfather_name": prefill.get("grandfather_name", ""),
         "prefill_phone": prefill.get("phone", ""),
         "prefill_present_address": prefill.get("present_address", ""),
+        "prefill_parents_address": prefill.get("parents_address", ""),
+        "prefill_national_id": prefill.get("national_id", ""),
         "prefill_customer_id": prefill.get("customer_id", ""),
     })
     return render(request, "admin/admin_booking.html", context)
@@ -607,31 +706,70 @@ def all_suits_reception(request):
 
 @login_required
 def create_rental(request):
-    if not is_reception_or_admin(request.user):
-        messages.error(request, "Access denied. Reception/Admin only.")
+    is_repeat_submission = request.POST.get("repeat_rental_submission") == "1"
+    customer_user_id = request.POST.get("customer_user_id", "").strip()
+    is_reception_user = is_reception(request.user)
+    if not is_admin(request.user) and not (is_reception_user and is_repeat_submission):
+        messages.error(request, "Only Admin or Reception may create this rental.")
         return redirect("home")
 
     if request.method != "POST":
-        return redirect("reception_reception")
+        return redirect("manage_users" if is_reception_user else "requests")
+
+    repeat_customer = None
+    repeat_token_key = None
+    if is_repeat_submission:
+        try:
+            repeat_customer = User.objects.get(pk=int(customer_user_id), is_staff=False)
+        except (TypeError, ValueError, User.DoesNotExist):
+            messages.error(request, "Select a valid customer account before creating a rental.")
+            return redirect("manage_users")
+
+        repeat_token_key = f"repeat_rental_token_{repeat_customer.pk}"
+        submitted_token = request.POST.get("rental_submission_token", "")
+        if not submitted_token or submitted_token != request.session.get(repeat_token_key):
+            messages.error(request, "This rental form was already submitted or has expired. Please review it and try again.")
+            return redirect("new_rent_for_customer", user_id=repeat_customer.pk)
+        request.session.pop(repeat_token_key, None)
+
+    def rental_error_redirect():
+        if repeat_customer:
+            field_names = (
+                "first_name", "father_name", "grandfather_name", "phone",
+                "present_address", "parents_address", "has_national_id",
+                "id_number", "suit_id", "quantity", "days", "start_date",
+                "end_date", "amount_paid", "payment_method",
+                "payment_reference", "notes",
+            )
+            request.session[f"repeat_rental_form_values_{repeat_customer.pk}"] = {
+                name: request.POST.get(name, "") for name in field_names
+            }
+            return redirect("new_rent_for_customer", user_id=repeat_customer.pk)
+        if is_reception_user:
+            return redirect("manage_users")
+        return redirect("requests")
 
     suit_id_raw = request.POST.get("suit_id", "").strip()
     if not suit_id_raw:
         messages.error(request, "Please select a suit before creating a rental.")
-        return redirect("reception_reception")
+        return rental_error_redirect()
 
     try:
         suit_id = int(suit_id_raw)
     except (TypeError, ValueError):
         messages.error(request, "Please select a valid suit before creating a rental.")
-        return redirect("reception_reception")
+        return rental_error_redirect()
 
-    suit = get_object_or_404(Suit, id=suit_id)
+    suit = Suit.objects.filter(pk=suit_id).first()
+    if suit is None:
+        messages.error(request, "The selected suit is unavailable. Please choose another suit.")
+        return rental_error_redirect()
     try:
         quantity_requested = int(request.POST.get("quantity", 1))
         days_requested = int(request.POST.get("days", 1))
     except (TypeError, ValueError):
         messages.error(request, "Please enter valid numeric values for quantity and rental days.")
-        return redirect("reception_reception")
+        return rental_error_redirect()
     start_date = parse_date(request.POST.get("start_date"))
     end_date = parse_date(request.POST.get("end_date"))
     first_name = request.POST.get("first_name", "").strip()
@@ -640,24 +778,68 @@ def create_rental(request):
     phone = request.POST.get("phone", "").strip()
     national_id = request.POST.get("id_number") if request.POST.get("has_national_id") else None
     present_address = request.POST.get("present_address", "").strip()
+    parents_address = request.POST.get("parents_address", "").strip()
     notes = request.POST.get("notes", "").strip()
-    customer_user_id = request.POST.get("customer_user_id", "").strip()
     amount_paid_raw = request.POST.get("amount_paid", "0").strip() or "0"
     payment_method = request.POST.get("payment_method", "cash").strip()
     payment_reference = request.POST.get("payment_reference", "").strip()
     accessories = request.POST.getlist("addons[]")
+    if any(accessory not in ACCESSORY_TYPES for accessory in accessories):
+        messages.error(request, "Please select valid accessories.")
+        return rental_error_redirect()
+
+    user_for_rental = repeat_customer
+    if customer_user_id and not is_repeat_submission:
+        try:
+            user_for_rental = User.objects.get(pk=int(customer_user_id), is_staff=False)
+        except (TypeError, ValueError, User.DoesNotExist):
+            messages.error(request, "The selected customer account could not be found.")
+            return rental_error_redirect()
+
+    if user_for_rental:
+        customer_profile, _ = Profile.objects.get_or_create(user=user_for_rental)
+        recent_rental = (
+            SuitRequest.objects.filter(user=user_for_rental)
+            .order_by("-request_date")
+            .first()
+        )
+        first_name = (
+            first_name or user_for_rental.first_name
+            or (recent_rental.first_name if recent_rental else "")
+            or user_for_rental.username
+        )
+        father_name = (
+            father_name or user_for_rental.last_name
+            or (recent_rental.second_name if recent_rental else "")
+        )
+        phone = (
+            phone or customer_profile.customer_phone
+            or (recent_rental.phone if recent_rental else "")
+        )
+        national_id = (
+            national_id or customer_profile.national_id
+            or (recent_rental.national_id if recent_rental else None)
+        )
+        present_address = (
+            present_address or customer_profile.present_address
+            or (recent_rental.present_address if recent_rental else "")
+        )
+        parents_address = (
+            parents_address or customer_profile.parents_address
+            or (recent_rental.parents_address if recent_rental else "")
+        )
 
     try:
         phone = validate_phone_number(phone)
     except ValueError as e:
         messages.error(request, str(e))
-        return redirect("reception_reception")
+        return rental_error_redirect()
 
     try:
         national_id = validate_national_id(national_id)
     except ValueError as e:
         messages.error(request, str(e))
-        return redirect("reception_reception")
+        return rental_error_redirect()
 
     image_file = request.FILES.get("customer_image")
     if image_file:
@@ -666,124 +848,144 @@ def create_rental(request):
                 validate_image_upload(image_file, "customer image")
         except forms.ValidationError as e:
             messages.error(request, str(e))
-            return redirect("reception_reception")
+            return rental_error_redirect()
 
     try:
         amount_paid = Decimal(amount_paid_raw)
     except (InvalidOperation, TypeError, ValueError):
         messages.error(request, "Please enter a valid amount paid.")
-        return redirect("reception_reception")
+        return rental_error_redirect()
 
     if amount_paid < 0:
         messages.error(request, "Amount paid cannot be negative.")
-        return redirect("reception_reception")
+        return rental_error_redirect()
 
     if quantity_requested < 1 or quantity_requested > 5:
         messages.error(request, "Please select a quantity between 1 and 5 suits.")
-        return redirect("reception_reception")
+        return rental_error_redirect()
 
     if days_requested < 1 or days_requested > 30:
         messages.error(request, "Please select a rental duration between 1 and 30 days.")
-        return redirect("reception_reception")
-
-    if quantity_requested > suit.quantity:
-        messages.error(request, f"Only {suit.quantity} suits are available for this selection.")
-        return redirect("reception_reception")
-
-    if not suit.is_available_for_booking:
-        messages.error(request, "The selected suit is not currently available.")
-        return redirect("reception_reception")
+        return rental_error_redirect()
 
     if not start_date or not end_date:
         messages.error(request, "Please provide a valid rental start and end date.")
-        return redirect("reception_reception")
+        return rental_error_redirect()
 
     if end_date <= start_date:
         messages.error(request, "Return date must be after rental start date.")
-        return redirect("reception_reception")
+        return rental_error_redirect()
 
     rental_start_time = timezone.make_aware(datetime.combine(start_date, time.min))
-    rental_end_time = timezone.make_aware(datetime.combine(end_date, time.min))
+    rental_end_time = rental_start_time + timedelta(days=days_requested)
 
-    accessory_total = Decimal("0.00")
+    accessory_total = ACCESSORY_DAILY_PRICE * len(set(accessories))
     accessory_details = []
-    for accessory in accessories:
-        price_raw = request.POST.get(f"addon_price_{accessory}", "").strip()
-        if not price_raw:
-            continue
-        try:
-            accessory_price = Decimal(price_raw)
-        except (InvalidOperation, TypeError, ValueError):
-            messages.error(request, f"Please enter a valid price for {accessory}.")
-            return redirect("reception_reception")
-        if accessory_price < 0:
-            messages.error(request, "Accessory prices cannot be negative.")
-            return redirect("reception_reception")
-        accessory_total += accessory_price
-        accessory_details.append(f"{accessory.title()}: ${accessory_price:.2f}")
+    for accessory in dict.fromkeys(accessories):
+        size = request.POST.get(f"{accessory}_size", "").strip()
+        color = request.POST.get(f"{accessory}_color", "").strip()
+        accessory_details.append(
+            f"{accessory} ({size or 'Standard'} / {color or 'Standard'})"
+        )
 
-    total_amount = (suit.price_per_day * quantity_requested * days_requested) + (accessory_total * days_requested)
+    total_amount = (
+        suit.price_per_day * quantity_requested * days_requested
+        + accessory_total * quantity_requested * days_requested
+    )
     customer_full_name = " ".join(filter(None, [first_name, father_name, grandfather_name])) or "Guest Customer"
 
     if amount_paid > total_amount:
         messages.error(request, "Amount paid cannot exceed the total rental amount.")
-        return redirect("reception_reception")
+        return rental_error_redirect()
 
-    user_for_rental = None
-    if customer_user_id:
-        try:
-            user_for_rental = User.objects.get(id=int(customer_user_id))
-        except (TypeError, ValueError, User.DoesNotExist):
-            user_for_rental = None
+    try:
+        with transaction.atomic():
+            suit = Suit.objects.select_for_update().get(pk=suit_id)
+            if suit.is_retired or quantity_requested > suit.quantity:
+                raise ValidationError(
+                    f"Only {suit.quantity} units of {suit.suit_name} are currently available."
+                )
 
-    rental = SuitRequest.objects.create(
-        suit=suit,
-        user=user_for_rental,
-        first_name=first_name or None,
-        second_name=father_name or None,
-        name=customer_full_name,
-        phone=phone,
-        customer_email=request.user.email if request.user.is_authenticated else None,
-        national_id=national_id,
-        present_address=present_address or None,
-        parents_address=None,
-        notes=notes or None,
-        rental_start_time=rental_start_time,
-        end_time=rental_end_time,
-        days_requested=days_requested,
-        quantity_requested=quantity_requested,
-        total_amount=total_amount,
-        status="Active",
-        is_paid=False,
-        payment_method=payment_method.title() if amount_paid > 0 else "",
-        payment_reference=payment_reference if amount_paid > 0 else None,
-    )
+            rental = SuitRequest.objects.create(
+                suit=suit,
+                user=user_for_rental,
+                first_name=first_name or None,
+                second_name=father_name or None,
+                name=customer_full_name,
+                phone=phone,
+                customer_email=user_for_rental.email if user_for_rental else None,
+                national_id=national_id,
+                present_address=present_address or None,
+                parents_address=parents_address or None,
+                notes="\n".join(
+                    line for line in (
+                        notes,
+                        f"Accessories: {', '.join(accessory_details)}" if accessory_details else "",
+                    ) if line
+                ) or None,
+                days_requested=days_requested,
+                quantity_requested=quantity_requested,
+                total_amount=total_amount,
+                customer_image=image_file,
+                status="Pending",
+                is_paid=False,
+                payment_method=payment_method.title() if amount_paid > 0 else "",
+                payment_reference=payment_reference if amount_paid > 0 else None,
+            )
+            rental.start_rental(start_time=rental_start_time, performed_by=request.user)
 
-    suit.quantity -= quantity_requested
-    suit.status = "Rented"
-    suit.save()
-    suit.refresh_rental_end_time()
+            if user_for_rental:
+                updated_user_fields = []
+                if first_name and user_for_rental.first_name != first_name and not (
+                    not user_for_rental.first_name and first_name == user_for_rental.username
+                ):
+                    user_for_rental.first_name = first_name
+                    updated_user_fields.append("first_name")
+                if father_name and user_for_rental.last_name != father_name:
+                    user_for_rental.last_name = father_name
+                    updated_user_fields.append("last_name")
+                if updated_user_fields:
+                    user_for_rental.save(update_fields=updated_user_fields)
+                customer_profile, _ = Profile.objects.get_or_create(user=user_for_rental)
+                updated_profile_fields = []
+                profile_values = {
+                    "customer_phone": phone,
+                    "national_id": national_id,
+                    "present_address": present_address,
+                    "parents_address": parents_address,
+                }
+                for field_name, value in profile_values.items():
+                    if value and getattr(customer_profile, field_name) != value:
+                        setattr(customer_profile, field_name, value)
+                        updated_profile_fields.append(field_name)
+                if updated_profile_fields:
+                    customer_profile.save(update_fields=updated_profile_fields + ["updated_at"])
 
-    if amount_paid > 0:
-        payment_status = 'paid' if amount_paid >= total_amount else 'partial'
-        payment = Payment.objects.create(
-            rental=rental,
-            cashier=request.user,
-            amount_paid=amount_paid,
-            payment_method=payment_method.title() if payment_method else 'Cash',
-            payment_reference=payment_reference or None,
-            status=payment_status,
-            payment_date=timezone.now(),
-        )
-        payment.receipt_number = f"RCPT-{payment.id:06d}"
-        payment.save(update_fields=['receipt_number'])
+            if amount_paid > 0:
+                payment_status = 'paid' if amount_paid >= total_amount else 'partial'
+                payment = Payment.objects.create(
+                    rental=rental,
+                    cashier=request.user,
+                    amount_paid=amount_paid,
+                    payment_method=payment_method.title() if payment_method else 'Cash',
+                    payment_reference=payment_reference or None,
+                    status=payment_status,
+                    payment_date=timezone.now(),
+                )
+                payment.receipt_number = f"RCPT-{payment.id:06d}"
+                payment.save(update_fields=['receipt_number'])
 
-        if amount_paid >= total_amount:
-            rental.is_paid = True
-            rental.save(update_fields=['is_paid'])
+                if amount_paid >= total_amount:
+                    rental.is_paid = True
+                    rental.save(update_fields=['is_paid'])
+    except ValidationError as exc:
+        messages.error(request, "; ".join(exc.messages))
+        return rental_error_redirect()
 
     messages.success(request, "New rental was created successfully.")
-    return redirect("reception_reception")
+    if repeat_customer:
+        return redirect("customer_detail_by_user", user_id=repeat_customer.pk)
+    return redirect("requests")
 
 
 # =========================
@@ -827,11 +1029,30 @@ def receipt_view(request, req_id):
         messages.error(request, "You do not have permission to view this receipt.")
         return redirect("requests")
 
+    latest_payment = (
+        req.payments.select_related("cashier")
+        .order_by("-payment_date")
+        .first()
+    )
     return render(request, "admin/receipt.html", {
         "req": req,
         "company_name": "Suit Rental",
         "company_address": "123 Main Street, City",
         "company_phone": "+252 61 234 5678",
+        "receipt_number": (
+            latest_payment.receipt_number
+            if latest_payment and latest_payment.receipt_number
+            else f"SR-{req.pk:06d}"
+        ),
+        "reception_name": (
+            latest_payment.cashier.get_full_name() or latest_payment.cashier.username
+            if latest_payment and latest_payment.cashier
+            else "Royal Rental"
+        ),
+        "total_amount": req.total_amount,
+        "is_admin_user": is_admin(request.user),
+        "is_reception_user": is_reception(request.user),
+        "hide_admin_sidebar": not is_admin(request.user),
     })
 
 
@@ -954,50 +1175,82 @@ def requests_page(request):
         messages.error(request, "Access denied. Admin only.")
         return redirect("home")
 
-    requests = SuitRequest.objects.all().order_by("-request_date")
+    expire_overdue()
 
-    status_filter = request.GET.get("status")
-    if status_filter:
-        if status_filter == "pending":
-            requests = requests.filter(status="Pending")
-        elif status_filter == "reserved":
-            requests = requests.filter(status__in=["Approved", "Reserved"])
-        elif status_filter == "active":
-            requests = requests.filter(status="Active")
-        elif status_filter == "returned":
-            requests = requests.filter(status="Returned")
-        elif status_filter == "available":
-            requests = requests.filter(suit__status="Available")
-        elif status_filter == "dry-cleaning":
-            requests = requests.filter(suit__status="Dry Cleaning")
-        else:
-            requests = requests.filter(status=request.GET.get("status"))
+    tab_statuses = {
+        "pending": ("Pending",),
+        "reserved": ("Approved", "Reserved"),
+        "active": ("Active",),
+        "returned": ("Returned",),
+        "closed": ("Rejected", "Expired"),
+    }
+    legacy_tab = {
+        "Pending": "pending",
+        "Approved": "reserved",
+        "Reserved": "reserved",
+        "Active": "active",
+        "Returned": "returned",
+        "Rejected": "closed",
+        "Expired": "closed",
+    }
+    requested_tab = request.GET.get("tab", "").strip()
+    if not requested_tab:
+        requested_tab = legacy_tab.get(request.GET.get("status", ""), "pending")
+    active_tab = requested_tab if requested_tab in tab_statuses else "pending"
+    query = request.GET.get("q", "").strip()
 
-    if request.GET.get("q"):
-        q = request.GET.get("q")
-        requests = requests.filter(
-            Q(name__icontains=q) |
-            Q(phone__icontains=q) |
-            Q(suit__suit_name__icontains=q)
+    all_requests = SuitRequest.objects.select_related("suit")
+    if query:
+        search_filter = (
+            Q(name__icontains=query)
+            | Q(phone__icontains=query)
+            | Q(national_id__icontains=query)
+            | Q(suit__suit_name__icontains=query)
         )
+        numeric_query = query.lstrip("#")
+        if numeric_query.isdigit() and len(numeric_query) <= 18:
+            search_filter |= Q(pk=int(numeric_query))
+        all_requests = all_requests.filter(search_filter)
 
-    available_count = Suit.objects.filter(status="Available").count()
+    counts = {
+        "pending": all_requests.filter(status="Pending").count(),
+        "reserved": all_requests.filter(status__in=tab_statuses["reserved"]).count(),
+        "active": all_requests.filter(status="Active").count(),
+        "returned": all_requests.filter(status="Returned").count(),
+        "closed": all_requests.filter(status__in=tab_statuses["closed"]).count(),
+    }
+    requests = all_requests.filter(status__in=tab_statuses[active_tab])
+    requests = requests.order_by("waiting_deadline", "-request_date") if active_tab == "reserved" else requests.order_by("-request_date")
+    page_obj = Paginator(requests, 10).get_page(request.GET.get("page"))
+
+    available_count = _available_inventory_queryset().count()
     reserved_count = Suit.objects.filter(status="Reserved").count()
     rented_count = Suit.objects.filter(status="Rented").count()
     returned_count = Suit.objects.filter(status="Returned").count()
     dry_cleaning_count = Suit.objects.filter(status="Dry Cleaning").count()
 
     context = {
-        "requests": requests,
-        "active_requests": SuitRequest.objects.filter(status="Active").order_by("-request_date"),
-        "total_count": SuitRequest.objects.count(),
-        "pending_count": SuitRequest.objects.filter(status="Pending").count(),
+        "requests": page_obj.object_list,
+        "page_obj": page_obj,
+        "tabs": [
+            {"key": "pending", "label": "Pending", "icon": "fa-hourglass-half", "count": counts["pending"]},
+            {"key": "reserved", "label": "Reserved", "icon": "fa-bookmark", "count": counts["reserved"]},
+            {"key": "active", "label": "Active", "icon": "fa-shirt", "count": counts["active"]},
+            {"key": "returned", "label": "Returned", "icon": "fa-rotate-left", "count": counts["returned"]},
+            {"key": "closed", "label": "Rejected / Expired", "icon": "fa-ban", "count": counts["closed"]},
+        ],
+        "active_tab": active_tab,
+        "current_q": query,
+        "active_requests": SuitRequest.objects.filter(status="Active").select_related("suit").order_by("-request_date"),
+        "late_fee_policy": RentalPolicy.get_solo(),
+        "return_payment_key": str(uuid4()),
+        "total_count": all_requests.count(),
+        "pending_count": counts["pending"],
         "approved_count": SuitRequest.objects.filter(status="Approved").count(),
         "rejected_count": SuitRequest.objects.filter(status="Rejected").count(),
-        "active_count": SuitRequest.objects.filter(status="Active").count(),
+        "active_count": counts["active"],
         "returned_count": returned_count,
         "expired_count": SuitRequest.objects.filter(status="Expired").count(),
-        "current_q": request.GET.get("q", ""),
         "current_status": request.GET.get("status", ""),
         "available_count": available_count,
         "reserved_count": reserved_count,
@@ -1046,19 +1299,34 @@ def reception_requests(request):
 
             if not request_id:
                 messages.error(request, "No rental request selected.")
-                return redirect("reception_requests")
+                return redirect("requests")
 
             suit_request = SuitRequest.objects.filter(id=request_id, status="Returned").select_related("suit").first()
             if not suit_request:
                 messages.error(request, "That rental request is not available for this action.")
-                return redirect("reception_requests")
+                return redirect("requests")
 
-            dry_clean = DryCleaning.objects.filter(suit_id=suit_request.suit.id, status="approved").order_by("-created_at").first()
+            dry_clean = DryCleaning.objects.filter(
+                rental_request=suit_request,
+                status__in=["completed", "approved"],
+            ).order_by("-created_at").first()
             if not dry_clean:
-                messages.error(request, f"Admin approval is still pending for '{suit_request.suit.suit_name}'.")
-                return redirect("reception_requests")
+                dry_clean = DryCleaning.objects.filter(
+                    suit=suit_request.suit,
+                    rental_request__isnull=True,
+                    status="approved",
+                ).order_by("-created_at").first()
+            if not dry_clean:
+                messages.error(request, f"Laundry must be completed before '{suit_request.suit.suit_name}' can return to inventory.")
+                return redirect("requests")
 
             with transaction.atomic():
+                suit = Suit.objects.select_for_update().get(pk=suit_request.suit_id)
+                dry_clean = DryCleaning.objects.select_for_update().get(pk=dry_clean.pk)
+                if dry_clean.status not in ["completed", "approved"]:
+                    messages.error(request, "This cleaning job has already been returned to inventory.")
+                    return redirect("requests")
+
                 try:
                     amount = Decimal(cleaning_cost) if cleaning_cost not in [None, ""] else dry_clean.amount
                 except (InvalidOperation, TypeError, ValueError):
@@ -1076,63 +1344,140 @@ def reception_requests(request):
                         notes=laundry_notes or f"Dry cleaning cost for {suit_request.suit.suit_name}",
                     )
 
-                suit = suit_request.suit
+                quantity_delta = suit_request.quantity_requested
                 suit.quantity += suit_request.quantity_requested
                 suit.status = "Available"
                 suit.save(update_fields=["quantity", "status"])
+                record_inventory_movement(
+                    suit,
+                    "cleaning_completed",
+                    quantity_delta=quantity_delta,
+                    performed_by=request.user,
+                    rental_request=suit_request,
+                    notes="Cleaned items returned to available inventory.",
+                )
 
                 suit_request.status = "Returned"
                 suit_request.save(update_fields=["status"])
 
                 dry_clean.paid = True
-                dry_clean.status = "approved"
-                dry_clean.save(update_fields=["paid", "status"])
+                dry_clean.status = "returned"
+                dry_clean.returned_at = timezone.now()
+                dry_clean.save(update_fields=["paid", "status", "returned_at"])
 
                 messages.success(request, f"{suit.suit_name} is now ready and removed from dry cleaning.")
 
-            return redirect("reception_requests")
+            return redirect("requests")
 
-    status_filter = request.GET.get("status", "all")
+    # --- Filters from GET params ---
+    search_query = request.GET.get('search', '').strip()
+    status_filter = request.GET.get('status', 'all').strip().lower()
+    date_filter = request.GET.get('date', '').strip()
+    month_filter = request.GET.get('month', '').strip()  # format: YYYY-MM
+    year_filter = request.GET.get('year', '').strip()
     page = request.GET.get("page", 1)
-    requests = SuitRequest.objects.all().select_related('suit').prefetch_related('suit__dry_cleanings').order_by("-request_date")
 
-    if status_filter == "pending":
-        requests = requests.filter(status="Pending")
-    elif status_filter == "reserved":
-        requests = requests.filter(status__in=["Approved", "Reserved"])
-    elif status_filter == "active":
-        requests = requests.filter(status="Active")
-    elif status_filter == "returned":
-        requests = requests.filter(status="Returned")
-    elif status_filter == "dry-cleaning":
-        requests = requests.filter(suit__status="Dry Cleaning")
-    elif status_filter == "available":
-        requests = requests.filter(suit__status="Available")
+    requests_qs = SuitRequest.objects.select_related('suit').prefetch_related('suit__dry_cleanings').order_by('-request_date')
 
-    paginator = Paginator(requests, 10)
-    page_obj = paginator.get_page(page)
+    # Text search
+    if search_query:
+        requests_qs = requests_qs.filter(
+            Q(name__icontains=search_query) |
+            Q(phone__icontains=search_query) |
+            Q(suit__suit_name__icontains=search_query) |
+            Q(national_id__icontains=search_query) |
+            Q(first_name__icontains=search_query) |
+            Q(second_name__icontains=search_query)
+        )
+
+    # Status filter
+    status_map = {
+        'pending': 'Pending',
+        'active': 'Active',
+        'returned': 'Returned',
+        'rejected': 'Rejected',
+        'approved': 'Approved',
+        'reserved': 'Reserved',
+        'expired': 'Expired',
+    }
+    if status_filter == 'reserved':
+        requests_qs = requests_qs.filter(status__in=['Approved', 'Reserved'])
+    elif status_filter == 'dry-cleaning':
+        requests_qs = requests_qs.filter(suit__status='Dry Cleaning')
+    elif status_filter == 'available':
+        requests_qs = requests_qs.filter(suit__status='Available')
+    elif status_filter != 'all' and status_filter in status_map:
+        requests_qs = requests_qs.filter(status=status_map[status_filter])
+
+    # Date filter (specific date)
+    if date_filter:
+        parsed_date, date_error = parse_historical_date(date_filter)
+        if date_error:
+            messages.error(request, date_error)
+        if parsed_date:
+            requests_qs = requests_qs.filter(request_date__date=parsed_date)
+
+    # Month filter (YYYY-MM), only if no date filter
+    if month_filter and not date_filter:
+        try:
+            year_m, month_m = month_filter.split('-')
+            requests_qs = requests_qs.filter(
+                request_date__year=int(year_m),
+                request_date__month=int(month_m)
+            )
+        except (ValueError, AttributeError):
+            pass
+    elif year_filter and not date_filter and not month_filter:
+        # Year only
+        try:
+            requests_qs = requests_qs.filter(request_date__year=int(year_filter))
+        except ValueError:
+            pass
+
+    # Stats (computed after filters so they reflect filtered set)
+    pending_count = requests_qs.filter(status='Pending').count()
+    active_count = requests_qs.filter(status='Active').count()
+    reserved_count = requests_qs.filter(status__in=['Reserved', 'Approved']).count()
+    rejected_count = requests_qs.filter(status='Rejected').count()
+    total_count = requests_qs.count()
 
     recent_rentals = SuitRequest.objects.filter(status="Returned").select_related('suit').order_by("-return_date")[:10]
 
-    available_count = Suit.objects.filter(status="Available").count()
-    reserved_count = Suit.objects.filter(status="Reserved").count()
+    available_count = _available_inventory_queryset().count()
     rented_count = Suit.objects.filter(status="Rented").count()
     returned_count = Suit.objects.filter(status="Returned").count()
     dry_cleaning_count = Suit.objects.filter(status="Dry Cleaning").count()
 
+    # Pagination
+    paginator = Paginator(requests_qs, 20)
+    page_obj = paginator.get_page(page)
+
+    # Available years for year dropdown
+    available_years = list(
+        SuitRequest.objects.values_list('request_date__year', flat=True)
+        .distinct().order_by('-request_date__year')
+    )
+
     context = {
-        'requests': page_obj.object_list,
+        'requests': page_obj,
         'page_obj': page_obj,
         'recent_rentals': recent_rentals,
-        'active_requests': SuitRequest.objects.filter(status="Active").order_by("-request_date"),
-        'total_count': SuitRequest.objects.count(),
-        'pending_count': SuitRequest.objects.filter(status="Pending").count(),
+        'active_requests': SuitRequest.objects.filter(status="Active").select_related('suit'),
+        'late_fee_policy': RentalPolicy.get_solo(),
+        'return_payment_key': str(uuid4()),
+        'total_count': total_count,
+        'pending_count': pending_count,
         'approved_count': SuitRequest.objects.filter(status="Approved").count(),
-        'active_count': SuitRequest.objects.filter(status="Active").count(),
-        'rejected_count': SuitRequest.objects.filter(status="Rejected").count(),
+        'active_count': active_count,
+        'rejected_count': rejected_count,
         'returned_count': SuitRequest.objects.filter(status="Returned").count(),
         'expired_count': SuitRequest.objects.filter(status="Expired").count(),
         'current_status': status_filter,
+        'search_query': search_query,
+        'date_filter': date_filter,
+        'month_filter': month_filter,
+        'year_filter': year_filter,
+        'available_years': available_years,
         'available_count': available_count,
         'reserved_count': reserved_count,
         'rented_count': rented_count,
@@ -1164,7 +1509,10 @@ def customer_search(request):
 @login_required
 def customer_detail(request, customer_name):
     if request.user.is_authenticated and not request.user.is_staff:
-        customer_requests = SuitRequest.objects.filter(user=request.user).order_by("-request_date")
+        context = _customer_history_context(request.user)
+        context["hide_admin_sidebar"] = True
+        context["can_manage_customer_rentals"] = False
+        return render(request, "admin/customer_detail.html", context)
     elif not is_reception_or_cashier_or_admin(request.user):
         messages.error(request, "Access denied. Reception/Cashier/Admin only.")
         return redirect("home")
@@ -1176,93 +1524,242 @@ def customer_detail(request, customer_name):
             messages.error(request, "You have no rental history yet.")
             return redirect("customer_history")
         messages.error(request, "Customer not found.")
-        return redirect("reception_requests")
+        return redirect("requests")
     
     # Get first request to grab customer details
     first_req = customer_requests.first()
+    if first_req.user_id:
+        context = _customer_history_context(first_req.user)
+        context["is_reception_user"] = is_reception(request.user)
+        context["hide_admin_sidebar"] = context["is_reception_user"]
+        context["can_manage_customer_rentals"] = _can_manage_customer_rentals(request.user)
+        return render(request, "admin/customer_detail.html", context)
+
+    customer_profile = None
+    customer_requests = list(
+        customer_requests.select_related("suit").prefetch_related("payments")
+    )
+    for rental in customer_requests:
+        rental.history_payments = list(rental.payments.all())
+        rental.history_amount_paid = sum(
+            (payment.amount_paid for payment in rental.history_payments),
+            Decimal("0.00"),
+        )
+        rental.history_balance_due = max(
+            rental.total_amount - rental.history_amount_paid,
+            Decimal("0.00"),
+        )
     
     # Calculate stats
-    total_rentals = customer_requests.count()
-    active_rentals = customer_requests.filter(status="Active").count()
-    returned_rentals = customer_requests.filter(status="Returned").count()
-    pending_rentals = customer_requests.filter(status="Pending").count()
-    total_spent = customer_requests.filter(status__in=["Active", "Returned"]).aggregate(total=Sum("total_amount"))['total'] or 0
+    total_rentals = len(customer_requests)
+    active_rentals = sum(rental.status == "Active" for rental in customer_requests)
+    returned_rentals = sum(rental.status == "Returned" for rental in customer_requests)
+    pending_rentals = sum(rental.status == "Pending" for rental in customer_requests)
+    total_spent = sum(
+        (
+            rental.total_amount
+            for rental in customer_requests
+            if rental.status in {"Active", "Returned"}
+        ),
+        Decimal("0.00"),
+    )
     
     context = {
         'customer_name': first_req.name,
         'customer_phone': first_req.phone,
         'customer_id': first_req.national_id,
         'customer_image': first_req.customer_image,
+        'customer_profile': customer_profile,
+        'customer_present_address': first_req.present_address,
+        'customer_parents_address': first_req.parents_address,
         'requests': customer_requests,
+        'latest_rental': customer_requests[0] if customer_requests else None,
         'total_rentals': total_rentals,
         'active_rentals': active_rentals,
+        'active_rental_records': [rental for rental in customer_requests if rental.status == "Active"],
+        'overdue_rentals': sum(rental.is_overdue for rental in customer_requests),
         'returned_rentals': returned_rentals,
         'pending_rentals': pending_rentals,
         'total_spent': total_spent,
+        'total_paid': sum(
+            (rental.history_amount_paid for rental in customer_requests),
+            Decimal("0.00"),
+        ),
+        'hide_admin_sidebar': False,
+        'can_manage_customer_rentals': is_admin(request.user),
+        'total_balance_due': sum(
+            (rental.history_balance_due for rental in customer_requests),
+            Decimal("0.00"),
+        ),
     }
     return render(request, "admin/customer_detail.html", context)
 
 
 @login_required
 def customer_detail_by_user(request, user_id):
-    if not is_reception_or_cashier_or_admin(request.user):
-        messages.error(request, "Access denied. Reception/Cashier/Admin only.")
+    if not _can_manage_customer_rentals(request.user):
+        messages.error(request, "Access denied. Admin or Reception only.")
         return redirect("home")
 
-    customer_user = get_object_or_404(User, id=user_id)
-    customer_requests = SuitRequest.objects.filter(user=customer_user).order_by("-request_date")
+    customer_user = get_object_or_404(User, pk=user_id, is_staff=False)
+    context = _customer_history_context(customer_user)
+    context["is_reception_user"] = is_reception(request.user)
+    context["hide_admin_sidebar"] = context["is_reception_user"]
+    context["can_manage_customer_rentals"] = True
+    return render(request, "admin/customer_detail.html", context)
 
-    if not customer_requests.exists():
-        customer_requests = SuitRequest.objects.filter(name=customer_user.get_full_name() or customer_user.username).order_by("-request_date")
 
-    if not customer_requests.exists():
-        messages.error(request, "Customer not found.")
-        return redirect("manage_users")
+def _customer_history_context(customer_user):
+    customer_profile = Profile.objects.filter(user=customer_user).first() or Profile(
+        user=customer_user
+    )
+    customer_requests = list(
+        SuitRequest.objects.filter(user=customer_user)
+        .select_related("suit")
+        .prefetch_related("payments")
+        .order_by("-request_date")
+    )
 
-    first_req = customer_requests.first()
-    total_rentals = customer_requests.count()
-    active_rentals = customer_requests.filter(status="Active").count()
-    returned_rentals = customer_requests.filter(status="Returned").count()
-    pending_rentals = customer_requests.filter(status="Pending").count()
-    total_spent = customer_requests.filter(status__in=["Active", "Returned"]).aggregate(total=Sum("total_amount"))["total"] or 0
+    for rental in customer_requests:
+        rental.history_payments = list(rental.payments.all())
+        rental.history_amount_paid = sum(
+            (payment.amount_paid for payment in rental.history_payments),
+            Decimal("0.00"),
+        )
+        rental.history_balance_due = max(
+            rental.total_amount - rental.history_amount_paid,
+            Decimal("0.00"),
+        )
 
-    context = {
-        "customer_name": first_req.name or customer_user.get_full_name() or customer_user.username,
-        "customer_phone": first_req.phone or "",
-        "customer_id": first_req.national_id or customer_user.username,
-        "customer_image": first_req.customer_image,
+    latest_rental = customer_requests[0] if customer_requests else None
+    active_rental_records = [rental for rental in customer_requests if rental.status == "Active"]
+    return {
+        "customer_name": (
+            latest_rental.name if latest_rental else ""
+        ) or customer_user.get_full_name() or customer_user.username,
+        "customer_phone": (
+            customer_profile.customer_phone
+            or (latest_rental.phone if latest_rental else "")
+        ),
+        "customer_id": (
+            customer_profile.national_id
+            or (latest_rental.national_id if latest_rental else "")
+            or customer_user.username
+        ),
+        "customer_present_address": (
+            customer_profile.present_address
+            or (latest_rental.present_address if latest_rental else "")
+        ),
+        "customer_parents_address": (
+            customer_profile.parents_address
+            or (latest_rental.parents_address if latest_rental else "")
+        ),
+        "customer_image": (
+            latest_rental.customer_image
+            if latest_rental and latest_rental.customer_image
+            else customer_profile.profile_photo
+        ),
+        "customer_profile": customer_profile,
         "customer_user": customer_user,
         "requests": customer_requests,
-        "total_rentals": total_rentals,
-        "active_rentals": active_rentals,
-        "returned_rentals": returned_rentals,
-        "pending_rentals": pending_rentals,
-        "total_spent": total_spent,
+        "latest_rental": latest_rental,
+        "active_rental_records": active_rental_records,
+        "total_rentals": len(customer_requests),
+        "active_rentals": len(active_rental_records),
+        "overdue_rentals": sum(rental.is_overdue for rental in active_rental_records),
+        "returned_rentals": sum(rental.status == "Returned" for rental in customer_requests),
+        "pending_rentals": sum(rental.status == "Pending" for rental in customer_requests),
+        "total_spent": sum(
+            (
+                rental.total_amount
+                for rental in customer_requests
+                if rental.status in {"Active", "Returned"}
+            ),
+            Decimal("0.00"),
+        ),
+        "total_paid": sum(
+            (rental.history_amount_paid for rental in customer_requests),
+            Decimal("0.00"),
+        ),
+        "total_balance_due": sum(
+            (rental.history_balance_due for rental in customer_requests),
+            Decimal("0.00"),
+        ),
     }
-    return render(request, "admin/customer_detail.html", context)
 
 
 @login_required
 def new_rent_for_customer(request, user_id):
-    if not is_reception_or_cashier_or_admin(request.user):
-        messages.error(request, "Access denied. Reception/Cashier/Admin only.")
+    if not _can_manage_customer_rentals(request.user):
+        messages.error(request, "Access denied. Admin or Reception only.")
         return redirect("home")
 
-    customer_user = get_object_or_404(User, id=user_id)
-    recent_request = SuitRequest.objects.filter(user=customer_user).order_by("-request_date").first()
-
-    request.session["prefill_customer"] = {
-        "customer_id": customer_user.id,
-        "first_name": customer_user.first_name or getattr(recent_request, "first_name", "") or "",
-        "father_name": customer_user.last_name or getattr(recent_request, "second_name", "") or "",
+    customer_user = get_object_or_404(User, pk=user_id, is_staff=False)
+    customer_profile = Profile.objects.filter(user=customer_user).first() or Profile(
+        user=customer_user
+    )
+    recent_request = (
+        SuitRequest.objects.filter(user=customer_user)
+        .order_by("-request_date")
+        .first()
+    )
+    prefill = {
+        "customer_id": customer_user.pk,
+        "first_name": (
+            customer_user.first_name
+            or (recent_request.first_name if recent_request else "")
+            or customer_user.username
+        ),
+        "father_name": (
+            customer_user.last_name
+            or (recent_request.second_name if recent_request else "")
+            or ""
+        ),
         "grandfather_name": "",
-        "phone": getattr(recent_request, "phone", "") or "",
-        "present_address": getattr(recent_request, "present_address", "") or "",
+        "phone": customer_profile.customer_phone or (recent_request.phone if recent_request else ""),
+        "present_address": (
+            customer_profile.present_address
+            or (recent_request.present_address if recent_request else "")
+        ),
+        "national_id": (
+            customer_profile.national_id
+            or (recent_request.national_id if recent_request else "")
+        ),
+        "parents_address": (
+            customer_profile.parents_address
+            or (recent_request.parents_address if recent_request else "")
+        ),
     }
+    context = _customer_history_context(customer_user)
+    available_suits = list(_available_inventory_queryset().order_by("suit_name"))
+    for suit in available_suits:
+        suit.booking_available_quantity = suit.quantity - suit._held_units
 
-    if is_admin(request.user):
-        return redirect("admin_booking")
-    return redirect("reception_reception")
+    context.update({
+        "is_reception_user": is_reception(request.user),
+        "hide_admin_sidebar": is_reception(request.user),
+        "can_manage_customer_rentals": True,
+        "show_new_rent_form": True,
+        "available_suits": available_suits,
+        "rental_day_options": [(days, days * 24) for days in range(1, 31)],
+        "prefill_customer_id": prefill["customer_id"],
+        "prefill_first_name": prefill["first_name"],
+        "prefill_father_name": prefill["father_name"],
+        "prefill_grandfather_name": prefill["grandfather_name"],
+        "prefill_phone": prefill["phone"],
+        "prefill_present_address": prefill["present_address"],
+        "prefill_national_id": prefill["national_id"],
+        "prefill_parents_address": prefill["parents_address"],
+        "rental_form_values": request.session.pop(
+            f"repeat_rental_form_values_{customer_user.pk}", {}
+        ),
+        "default_start_date": timezone.localdate().isoformat(),
+        "default_end_date": (timezone.localdate() + timedelta(days=1)).isoformat(),
+    })
+    token_key = f"repeat_rental_token_{customer_user.pk}"
+    context["rental_submission_token"] = uuid4().hex
+    request.session[token_key] = context["rental_submission_token"]
+    return render(request, "admin/customer_detail.html", context)
 
 
 @login_required
@@ -1312,7 +1809,7 @@ def send_return_reminder(request, req_id):
 def reception_send_sms(request, req_id):
     if not is_reception_or_admin(request.user):
         messages.error(request, "Access denied. Reception/Admin only.")
-        return redirect('reception_dashboard')
+        return redirect('dashboard')
 
     req = get_object_or_404(SuitRequest, id=req_id)
 
@@ -1320,7 +1817,7 @@ def reception_send_sms(request, req_id):
         message_text = request.POST.get('message', '').strip()
         if not message_text:
             messages.error(request, 'Message cannot be empty.')
-            return redirect('reception_send_sms', req_id=req_id)
+            return redirect('send_return_reminder', req_id=req_id)
 
         # Send SMS via sms utility
         try:
@@ -1357,48 +1854,47 @@ def approve_request(request, req_id):
         return redirect("home")
 
     req = get_object_or_404(SuitRequest, id=req_id)
-    return_url = "requests" if is_admin(request.user) else "reception_requests"
+    return_url = "requests" if is_admin(request.user) else "requests"
 
     pickup_mode_default = False
-    action_mode_default = 'rent_now'
+    action_mode_default = 'approve'
     if request.method == "GET":
         pickup_mode_default = request.GET.get('pickup') == '1' or request.GET.get('mode') == 'pickup'
-        if req.status == 'Reserved' and not pickup_mode_default:
-            action_mode_default = 'reserve'
+        if pickup_mode_default or req.status in {'Reserved', 'Approved'}:
+            action_mode_default = 'rent_now'
     
-    if req.status != "Pending" and req.status != 'Reserved':
-        messages.error(request, "Only pending or reserved requests can be approved.")
+    if req.status not in {"Pending", "Approved", "Reserved"}:
+        messages.error(request, "Only pending, approved, or reserved requests can be processed.")
         return redirect(return_url)
 
     if request.method == "POST":
-        start_date_raw = request.POST.get("start_date")
-        # request.POST may sometimes contain non-string date objects depending on middleware or JS
-        if isinstance(start_date_raw, datetime):
-            start_date = start_date_raw.date()
-        elif isinstance(start_date_raw, date):
-            start_date = start_date_raw
-        else:
-            # Only parse when we have a string; guard against lists/bytes/other types
-            if isinstance(start_date_raw, bytes):
-                try:
-                    start_date_raw = start_date_raw.decode('utf-8')
-                except Exception:
-                    start_date = None
-                    start_date_raw = None
-
-            if isinstance(start_date_raw, str):
-                start_date = parse_date(start_date_raw)
-            else:
-                start_date = None
         amount_paid_raw = request.POST.get("amount_paid", "0").strip() or "0"
         payment_method = request.POST.get("payment_method", "cash").strip()
         payment_reference = request.POST.get("payment_reference", "").strip()
         accessories = request.POST.getlist("accessories")
-        action_mode = request.POST.get("action_mode", "rent_now").strip()
+        if (
+            "accessories_configured" not in request.POST
+            and not accessories
+            and req.status in {"Approved", "Reserved"}
+        ):
+            stored_accessories = req.accessory_items
+            accessories = [
+                item
+                for item in ACCESSORY_TYPES
+                if any(detail.lower().startswith(item) for detail in stored_accessories)
+            ]
+        if any(accessory not in ACCESSORY_TYPES for accessory in accessories):
+            messages.error(request, "Please select valid accessories.")
+            return redirect("approve_request", req.id)
+        action_mode = request.POST.get("action_mode", "approve").strip()
         id_document_type = request.POST.get("id_document_type", "National ID").strip()
         id_document_number = request.POST.get("id_document_number", "").strip()
         reserve_duration_raw = request.POST.get("reserve_duration", "24").strip()
         reserve_custom_hours_raw = request.POST.get("reserve_custom_hours", "").strip()
+
+        if action_mode not in {"approve", "rent_now", "reserve"}:
+            messages.error(request, "Choose approval, immediate issue, or reservation.")
+            return redirect("approve_request", req.id)
 
         try:
             amount_paid = Decimal(amount_paid_raw)
@@ -1406,25 +1902,16 @@ def approve_request(request, req_id):
             messages.error(request, "Please enter a valid payment amount.")
             return redirect("approve_request", req.id)
 
-        accessory_prices = {
-            "shoes": Decimal("5.00"),
-            "tie": Decimal("1.50"),
-            "shirt": Decimal("3.00"),
-            "belt": Decimal("1.00"),
-        }
-        accessory_total = sum(accessory_prices.get(item, Decimal("0.00")) for item in accessories)
+        accessory_total = ACCESSORY_DAILY_PRICE * len(set(accessories))
         total_amount = (req.suit.price_per_day * req.days_requested * req.quantity_requested) + (accessory_total * req.days_requested * req.quantity_requested)
 
         if amount_paid < 0:
             messages.error(request, "Amount paid cannot be negative.")
             return redirect("approve_request", req.id)
 
-        if amount_paid > total_amount:
-            messages.error(request, "Amount paid cannot exceed the total rental amount.")
-            return redirect("approve_request", req.id)
-
-        if req.quantity_requested > req.suit.quantity:
-            messages.error(request, f"Only {req.suit.quantity} suits are available for this request.")
+        current_balance = max(total_amount - req.amount_paid, Decimal("0.00"))
+        if amount_paid > current_balance:
+            messages.error(request, "Amount paid cannot exceed the remaining rental balance.")
             return redirect("approve_request", req.id)
 
         reserve_hours = None
@@ -1441,7 +1928,10 @@ def approve_request(request, req_id):
         if reserve_hours <= 0:
             reserve_hours = 24
 
-        notes = req.notes or ""
+        notes = "\n".join(
+            line for line in (req.notes or "").splitlines()
+            if not line.strip().startswith("Accessories:")
+        )
         req.payment_method = payment_method.title() if payment_method else 'Cash'
         req.payment_reference = payment_reference or None
         if id_document_number:
@@ -1452,45 +1942,51 @@ def approve_request(request, req_id):
                 req.national_id = id_document_number
 
         accessory_details = []
-        if "shoes" in accessories:
-            accessory_details.append(f"shoes ({request.POST.get('shoes_size', '')} / {request.POST.get('shoes_color', '')})")
-        if "tie" in accessories:
-            accessory_details.append(f"tie ({request.POST.get('tie_size', '')} / {request.POST.get('tie_color', '')})")
-        if "shirt" in accessories:
-            accessory_details.append(f"shirt ({request.POST.get('shirt_size', '')} / {request.POST.get('shirt_color', '')})")
-        if "belt" in accessories:
-            accessory_details.append(f"belt ({request.POST.get('belt_size', '')} / {request.POST.get('belt_color', '')})")
+        for accessory in ACCESSORY_TYPES:
+            if accessory not in accessories:
+                continue
+            existing_detail = next(
+                (
+                    detail for detail in req.accessory_items
+                    if detail.lower().startswith(accessory)
+                ),
+                None,
+            )
+            size = request.POST.get(f"{accessory}_size", "").strip()
+            color = request.POST.get(f"{accessory}_color", "").strip()
+            if existing_detail and not size:
+                accessory_details.append(existing_detail)
+            else:
+                accessory_details.append(f"{accessory} ({size} / {color})")
 
         if accessory_details:
             if notes:
                 notes += "\n"
             notes += f"Accessories: {', '.join(accessory_details)}"
 
-        if start_date:
-            rental_start_time = timezone.make_aware(datetime.combine(start_date, time.min))
-        else:
-            rental_start_time = timezone.now() if action_mode == "rent_now" else None
-
         if action_mode == "reserve":
+            reservation_expires_at = timezone.now() + timedelta(hours=reserve_hours)
+            try:
+                if not req.reserve_inventory(reservation_expires_at, performed_by=request.user):
+                    messages.error(request, "This request already has an active inventory reservation.")
+                    return redirect(return_url)
+            except ValidationError as exc:
+                messages.error(request, "; ".join(exc.messages))
+                return redirect(return_url)
+
             req.status = "Reserved"
+            req.rent_days = req.days_requested or req.rent_days or 1
             req.payment_method = payment_method.title() if payment_method else 'Cash'
             req.payment_reference = payment_reference or None
             if not req.approved_at:
                 req.approved_at = timezone.now()
-            if rental_start_time:
-                req.rental_start_time = rental_start_time
-                req.due_date = rental_start_time + timedelta(hours=reserve_hours)
-            else:
-                req.due_date = timezone.now() + timedelta(hours=reserve_hours)
+            req.due_date = reservation_expires_at
             if notes:
                 notes += "\n"
             notes += f"Reserved pickup for {reserve_hours} hours"
             req.notes = notes.strip()
             req.total_amount = total_amount
-            req.save(update_fields=['status', 'approved_at', 'due_date', 'rental_start_time', 'total_amount', 'notes', 'national_id', 'payment_method', 'payment_reference'])
-
-            req.suit.status = "Reserved"
-            req.suit.save(update_fields=['status'])
+            req.save(update_fields=['status', 'approved_at', 'due_date', 'rental_start_time', 'rent_days', 'total_amount', 'notes', 'national_id', 'payment_method', 'payment_reference'])
 
             if amount_paid > 0:
                 payment_status = 'paid' if amount_paid >= total_amount else 'partial'
@@ -1506,25 +2002,83 @@ def approve_request(request, req_id):
                 payment.receipt_number = f"RCPT-{payment.id:06d}"
                 payment.save(update_fields=['receipt_number'])
 
-                if amount_paid >= total_amount:
+                if amount_paid >= current_balance:
                     req.is_paid = True
                     req.save(update_fields=['is_paid'])
 
             messages.success(request, "Request reserved for pickup successfully.")
             return redirect(return_url)
 
-        # Set suit status to Reserved before starting rental
-        req.suit.status = "Reserved"
-        req.suit.save()
+        if action_mode == "approve":
+            if req.status == "Reserved":
+                messages.error(request, "A reserved request must be issued at pickup or kept reserved.")
+                return redirect(return_url)
 
-        req.rent_days = req.days_requested or 1
-        req.approved_at = timezone.now()
-        req.due_date = req._default_due_date(req.approved_at)
-        req.notes = notes.strip()
-        req.total_amount = total_amount
-        req.save(update_fields=['rent_days', 'approved_at', 'due_date', 'notes', 'total_amount', 'national_id'])
+            try:
+                with transaction.atomic():
+                    approved_request = SuitRequest.objects.select_for_update().get(pk=req.pk)
+                    remaining_balance = max(total_amount - approved_request.amount_paid, Decimal("0.00"))
+                    if amount_paid > remaining_balance:
+                        raise ValidationError("Amount paid cannot exceed the remaining rental balance.")
 
-        req.start_rental(start_time=rental_start_time)
+                    approved_request.status = "Approved"
+                    approved_request.approved_at = approved_request.approved_at or timezone.now()
+                    approved_request.rent_days = approved_request.days_requested or approved_request.rent_days or 1
+                    approved_request.total_amount = total_amount
+                    approved_request.notes = notes.strip()
+                    approved_request.payment_method = payment_method.title() if payment_method else "Cash"
+                    approved_request.payment_reference = payment_reference or None
+                    if id_document_number and id_document_type == "National ID":
+                        approved_request.national_id = id_document_number
+                    approved_request.save(update_fields=[
+                        "status", "approved_at", "rent_days", "total_amount", "notes",
+                        "payment_method", "payment_reference", "national_id",
+                    ])
+
+                    if amount_paid > 0:
+                        payment = Payment.objects.create(
+                            rental=approved_request,
+                            cashier=request.user,
+                            amount_paid=amount_paid,
+                            payment_method=payment_method.title() if payment_method else "Cash",
+                            payment_reference=payment_reference or None,
+                            status="paid" if amount_paid >= remaining_balance else "partial",
+                            payment_date=timezone.now(),
+                        )
+                        payment.receipt_number = f"RCPT-{payment.id:06d}"
+                        payment.save(update_fields=["receipt_number"])
+                        if amount_paid >= remaining_balance:
+                            approved_request.is_paid = True
+                            approved_request.save(update_fields=["is_paid"])
+            except ValidationError as exc:
+                messages.error(request, "; ".join(exc.messages))
+                return redirect("approve_request", req.id)
+
+            messages.success(request, "Request approved. The rental timer starts only when the item is issued.")
+            return redirect(return_url)
+
+        try:
+            with transaction.atomic():
+                issue_request = SuitRequest.objects.select_for_update().get(pk=req.pk)
+                issue_request.notes = notes.strip()
+                issue_request.total_amount = total_amount
+                if id_document_number and id_document_type == "National ID":
+                    issue_request.national_id = id_document_number
+                issue_request.payment_method = payment_method.title() if payment_method else "Cash"
+                issue_request.payment_reference = payment_reference or None
+                issue_request.save(update_fields=[
+                    "notes", "total_amount", "national_id",
+                    "payment_method", "payment_reference",
+                ])
+
+                if not issue_request.start_rental(
+                    start_time=timezone.now(),
+                    performed_by=request.user,
+                ):
+                    raise ValidationError("This rental has already been issued.")
+        except ValidationError as exc:
+            messages.error(request, "; ".join(exc.messages))
+            return redirect(return_url)
 
         if amount_paid > 0:
             payment_status = 'paid' if amount_paid >= total_amount else 'partial'
@@ -1540,11 +2094,11 @@ def approve_request(request, req_id):
             payment.receipt_number = f"RCPT-{payment.id:06d}"
             payment.save(update_fields=['receipt_number'])
 
-            if amount_paid >= total_amount:
+            if amount_paid >= current_balance:
                 req.is_paid = True
                 req.save(update_fields=['is_paid'])
 
-        messages.success(request, "Request approved and rental started successfully.")
+        messages.success(request, "Rental issued to customer. The rental timer has started.")
         return redirect(return_url)
 
     total_amount = req.suit.price_per_day * req.days_requested * req.quantity_requested
@@ -1562,6 +2116,16 @@ def approve_request(request, req_id):
         'back_url': return_url,
         'action_mode_default': action_mode_default,
         'pickup_mode_default': pickup_mode_default,
+        'accessory_daily_price': ACCESSORY_DAILY_PRICE,
+        'issue_date': timezone.localdate(),
+        'selected_accessories': [
+            accessory
+            for accessory in ACCESSORY_TYPES
+            if any(
+                detail.lower().startswith(accessory)
+                for detail in req.accessory_items
+            )
+        ],
     }
     template_name = "admin/admin_approve.html" if is_admin(request.user) else "reception/reception_approve.html"
     return render(request, template_name, context)
@@ -1571,151 +2135,289 @@ def approve_request(request, req_id):
 # REJECT REQUEST
 # =========================
 @login_required
+@require_POST
+@transaction.atomic
 def reject_request(request, req_id):
-    if not request.user.is_staff:
+    if not is_admin(request.user):
         messages.error(request, "Access denied. Admin only.")
         return redirect("home")
 
     req = get_object_or_404(SuitRequest, id=req_id)
+    reason = request.POST.get("reason", "").strip()[:255]
+    if req.status not in {"Pending", "Approved", "Reserved"}:
+        messages.error(request, f"Request #{req.pk} cannot be rejected in its current status.")
+        return redirect(f"{reverse('requests')}?tab=closed")
 
-    if req.status == "Pending":
-        req.status = "Rejected"
-        req.save()
+    try:
+        change_status(
+            req,
+            "cancelled",
+            user=request.user,
+            note=reason or "Request rejected by administrator.",
+        )
+    except WorkflowError as exc:
+        messages.error(request, str(exc))
+        return redirect("requests")
 
-        messages.success(request, "Request rejected")
-
-    if is_cashier(request.user):
-        return redirect("reception_requests")
-    return redirect("requests")
+    req.rejected_reason = reason
+    req.save(update_fields=["rejected_reason"])
+    messages.success(request, f"Request #{req.pk} was rejected.")
+    return redirect(f"{reverse('requests')}?tab=closed")
 
 
 # =========================
 # RETURN SUIT
 # =========================
 @login_required
+@transaction.atomic
 def return_suit(request, req_id):
     if not is_reception_or_admin(request.user):
         messages.error(request, "Access denied. Reception/Admin only.")
         return redirect("home")
 
-    req = get_object_or_404(SuitRequest, id=req_id)
+    req = get_object_or_404(
+        SuitRequest.objects.select_for_update().select_related("suit"),
+        id=req_id,
+    )
 
     if req.status == "Active":
-        req.return_suit()
-        late_fee = req.late_fee
-        if late_fee > 0:
-            messages.success(request, f"Suit returned successfully. Late fee applied: ${late_fee}.")
+        return_condition = request.POST.get("return_condition", "good") if request.method == "POST" else "good"
+        if return_condition not in dict(SuitRequest.RETURN_CONDITION_CHOICES):
+            messages.error(request, "Select a valid returned-item condition.")
+            return redirect("requests" if is_cashier(request.user) else "requests")
+        if req.return_suit(performed_by=request.user, return_condition=return_condition) and req.late_fee > 0:
+            messages.success(request, f"Suit returned successfully. Late fee applied: ${req.late_fee}.")
+        elif req.status == "Returned":
+            messages.success(request, "Suit returned successfully.")
         else:
-            messages.success(request, "Suit returned successfully")
+            messages.error(request, "This rental has already been returned.")
+    else:
+        messages.error(request, "This rental has already been returned.")
 
     if is_cashier(request.user):
-        return redirect("reception_requests")
+        return redirect("requests")
     return redirect("requests")
 
 
 @login_required
+@transaction.atomic
 def process_return(request):
     if request.method != "POST":
-        return redirect("reception_reception")
+        return redirect("requests")
 
     if not is_reception_or_admin(request.user):
         messages.error(request, "Access denied. Reception/Admin only.")
         return redirect("home")
 
+    return_page = "requests" if is_admin(request.user) else "requests"
     rental_id = request.POST.get("rental_id")
-    return_notes = request.POST.get("return_notes", "")
-    actual_return_date_str = request.POST.get("actual_return_date")
-    return_discount = request.POST.get("return_discount", "0")
-    return_amount_paid = request.POST.get("return_amount_paid", "0")
+    req = get_object_or_404(
+        SuitRequest.objects.select_for_update().select_related("suit"),
+        id=rental_id,
+    )
+    if not is_admin(request.user):
+        return_page = reverse("return_view", kwargs={"request_id": req.pk})
+    if req.status != "Active":
+        messages.error(request, "Only active rentals can be returned.")
+        return redirect("requests" if not is_admin(request.user) else return_page)
 
-    req = get_object_or_404(SuitRequest, id=rental_id)
+    return_condition = request.POST.get("return_condition", "good")
+    if return_condition not in dict(SuitRequest.RETURN_CONDITION_CHOICES):
+        messages.error(request, "Select a valid returned-item condition.")
+        return redirect(return_page)
 
-    # parse actual return date if provided
-    parsed_date = None
-    if actual_return_date_str:
+    def read_nonnegative_amount(field_name):
+        try:
+            amount = Decimal(request.POST.get(field_name, "0") or "0")
+        except (InvalidOperation, TypeError, ValueError):
+            return None
+        if not amount.is_finite() or amount < 0:
+            return None
+        return amount.quantize(Decimal("0.01"))
+
+    discount = read_nonnegative_amount("return_discount")
+    amount_received = read_nonnegative_amount("return_amount_paid")
+    damage_fee = read_nonnegative_amount("laundry_fee") if request.POST.get("requires_laundry") else Decimal("0.00")
+    if discount is None or amount_received is None or damage_fee is None:
+        messages.error(request, "Enter valid, non-negative amounts for the return.")
+        return redirect(return_page)
+
+    actual_return_date_str = request.POST.get("actual_return_date", "")
+    return_dt = parse_datetime(actual_return_date_str) if actual_return_date_str else None
+    if return_dt is None and actual_return_date_str:
         parsed_date = parse_date(actual_return_date_str)
+        if parsed_date:
+            return_dt = datetime.combine(parsed_date, timezone.localtime().time())
+    if return_dt is None:
+        return_dt = timezone.localtime()
+    if timezone.is_naive(return_dt):
+        return_dt = timezone.make_aware(return_dt, timezone.get_current_timezone())
+    if return_dt > timezone.now():
+        messages.error(request, "Return date and time cannot be in the future.")
+        return redirect(return_page)
+    if req.rental_start_time and return_dt < req.rental_start_time:
+        messages.error(request, "Return date and time cannot be before the rental started.")
+        return redirect(return_page)
 
-    if parsed_date:
-        # combine parsed date with current time and make tz-aware
-        return_dt = timezone.make_aware(datetime.combine(parsed_date, datetime.now().time()))
-    else:
-        return_dt = timezone.now()
-
-    # Calculate late fee based on provided actual return datetime
     late_fee = req._calculate_late_fee(return_dt)
+    total_before_discount = (req.total_amount or Decimal("0.00")) + late_fee + damage_fee
+    if discount > total_before_discount:
+        messages.error(request, "Discount cannot be greater than the amount due.")
+        return redirect(return_page)
 
-    # Update request fields similarly to return_suit(), but using provided date
-    req.return_date = return_dt
-    returned_items = (request.POST.get("returned_items") or "").strip()
-    if returned_items:
-        existing_notes = req.notes or ""
-        req.notes = f"{existing_notes}\nReturned items: {returned_items}" if existing_notes else f"Returned items: {returned_items}"
-    # Add late fee to total_amount (only if positive)
-    try:
-        if late_fee and late_fee > 0:
-            req.total_amount = (req.total_amount or 0) + late_fee
-    except Exception:
-        pass
+    final_total = total_before_discount - discount
+    current_balance = max(final_total - req.amount_paid, Decimal("0.00"))
+    if amount_received > current_balance:
+        messages.error(request, "Amount received cannot be greater than the remaining balance.")
+        return redirect(return_page)
 
-    # Apply discount if any
-    try:
-        discount_dec = Decimal(return_discount)
-        if discount_dec and discount_dec > 0:
-            # Reduce total_amount by discount
-            req.total_amount = max(Decimal(req.total_amount) - discount_dec, Decimal('0.00'))
-    except (InvalidOperation, TypeError, ValueError):
-        discount_dec = Decimal('0.00')
+    if current_balance > 0 and amount_received == 0:
+        messages.error(request, "Enter an amount received before recording a partial payment.")
+        return redirect(return_page)
 
-    # Mark returned
-    req.status = 'Returned'
-    # Append return notes to existing notes
-    if return_notes:
-        existing = req.notes or ''
-        req.notes = f"{existing}\nReturn notes: {return_notes}" if existing else f"Return notes: {return_notes}"
+    if amount_received < current_balance and (discount or damage_fee):
+        messages.error(request, "Discounts and damage fees can only be applied when the return is paid in full.")
+        return redirect(return_page)
 
-    req.save()
+    idempotency_key_raw = request.POST.get("payment_idempotency_key", "").strip()
+    idempotency_key = None
+    if idempotency_key_raw:
+        try:
+            idempotency_key = str(UUID(idempotency_key_raw))
+        except (TypeError, ValueError, AttributeError):
+            messages.error(request, "Invalid payment submission key. Reload the return form and try again.")
+            return redirect(return_page)
 
-    # Move the suit into cleaning only when it should follow the laundry workflow.
-    suit = req.suit
-    if suit.should_queue_for_dry_cleaning:
-        suit.status = 'Dry Cleaning'
-    else:
-        suit.quantity += req.quantity_requested or 1
-        suit.status = 'Available'
-    suit.save(update_fields=['status', 'quantity'])
-    try:
-        suit.refresh_rental_end_time()
-    except Exception:
-        pass
+        previous_payment = Payment.objects.filter(idempotency_key=idempotency_key).first()
+        if previous_payment:
+            same_submission = (
+                previous_payment.rental_id == req.pk
+                and previous_payment.amount_paid == amount_received
+                and previous_payment.payment_method == request.POST.get("payment_method", "cash")
+                and previous_payment.payment_reference == request.POST.get("transaction_ref", "")
+            )
+            if same_submission:
+                messages.info(request, "This payment was already recorded; it was not added again.")
+            else:
+                messages.error(request, "This payment submission key has already been used.")
+            return redirect(return_page)
 
-    # Record payment if any amount collected at return
-    try:
-        paid_dec = Decimal(return_amount_paid)
-    except (InvalidOperation, TypeError, ValueError):
-        paid_dec = Decimal('0.00')
+    def create_return_payment(status, notes):
+        payment_values = {
+            "rental": req,
+            "cashier": request.user,
+            "amount_paid": amount_received,
+            "payment_method": request.POST.get("payment_method", "cash"),
+            "payment_reference": request.POST.get("transaction_ref", ""),
+            "status": status,
+            "notes": notes,
+        }
+        if idempotency_key:
+            payment, created = Payment.objects.get_or_create(
+                idempotency_key=idempotency_key,
+                defaults=payment_values,
+            )
+        else:
+            payment = Payment.objects.create(**payment_values)
+            created = True
 
-    if paid_dec and paid_dec > 0:
-        Payment.objects.create(
-            rental=req,
-            cashier=request.user if request.user.is_authenticated else None,
-            amount_paid=paid_dec,
-            payment_method=request.POST.get('payment_method', 'cash'),
-            notes=f"Return collection. Discount applied: {discount_dec if 'discount_dec' in locals() else 0}",
+        if not created:
+            same_submission = (
+                payment.rental_id == req.pk
+                and payment.amount_paid == amount_received
+                and payment.payment_method == request.POST.get("payment_method", "cash")
+                and payment.payment_reference == request.POST.get("transaction_ref", "")
+            )
+            if not same_submission:
+                return None, False
+
+        if created and not payment.receipt_number:
+            payment.receipt_number = f"RCPT-{payment.id:06d}"
+            payment.save(update_fields=["receipt_number"])
+        return payment, created
+
+    if amount_received < current_balance:
+        payment, created = create_return_payment(
+            "partial",
+            "Partial collection before return completion.",
+        )
+        if not created:
+            if payment:
+                messages.info(request, "This payment was already recorded; it was not added again.")
+            else:
+                messages.error(request, "This payment submission key has already been used.")
+            return redirect(return_page)
+        messages.info(request, f"Partial payment recorded. Remaining balance: ${max(current_balance - amount_received, Decimal('0.00')):.2f}. Return is not complete.")
+        return redirect(return_page)
+
+    with transaction.atomic():
+        if amount_received:
+            payment, created = create_return_payment(
+                "paid",
+                f"Return collection. Discount applied: {discount:.2f}",
+            )
+            if not created:
+                if payment:
+                    messages.info(request, "This payment was already recorded; it was not added again.")
+                else:
+                    messages.error(request, "This payment submission key has already been used.")
+                return redirect(return_page)
+
+        req.total_amount = final_total
+        req.return_date = return_dt
+        returned_items = (request.POST.get("returned_items") or "").strip()
+        return_notes = (request.POST.get("return_notes") or "").strip()
+        if returned_items:
+            req.notes = f"{req.notes}\nReturned items: {returned_items}" if req.notes else f"Returned items: {returned_items}"
+        if return_notes:
+            req.notes = f"{req.notes}\nReturn notes: {return_notes}" if req.notes else f"Return notes: {return_notes}"
+        req.status = "Returned"
+        req.return_condition = return_condition
+        req.returned_by = request.user
+        req.save(update_fields=[
+            "total_amount", "return_date", "notes", "status",
+            "return_condition", "returned_by",
+        ])
+        record_late_fee_transaction(
+            req,
+            late_fee,
+            return_dt,
+            performed_by=request.user,
         )
 
-    # Update paid flag if fully paid
-    try:
-        if req.balance_due <= 0:
-            req.is_paid = True
-            req.save(update_fields=['is_paid'])
-    except Exception:
-        pass
+        suit = req.suit
+        if suit.should_queue_for_dry_cleaning or return_condition == "damaged":
+            suit.status = "Dry Cleaning"
+            movement_type = "returned_for_cleaning"
+            quantity_delta = 0
+        else:
+            suit.quantity += req.quantity_requested or 1
+            suit.status = "Available"
+            movement_type = "returned"
+            quantity_delta = req.quantity_requested or 1
+        suit.save(update_fields=["status", "quantity"])
+        record_inventory_movement(
+            suit,
+            movement_type,
+            quantity_delta=quantity_delta,
+            performed_by=request.user,
+            rental_request=req,
+            notes=(
+                "Damaged item held out of available stock pending cleaning or repair."
+                if return_condition == "damaged"
+                else "Customer return processed."
+            ),
+        )
+        suit.refresh_rental_end_time()
+
+        req.is_paid = req.balance_due <= 0
+        req.save(update_fields=["is_paid"])
 
     if suit.should_queue_for_dry_cleaning:
-        messages.success(request, f"Suit return processed and queued for cleaning. Remaining balance: ${req.balance_due}.")
+        messages.success(request, f"Return complete. {suit.suit_name} is queued for cleaning.")
     else:
-        messages.success(request, f"Suit return processed and item restored to stock. Remaining balance: ${req.balance_due}.")
-    return redirect('laundry_backlog')
+        messages.success(request, f"Return complete. {suit.suit_name} is back in stock.")
+    return redirect("laundry_backlog")
 
 
 @login_required
@@ -1723,11 +2425,11 @@ def process_reservation(request):
     if request.method != 'POST':
         return redirect('requests')
 
-    if not is_admin(request.user) and not is_reception(request.user):
-        messages.error(request, "Access denied. Reception/Admin only.")
+    if not is_admin(request.user):
+        messages.error(request, "Access denied. Admin only.")
         return redirect("home")
 
-    return_url = 'requests' if is_admin(request.user) else 'reception_requests'
+    return_url = 'requests' if is_admin(request.user) else 'requests'
 
     rental_id = request.POST.get("rental_id")
     duration_hours = request.POST.get("duration_hours", "24")
@@ -1747,19 +2449,48 @@ def process_reservation(request):
     except (TypeError, ValueError):
         duration_hours = 24
 
-    req.status = "Reserved"
-    req.notes = (req.notes or "") + f"\nReserved for {duration_hours} hours."
-    req.save(update_fields=['status', 'notes'])
+    if duration_hours <= 0:
+        messages.error(request, "Reservation duration must be greater than zero.")
+        return redirect(return_url)
 
-    suit = req.suit
-    suit.status = "Reserved"
-    suit.save(update_fields=['status'])
+    try:
+        if not req.reserve_inventory(timezone.now() + timedelta(hours=duration_hours), performed_by=request.user):
+            messages.error(request, "This request already has an active inventory reservation.")
+            return redirect(return_url)
+    except ValidationError as exc:
+        messages.error(request, "; ".join(exc.messages))
+        return redirect(return_url)
+
+    req.notes = (req.notes or "") + f"\nReserved for {duration_hours} hours."
+    req.save(update_fields=['notes'])
 
     messages.success(request, "Rental request has been reserved successfully.")
     return redirect(return_url)
 
 
 @login_required
+def reception_return_view(request, rental_id):
+    if not (is_reception(request.user) or is_cashier(request.user)):
+        messages.error(request, "Access denied. Reception staff only.")
+        return redirect("dashboard" if is_admin(request.user) else "home")
+
+    selected_rental = get_object_or_404(
+        SuitRequest.objects.select_related("suit"),
+        pk=rental_id,
+        status="Active",
+    )
+    active_rentals = SuitRequest.objects.filter(status="Active").select_related("suit").order_by("-request_date")
+    return render(request, "reception/reception_return.html", {
+        "active_rentals": active_rentals,
+        "selected_rental": selected_rental,
+        "late_fee_policy": RentalPolicy.get_solo(),
+        "return_payment_key": str(uuid4()),
+        "current_return_time": timezone.localtime().strftime("%Y-%m-%dT%H:%M"),
+    })
+
+
+@login_required
+@transaction.atomic
 def return_suit_view(request, request_id):
     """Simple endpoint to mark a suit request as returned and enqueue it for cleaning.
 
@@ -1768,44 +2499,41 @@ def return_suit_view(request, request_id):
     - Does NOT modify suit quantity here (cleaning will restore availability)
     - Redirects back to the reception requests page.
     """
-    suit_request = get_object_or_404(SuitRequest, id=request_id)
+    if not is_reception_or_admin(request.user):
+        messages.error(request, "Access denied. Reception/Admin only.")
+        return redirect("home")
 
-    if suit_request.status in ("Approved", "Active"):
-        suit_request.return_date = timezone.now()
-        suit_request.status = "Returned"
-        suit_request.save()
-
-        suit = suit_request.suit
-        if suit:
-            if suit.should_queue_for_dry_cleaning:
-                suit.status = 'Dry Cleaning'
-            else:
-                suit.quantity += suit_request.quantity_requested or 1
-                suit.status = 'Available'
-            suit.save(update_fields=['status', 'quantity'])
-            try:
-                suit.refresh_rental_end_time()
-            except Exception:
-                pass
-
-        if suit and suit.should_queue_for_dry_cleaning:
-            messages.info(request, f"📦 {suit_request.suit.suit_name} waa la soo celiyey, waxaana la geliyey safka dhar-dhaqista (Waiting for Cleaning).")
+    suit_request = get_object_or_404(
+        SuitRequest.objects.select_for_update().select_related("suit"),
+        id=request_id,
+    )
+    if suit_request.return_suit(performed_by=request.user):
+        if suit_request.suit.should_queue_for_dry_cleaning:
+            messages.info(request, f"{suit_request.suit.suit_name} was received and queued for cleaning.")
         else:
-            messages.info(request, f"📦 {suit_request.suit.suit_name} waa la soo celiyey, waxaana dib loogu celiyey keydka.")
+            messages.info(request, f"{suit_request.suit.suit_name} was returned to inventory.")
     else:
-        messages.error(request, "Dalabkan hadda ma aha mid furan oo la soo celin karo.")
+        messages.error(request, "Only active rentals can be returned.")
 
-    return redirect('reception_requests')
+    return redirect('requests')
 
 
 @login_required
+@transaction.atomic
 def return_suit_audit_view(request, request_id):
     """Show an audit/receive page before confirming a return and sending to laundry.
 
     Displays total, paid and remaining debt and on POST marks the request `Returned`
     and redirects to the laundry backlog page.
     """
-    suit_request = get_object_or_404(SuitRequest, id=request_id)
+    if not is_reception_or_admin(request.user):
+        messages.error(request, "Access denied. Reception/Admin only.")
+        return redirect("home")
+
+    suit_request = get_object_or_404(
+        SuitRequest.objects.select_for_update().select_related("suit"),
+        id=request_id,
+    )
 
     # Calculate debt: price_per_day * days_requested * quantity_requested
     total_amount = (suit_request.suit.price_per_day or 0) * (getattr(suit_request, 'days_requested', 0) or 0) * (suit_request.quantity_requested or 0)
@@ -1816,27 +2544,13 @@ def return_suit_audit_view(request, request_id):
         remaining_debt = total_amount
 
     if request.method == 'POST':
-        suit_request.return_date = timezone.now()
-        suit_request.status = 'Returned'
-        suit_request.save()
-
-        suit = suit_request.suit
-        if suit:
-            if suit.should_queue_for_dry_cleaning:
-                suit.status = 'Dry Cleaning'
-            else:
-                suit.quantity += suit_request.quantity_requested or 1
-                suit.status = 'Available'
-            suit.save(update_fields=['status', 'quantity'])
-            try:
-                suit.refresh_rental_end_time()
-            except Exception:
-                pass
-
-        if suit and suit.should_queue_for_dry_cleaning:
-            messages.success(request, f"📦 {suit_request.suit.suit_name} waa la gudoomay, waxaana loo wareejiyey dhar-dhaqista.")
+        if not suit_request.return_suit(performed_by=request.user):
+            messages.error(request, "Only active rentals can be returned.")
+            return redirect('requests')
+        if suit_request.suit.should_queue_for_dry_cleaning:
+            messages.success(request, f"{suit_request.suit.suit_name} was received and queued for cleaning.")
         else:
-            messages.success(request, f"📦 {suit_request.suit.suit_name} waa la soo celiyey, waxaana dib loogu celiyey keydka.")
+            messages.success(request, f"{suit_request.suit.suit_name} was returned to inventory.")
         return redirect('laundry_backlog')
 
     context = {
@@ -1853,7 +2567,7 @@ def return_suit_audit_view(request, request_id):
 # =========================
 @login_required
 def add_suit(request):
-    if not (is_admin(request.user) or is_reception(request.user)):
+    if not is_admin(request.user):
         messages.error(request, "Access denied.")
         return redirect("home")
 
@@ -1905,6 +2619,9 @@ def add_suit(request):
                 messages.error(request, "Suit not found.")
                 return redirect("inventory")
 
+            if not _set_inventory_quantity(request, suit, request.POST.get("quantity", suit.quantity)):
+                return redirect("inventory")
+            suit.refresh_from_db()
             suit.suit_name = request.POST.get("suit_name", suit.suit_name)
             suit.collection = collection or suit.collection
             suit.description = description or suit.description
@@ -1912,7 +2629,6 @@ def add_suit(request):
             suit.item_type = category or suit.item_type or "suits"
             suit.color = request.POST.get("color", suit.color)
             suit.price_per_day = price
-            suit.quantity = int(request.POST.get("quantity", suit.quantity))
             suit.condition_grade = condition_grade
             suit.damage_notes = damage_notes
             if image_file:
@@ -1920,7 +2636,7 @@ def add_suit(request):
             suit.save()
             messages.success(request, "Suit updated successfully!")
         else:
-            Suit.objects.create(
+            suit = Suit.objects.create(
                 suit_name=request.POST["suit_name"],
                 collection=collection,
                 description=description,
@@ -1934,10 +2650,17 @@ def add_suit(request):
                 damage_notes=damage_notes,
                 status="Available"
             )
+            record_inventory_movement(
+                suit,
+                "opening_balance",
+                quantity_delta=suit.quantity,
+                performed_by=request.user,
+                notes="Opening stock entered when the item was added.",
+            )
             messages.success(request, "Suit added successfully!")
 
         if is_reception(request.user) or is_cashier(request.user):
-            return redirect("reception_inventory")
+            return redirect("inventory")
         return redirect("inventory")
 
     suits = Suit.objects.all().order_by('-id')
@@ -1953,7 +2676,7 @@ def add_suit(request):
     status_filter = request.GET.get('status', '').strip()
     if status_filter and status_filter != 'all':
         if status_filter == 'available':
-            suits = suits.filter(quantity__gt=0, status__iexact='Available')
+            suits = _available_inventory_queryset(suits)
         elif status_filter == 'rented':
             suits = suits.filter(status__iexact='Rented')
         elif status_filter == 'out':
@@ -1996,7 +2719,7 @@ def add_suit(request):
                 suits = suits.filter(cat_q)
 
     total_suits = Suit.objects.count()
-    available_count = Suit.objects.filter(quantity__gt=0).count()
+    available_count = _available_inventory_queryset().count()
     rented_count = Suit.objects.filter(status__iexact='Rented').count()
     out_of_stock_count = Suit.objects.filter(quantity__lte=0).count()
     total_value = sum((s.price_per_day * s.quantity) for s in Suit.objects.all())
@@ -2031,13 +2754,18 @@ def add_suit(request):
 # =========================
 @login_required
 def edit_suit(request, suit_id):
-    if not (is_admin(request.user) or is_reception(request.user)):
+    if not is_admin(request.user):
         messages.error(request, "Access denied.")
         return redirect("home")
 
     suit = get_object_or_404(Suit, id=suit_id)
 
     if request.method == "POST":
+        requested_status = request.POST.get("status", suit.status)
+        if not is_admin(request.user) and requested_status == "Dry Cleaning" and suit.status != "Dry Cleaning":
+            messages.error(request, "Reception must request laundry approval instead of directly changing this status.")
+            return redirect("inventory")
+
         collection = request.POST["collection"]
         price = float(request.POST["price_per_day"])
 
@@ -2064,13 +2792,15 @@ def edit_suit(request, suit_id):
                 messages.error(request, "Budget suits price must be between $14 and $18.")
                 return redirect("edit_suit", suit_id=suit_id)
 
+        if not _set_inventory_quantity(request, suit, request.POST.get("quantity", suit.quantity)):
+            return redirect("edit_suit", suit_id=suit_id)
+
         suit.suit_name = request.POST["suit_name"]
         suit.collection = collection
         suit.size = request.POST["size"]
         suit.item_type = request.POST.get("category", suit.item_type or "suits")
         suit.color = request.POST["color"]
         suit.price_per_day = price
-        suit.quantity = int(request.POST.get("quantity", suit.quantity))
         suit.status = request.POST["status"]
 
         if request.FILES.get("image"):
@@ -2081,7 +2811,7 @@ def edit_suit(request, suit_id):
         suit.save()
         messages.success(request, "Suit updated successfully!")
         if is_reception(request.user) or is_cashier(request.user):
-            return redirect("reception_inventory")
+            return redirect("inventory")
         return redirect("dashboard")
 
     return render(request, "admin/edit_suit.html", {"suit": suit})
@@ -2092,13 +2822,13 @@ def edit_suit(request, suit_id):
 # =========================
 @login_required
 def delete_suit(request, suit_id):
-    if not (is_admin(request.user) or is_reception(request.user)):
+    if not is_admin(request.user):
         messages.error(request, "Access denied.")
         return redirect("home")
 
     Suit.objects.get(id=suit_id).delete()
     if is_reception(request.user) or is_cashier(request.user):
-        return redirect("reception_inventory")
+        return redirect("inventory")
     return redirect("dashboard")
 
 
@@ -2143,7 +2873,7 @@ def inventory_management(request):
 
     if status_filter and status_filter != 'all':
         if status_filter == 'available':
-            suits = suits.filter(quantity__gt=0, status__iexact='Available')
+            suits = _available_inventory_queryset(suits)
         elif status_filter == 'rented':
             suits = suits.filter(Q(status__iexact='Rented') | Q(status__iexact='Reserved'))
         elif status_filter == 'out':
@@ -2161,7 +2891,7 @@ def inventory_management(request):
         suits = suits.order_by('quantity' if order == 'asc' else '-quantity')
 
     total_items = Suit.objects.count()
-    available_count = Suit.objects.filter(quantity__gt=0).count()
+    available_count = _available_inventory_queryset().count()
     rented_count = SuitRequest.objects.filter(status__in=["Active", "Reserved"]).aggregate(total=Sum('quantity_requested'))['total'] or 0
     out_of_stock_count = Suit.objects.filter(quantity__lte=0).count()
     total_value = sum((s.price_per_day * s.quantity) for s in Suit.objects.all())
@@ -2194,6 +2924,7 @@ def inventory_management(request):
 
     context = {
         'suits': suits,
+        'is_admin_user': is_admin(request.user),
         'page_obj': page_obj,
         'page_range': list(range(max(1, page_obj.number - 2), min(page_obj.paginator.num_pages, page_obj.number + 2) + 1)),
         'sort_by': sort_by,
@@ -2217,6 +2948,37 @@ def inventory_management(request):
     }
 
     return render(request, "admin/inventory_admin.html", context)
+
+
+@login_required
+def inventory_movement_history(request):
+    if not is_admin(request.user):
+        messages.error(request, "Access denied. Admin only.")
+        return redirect("home")
+
+    movements = InventoryMovement.objects.select_related(
+        "suit", "rental_request", "performed_by"
+    )
+    query = request.GET.get("q", "").strip()
+    movement_type = request.GET.get("type", "").strip()
+    if query:
+        movements = movements.filter(
+            Q(suit_name__icontains=query)
+            | Q(rental_request__name__icontains=query)
+            | Q(rental_request__phone__icontains=query)
+            | Q(notes__icontains=query)
+        )
+    if movement_type in dict(InventoryMovement.MOVEMENT_TYPES):
+        movements = movements.filter(movement_type=movement_type)
+
+    page_obj = Paginator(movements, 30).get_page(request.GET.get("page"))
+    return render(request, "admin/inventory_movements.html", {
+        "page_obj": page_obj,
+        "movements": page_obj.object_list,
+        "query": query,
+        "selected_type": movement_type,
+        "movement_types": InventoryMovement.MOVEMENT_TYPES,
+    })
 
 
 @login_required
@@ -2389,7 +3151,34 @@ def admin_profile(request):
         messages.error(request, "Access denied. Admin only.")
         return redirect("home")
 
-    return render(request, "admin/admin_profile.html")
+    late_fee_policy = RentalPolicy.get_solo()
+    if request.method == "POST":
+        try:
+            late_fee_per_hour = Decimal(request.POST.get("late_fee_per_hour", ""))
+        except (InvalidOperation, TypeError, ValueError):
+            late_fee_per_hour = None
+
+        partial_hour_policy = request.POST.get("partial_hour_policy", "")
+        valid_policy = partial_hour_policy in dict(RentalPolicy.PARTIAL_HOUR_CHOICES)
+        if (
+            late_fee_per_hour is None
+            or not late_fee_per_hour.is_finite()
+            or late_fee_per_hour < 0
+            or late_fee_per_hour > Decimal("999999.99")
+            or not valid_policy
+        ):
+            messages.error(request, "Enter a valid non-negative hourly rate and partial-hour rule.")
+        else:
+            late_fee_policy.late_fee_per_hour = late_fee_per_hour.quantize(Decimal("0.01"))
+            late_fee_policy.partial_hour_policy = partial_hour_policy
+            late_fee_policy.save(update_fields=["late_fee_per_hour", "partial_hour_policy", "updated_at"])
+            messages.success(request, "Late-fee policy saved. Existing assessed fees are unchanged.")
+            return redirect("admin_profile")
+
+    return render(request, "admin/admin_profile.html", {
+        "late_fee_policy": late_fee_policy,
+        "late_fee_choices": RentalPolicy.PARTIAL_HOUR_CHOICES,
+    })
 
 
 @login_required(login_url='customer_login')
@@ -2441,277 +3230,191 @@ def register_view(request):
 # =========================
 # REPORTS
 # =========================
+def _get_report_data(request):
+    """Return the validated report range and all report querysets for that range."""
+    today = timezone.localdate()
+    start_date_raw = request.GET.get("start_date", request.GET.get("from_date", "")).strip()
+    end_date_raw = request.GET.get("end_date", request.GET.get("to_date", "")).strip()
+
+    # Preserve support for the former single-day report filter.
+    legacy_date = request.GET.get("date", "").strip()
+    if not start_date_raw and not end_date_raw and legacy_date:
+        start_date_raw = end_date_raw = legacy_date
+
+    date_range_error = None
+    if not start_date_raw and not end_date_raw:
+        start_date = today.replace(day=1)
+        end_date = today
+    elif not start_date_raw or not end_date_raw:
+        start_date = end_date = None
+        date_range_error = "Both start and end dates are required when filtering."
+    else:
+        try:
+            start_date = parse_date(start_date_raw)
+            end_date = parse_date(end_date_raw)
+        except (TypeError, ValueError):
+            start_date = end_date = None
+
+        if start_date is None:
+            date_range_error = "Enter a valid start date."
+        elif end_date is None:
+            date_range_error = "Enter a valid end date."
+        elif start_date > today:
+            date_range_error = "Start date cannot be in the future."
+        elif end_date > today:
+            date_range_error = "End date cannot be in the future."
+        elif start_date > end_date:
+            date_range_error = "Start date must be on or before the end date."
+
+    if date_range_error:
+        start_value = start_date_raw
+        end_value = end_date_raw
+        rentals = SuitRequest.objects.none()
+        payments = Payment.objects.none()
+        expenses = Expense.objects.none()
+    else:
+        start_value = start_date.isoformat()
+        end_value = end_date.isoformat()
+        current_tz = timezone.get_current_timezone()
+        range_start = timezone.make_aware(datetime.combine(start_date, time.min), current_tz)
+        range_end = timezone.make_aware(datetime.combine(end_date, time.max), current_tz)
+        rentals = SuitRequest.objects.filter(
+            request_date__range=(range_start, range_end)
+        ).select_related("suit").order_by("-request_date")
+        payments = Payment.objects.filter(
+            payment_date__range=(range_start, range_end)
+        ).select_related("rental", "rental__suit", "cashier").order_by("-payment_date")
+        expenses = Expense.objects.filter(
+            expense_date__range=(range_start, range_end)
+        ).select_related("created_by").order_by("-expense_date")
+
+    return {
+        "today": today,
+        "start_date": start_value,
+        "end_date": end_value,
+        "date_range_error": date_range_error,
+        "rentals": rentals,
+        "payments": payments,
+        "expenses": expenses,
+    }
+
+
 @login_required
 def reports(request):
     if not is_admin(request.user):
         messages.error(request, "Access denied. Admin only.")
         return redirect("home")
 
-    now = timezone.localtime()
-    
-    # New date range parameters (no restrictions)
-    from_date_str = request.GET.get('from_date', '').strip()
-    to_date_str = request.GET.get('to_date', '').strip()
-    
-    # Keep old parameters for backward compatibility
-    selected_date = request.GET.get('date', '').strip()
-    selected_month = request.GET.get('month', '').strip()
-    selected_recent_month = request.GET.get('recent_month', '').strip()
-    selected_period = request.GET.get('period', 'all').strip().lower()
-    month_range = request.GET.get('month_range', '').strip().lower()
+    report_data = _get_report_data(request)
+    rentals = report_data["rentals"]
+    payments = report_data["payments"]
+    expenses = report_data["expenses"]
 
-    def get_month_range(year, month):
-        start_date = datetime(year, month, 1, 0, 0, 0)
-        last_day = calendar.monthrange(year, month)[1]
-        end_date = datetime(year, month, last_day, 23, 59, 59, 999999)
-        tz = timezone.get_current_timezone()
-        return timezone.make_aware(start_date, tz), timezone.make_aware(end_date, tz)
-
-    def get_month_range_12_25(year, month):
-        """Get date range from 12th to 25th of a month"""
-        start_date = datetime(year, month, 12, 0, 0, 0)
-        end_date = datetime(year, month, 25, 23, 59, 59, 999999)
-        tz = timezone.get_current_timezone()
-        return timezone.make_aware(start_date, tz), timezone.make_aware(end_date, tz)
-
-    filter_start = None
-    filter_end = None
-    date_range_error = None
-    
-    # Priority: use new from_date/to_date if provided
-    if from_date_str or to_date_str:
-        try:
-            if from_date_str:
-                parsed_from = parse_date(from_date_str)
-                if parsed_from:
-                    filter_start = timezone.make_aware(datetime.combine(parsed_from, time.min), timezone.get_current_timezone())
-            if to_date_str:
-                parsed_to = parse_date(to_date_str)
-                if parsed_to:
-                    filter_end = timezone.make_aware(datetime.combine(parsed_to, time.max), timezone.get_current_timezone())
-            # Validate date range
-            if filter_start and filter_end and filter_start > filter_end:
-                date_range_error = "From date must be earlier than or equal to To date."
-        except Exception as e:
-            date_range_error = f"Invalid date format: {str(e)}"
-    
-    # Fallback to old parameters if no new date range provided
-    elif selected_date:
-        parsed_date = parse_date(selected_date)
-        if parsed_date:
-            filter_start = timezone.make_aware(datetime.combine(parsed_date, time.min), timezone.get_current_timezone())
-            filter_end = timezone.make_aware(datetime.combine(parsed_date, time.max), timezone.get_current_timezone())
-    elif selected_month:
-        try:
-            year_str, month_str = selected_month.split('-')
-            year = int(year_str)
-            month = int(month_str)
-            filter_start, filter_end = get_month_range(year, month)
-        except (ValueError, TypeError):
-            selected_month = ''
-    elif selected_recent_month:
-        try:
-            recent_months = int(selected_recent_month)
-            year = now.year
-            month = now.month - recent_months + 1
-            while month <= 0:
-                month += 12
-                year -= 1
-            filter_start, _ = get_month_range(year, month)
-            filter_end = now
-        except (ValueError, TypeError):
-            selected_recent_month = ''
-    elif month_range == 'current':
-        filter_start, filter_end = get_month_range_12_25(now.year, now.month)
-    elif month_range == 'last':
-        year = now.year
-        month = now.month - 1
-        if month <= 0:
-            month = 12
-            year -= 1
-        filter_start, filter_end = get_month_range_12_25(year, month)
-    elif selected_period in ['daily', 'weekly', 'monthly', 'yearly']:
-        if selected_period == 'daily':
-            filter_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
-            filter_end = now
-        elif selected_period == 'weekly':
-            filter_start = now - timedelta(days=7)
-            filter_end = now
-        elif selected_period == 'monthly':
-            filter_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
-            filter_end = now
-        elif selected_period == 'yearly':
-            filter_start = now.replace(month=1, day=1, hour=0, minute=0, second=0, microsecond=0)
-            filter_end = now
-
-    # Suit Statistics
-    available_quantity = Suit.objects.aggregate(total=Sum('quantity'))['total'] or 0
-    rented_quantity = SuitRequest.objects.filter(status="Active").aggregate(total=Sum('quantity_requested'))['total'] or 0
-    total_quantity = available_quantity + rented_quantity
-    total_suits = Suit.objects.count()
-    
-    # Request Statistics
-    filtered_requests = SuitRequest.objects.select_related('suit').order_by('-request_date')
-    filtered_payments = Payment.objects.select_related('rental').order_by('-payment_date')
-    filtered_expenses = Expense.objects.order_by('-expense_date')
-    staff_list = Staff.objects.order_by('name')
-
-    # Apply date filters (no restriction on future dates if explicitly requested)
-    if filter_start and filter_end:
-        filtered_requests = filtered_requests.filter(request_date__range=(filter_start, filter_end))
-        filtered_payments = filtered_payments.filter(payment_date__range=(filter_start, filter_end))
-        filtered_expenses = filtered_expenses.filter(expense_date__range=(filter_start, filter_end))
-    elif filter_start:
-        filtered_requests = filtered_requests.filter(request_date__gte=filter_start)
-        filtered_payments = filtered_payments.filter(payment_date__gte=filter_start)
-        filtered_expenses = filtered_expenses.filter(expense_date__gte=filter_start)
-    elif filter_end:
-        filtered_requests = filtered_requests.filter(request_date__lte=filter_end)
-        filtered_payments = filtered_payments.filter(payment_date__lte=filter_end)
-        filtered_expenses = filtered_expenses.filter(expense_date__lte=filter_end)
-
-    total_requests = filtered_requests.count()
-    pending_requests = filtered_requests.filter(status="Pending").count()
-    approved_requests = filtered_requests.filter(status="Approved").count()
-    active_requests = filtered_requests.filter(status="Active").count()
-    returned_requests = filtered_requests.filter(status="Returned").count()
-    rejected_requests = filtered_requests.filter(status="Rejected").count()
-    expired_requests = filtered_requests.filter(status="Expired").count()
-    
-    # Financial Data
-    revenue = filtered_requests.filter(status__in=["Active", "Returned"]).aggregate(
-        total=Sum('total_amount')
-    )['total'] or 0
-
-    # Calculate utilization rate
-    utilization_rate = 0
-    if total_quantity > 0:
-        utilization_rate = round((rented_quantity / total_quantity) * 100, 1)
-    
-    # Suit type breakdown and inventory mix
-    luxury_items = Suit.objects.filter(collection="Luxury")
-    standard_items = Suit.objects.filter(collection="Standard")
-    budget_items = Suit.objects.filter(collection="Budget")
-
-    luxury_count = luxury_items.count()
-    standard_count = standard_items.count()
-    budget_count = budget_items.count()
-    luxury_units = luxury_items.aggregate(total=Sum('quantity'))['total'] or 0
-    standard_units = standard_items.aggregate(total=Sum('quantity'))['total'] or 0
-    budget_units = budget_items.aggregate(total=Sum('quantity'))['total'] or 0
-    inventory_mix_total = luxury_units + standard_units + budget_units
-    luxury_mix_pct = round((luxury_units / inventory_mix_total * 100), 1) if inventory_mix_total else 0
-    standard_mix_pct = round((standard_units / inventory_mix_total * 100), 1) if inventory_mix_total else 0
-    budget_mix_pct = round((budget_units / inventory_mix_total * 100), 1) if inventory_mix_total else 0
-    revenue_potential = sum(
-        (item.quantity or 0) * (item.price_per_day or Decimal('0'))
-        for item in Suit.objects.all()
+    rental_summary = rentals.aggregate(
+        rental_count=Count("id"),
     )
-    
-    total_expenses = filtered_expenses.aggregate(total=Sum('amount'))['total'] or 0
-    
-    # Calculate dry cleaning expenses separately
-    if filter_start and filter_end:
-        dry_cleaning_expenses = DryCleaning.objects.filter(
-            date__range=(filter_start.date(), filter_end.date()),
-            status='approved'  # Only count approved dry cleaning
-        ).aggregate(total=Sum('amount'))['total'] or 0
-    else:
-        dry_cleaning_expenses = DryCleaning.objects.filter(
-            status='approved'
-        ).aggregate(total=Sum('amount'))['total'] or 0
-    
-    # Calculate profit scenarios
-    net_profit = revenue - total_expenses  # Profit after ALL expenses (including dry cleaning)
-    net_profit_before_cleaning = revenue - (total_expenses - dry_cleaning_expenses)  # Profit before dry cleaning cost deduction
-    
-    payment_count = filtered_payments.count()
-    expense_count = filtered_expenses.count()
+    revenue = rentals.filter(status__in=["Active", "Returned"]).aggregate(
+        total=Sum("total_amount")
+    )["total"] or Decimal("0.00")
+    expense_summary = expenses.aggregate(
+        total=Sum("amount"),
+        expense_count=Count("id"),
+    )
+    total_expenses = expense_summary["total"] or Decimal("0.00")
 
-    payments = filtered_payments[:100]
-    expenses = filtered_expenses[:100]
-    requests = filtered_requests[:100]
+    rental_by_day = list(
+        rentals.annotate(day=TruncDate("request_date", tzinfo=timezone.get_current_timezone()))
+        .values("day")
+        .annotate(rental_count=Count("id"))
+        .order_by("day")
+    )
+    revenue_by_day = list(
+        rentals.filter(status__in=["Active", "Returned"])
+        .annotate(day=TruncDate("request_date", tzinfo=timezone.get_current_timezone()))
+        .values("day")
+        .annotate(total=Sum("total_amount"))
+        .order_by("day")
+    )
+    expense_by_day = list(
+        expenses.annotate(day=TruncDate("expense_date", tzinfo=timezone.get_current_timezone()))
+        .values("day")
+        .annotate(total=Sum("amount"))
+        .order_by("day")
+    )
+    payments_by_day = list(
+        payments.annotate(day=TruncDate("payment_date", tzinfo=timezone.get_current_timezone()))
+        .values("day")
+        .annotate(payment_count=Count("id"))
+        .order_by("day")
+    )
 
-    all_activities = []
-    for expense in expenses:
-        all_activities.append({
-            'id': expense.id,
-            'type': 'Expense',
-            'date': expense.expense_date,
-            'category': expense.notes or 'Expense',
-            'description': expense.description,
-            'reference': expense.created_by.username if expense.created_by else '-',
-            'amount': expense.amount,
-        })
-    for payment in payments:
-        all_activities.append({
-            'id': payment.id,
-            'type': 'Transaction',
-            'date': payment.payment_date,
-            'category': payment.payment_method or 'Payment',
-            'description': f"Payment for {payment.rental.suit.suit_name if payment.rental and payment.rental.suit else 'Rental'}",
-            'reference': payment.receipt_number or '-',
-            'amount': payment.amount_paid,
-        })
-    for req in requests:
-        all_activities.append({
-            'id': req.id,
-            'type': 'Rental',
-            'date': req.request_date,
-            'category': req.status,
-            'description': f"{req.name} rented {req.suit.suit_name if req.suit else 'a suit'} ({req.quantity_requested} pcs)",
-            'reference': f"REQ-{req.id}",
-            'amount': req.total_amount,
-        })
-
-    all_activities = sorted(all_activities, key=lambda item: item['date'], reverse=True)
-
-    context = {
-        'total_suits': total_suits,
-        'total_quantity': total_quantity,
-        'available_quantity': available_quantity,
-        'rented_quantity': rented_quantity,
-        'total_requests': total_requests,
-        'pending_requests': pending_requests,
-        'approved_requests': approved_requests,
-        'active_requests': active_requests,
-        'returned_requests': returned_requests,
-        'rejected_requests': rejected_requests,
-        'expired_requests': expired_requests,
-        'revenue': revenue,
-        'total_expenses': total_expenses,
-        'dry_cleaning_expenses': dry_cleaning_expenses,
-        'other_expenses': total_expenses - dry_cleaning_expenses,
-        'net_profit': net_profit,
-        'net_profit_before_cleaning': net_profit_before_cleaning,
-        'utilization_rate': utilization_rate,
-        'recent_requests': filtered_requests[:15],
-        'selected_date': selected_date,
-        'selected_month': selected_month,
-        'selected_recent_month': selected_recent_month,
-        'selected_period': selected_period,
-        'month_range': month_range,
-        'from_date': from_date_str,
-        'to_date': to_date_str,
-        'date_range_error': date_range_error,
-        'now': timezone.now(),
-        'luxury_count': luxury_count,
-        'standard_count': standard_count,
-        'budget_count': budget_count,
-        'luxury_units': luxury_units,
-        'standard_units': standard_units,
-        'budget_units': budget_units,
-        'luxury_mix_pct': luxury_mix_pct,
-        'standard_mix_pct': standard_mix_pct,
-        'budget_mix_pct': budget_mix_pct,
-        'revenue_potential': revenue_potential,
-        'payment_count': payment_count,
-        'expense_count': expense_count,
-        'all_activities': all_activities,
-        'staff_list': staff_list,
+    chart_days = sorted({
+        row["day"]
+        for rows in (rental_by_day, revenue_by_day, expense_by_day, payments_by_day)
+        for row in rows
+    })
+    revenue_values = {row["day"]: row["total"] for row in revenue_by_day}
+    expense_values = {row["day"]: row["total"] for row in expense_by_day}
+    rental_counts = {row["day"]: row["rental_count"] for row in rental_by_day}
+    payment_counts = {row["day"]: row["payment_count"] for row in payments_by_day}
+    chart_labels = [day.strftime("%b %d") for day in chart_days]
+    chart_financial = {
+        "labels": chart_labels,
+        "revenue": [float(revenue_values.get(day, 0) or 0) for day in chart_days],
+        "expenses": [float(expense_values.get(day, 0) or 0) for day in chart_days],
     }
-    
-    return render(request, "admin/reports.html", context)
+    chart_activity = {
+        "labels": chart_labels,
+        "rentals": [rental_counts.get(day, 0) for day in chart_days],
+        "payments": [payment_counts.get(day, 0) for day in chart_days],
+    }
+
+    activities = []
+    for rental in rentals[:100]:
+        activities.append({
+            "type": "rental",
+            "date": rental.request_date,
+            "details": f"{rental.name} · {rental.suit.suit_name if rental.suit else 'Suit unavailable'} · {rental.status}",
+            "reference": f"REQ-{rental.pk}",
+            "amount": rental.total_amount,
+            "search": f"{rental.name} {rental.suit.suit_name if rental.suit else ''} {rental.status} REQ-{rental.pk}".lower(),
+        })
+    for payment in payments[:100]:
+        payment_rental = payment.rental
+        activities.append({
+            "type": "payment",
+            "date": payment.payment_date,
+            "details": f"{payment_rental.name if payment_rental else 'Customer unavailable'} · {payment.payment_method or 'Payment'} · {payment.status}",
+            "reference": payment.receipt_number or f"PAY-{payment.pk}",
+            "amount": payment.amount_paid,
+            "search": f"{payment_rental.name if payment_rental else ''} {payment.receipt_number or ''} {payment.status}".lower(),
+        })
+    for expense in expenses[:100]:
+        activities.append({
+            "type": "expense",
+            "date": expense.expense_date,
+            "details": f"{expense.description} · {expense.notes or 'Expense'}",
+            "reference": expense.created_by.username if expense.created_by else "—",
+            "amount": expense.amount,
+            "search": f"{expense.description} {expense.notes or ''}".lower(),
+        })
+    activities.sort(key=lambda activity: activity["date"], reverse=True)
+
+    return render(request, "admin/reports.html", {
+        **report_data,
+        "revenue": revenue,
+        "total_expenses": total_expenses,
+        "net_profit": revenue - total_expenses,
+        "total_rentals": rental_summary["rental_count"],
+        "total_requests": rental_summary["rental_count"],
+        "payment_count": payments.count(),
+        "expense_count": expense_summary["expense_count"],
+        "chart_financial": chart_financial,
+        "chart_activity": chart_activity,
+        "has_financial_chart_data": bool(revenue_by_day or expense_by_day),
+        "has_activity_chart_data": bool(rental_by_day or payments_by_day),
+        "activities": activities,
+    })
 
 
 @login_required
@@ -2754,8 +3457,9 @@ def reception_reports(request):
 
     filter_start = None
     filter_end = None
+    date_range_error = None
     if selected_date:
-        parsed_date = parse_date(selected_date)
+        parsed_date, date_range_error = parse_historical_date(selected_date)
         if parsed_date:
             filter_start = timezone.make_aware(datetime.combine(parsed_date, time.min), timezone.get_current_timezone())
             filter_end = timezone.make_aware(datetime.combine(parsed_date, time.max), timezone.get_current_timezone())
@@ -2764,12 +3468,21 @@ def reception_reports(request):
             year_str, month_str = selected_month.split('-')
             year = int(year_str)
             month = int(month_str)
-            filter_start, filter_end = get_month_range(year, month)
+            if (year, month) > (now.year, now.month):
+                date_range_error = "Report month cannot be in the future."
+                selected_month = ''
+            else:
+                filter_start, filter_end = get_month_range(year, month)
+                if (year, month) == (now.year, now.month):
+                    filter_end = min(filter_end, now)
         except (ValueError, TypeError):
             selected_month = ''
+            date_range_error = "Enter a valid report month."
     elif selected_recent_month:
         try:
             recent_months = int(selected_recent_month)
+            if recent_months < 1:
+                raise ValueError
             year = now.year
             month = now.month - recent_months + 1
             while month <= 0:
@@ -2779,9 +3492,11 @@ def reception_reports(request):
             filter_end = now
         except (ValueError, TypeError):
             selected_recent_month = ''
+            date_range_error = "Enter a valid recent-month range."
     elif month_range == 'current':
         # Filter 12th-25th of current month
         filter_start, filter_end = get_month_range_12_25(now.year, now.month)
+        filter_end = min(filter_end, now)
     elif month_range == 'last':
         # Filter 12th-25th of last month
         year = now.year
@@ -2813,6 +3528,10 @@ def reception_reports(request):
         rentals_qs = rentals_qs.filter(request_date__range=(filter_start, filter_end))
         payments_qs = payments_qs.filter(payment_date__range=(filter_start, filter_end))
         expenses_qs = expenses_qs.filter(expense_date__range=(filter_start, filter_end))
+    elif date_range_error:
+        rentals_qs = rentals_qs.none()
+        payments_qs = payments_qs.none()
+        expenses_qs = expenses_qs.none()
 
     total_suits = Suit.objects.count()
     available_quantity = Suit.objects.aggregate(total=Sum('quantity'))['total'] or 0
@@ -2906,7 +3625,7 @@ def admin_payments(request):
         messages.error(request, "Access denied. Admin only.")
         return redirect("home")
 
-    # Date range parameters (no restrictions)
+    # Date range parameters are restricted to historical dates.
     from_date_str = request.GET.get('from_date', '').strip()
     to_date_str = request.GET.get('to_date', '').strip()
     date_range_error = None
@@ -2916,20 +3635,17 @@ def admin_payments(request):
     
     # Parse date range if provided
     if from_date_str or to_date_str:
-        try:
-            if from_date_str:
-                parsed_from = parse_date(from_date_str)
-                if parsed_from:
-                    filter_start = timezone.make_aware(datetime.combine(parsed_from, time.min), timezone.get_current_timezone())
-            if to_date_str:
-                parsed_to = parse_date(to_date_str)
-                if parsed_to:
-                    filter_end = timezone.make_aware(datetime.combine(parsed_to, time.max), timezone.get_current_timezone())
-            # Validate date range
-            if filter_start and filter_end and filter_start > filter_end:
-                date_range_error = "From date must be earlier than or equal to To date."
-        except Exception as e:
-            date_range_error = f"Invalid date format: {str(e)}"
+        parsed_from, from_error = parse_historical_date(from_date_str, "start date")
+        parsed_to, to_error = parse_historical_date(to_date_str, "end date")
+        date_range_error = from_error or to_error
+        if parsed_from:
+            filter_start = timezone.make_aware(datetime.combine(parsed_from, time.min), timezone.get_current_timezone())
+        if parsed_to:
+            filter_end = timezone.make_aware(datetime.combine(parsed_to, time.max), timezone.get_current_timezone())
+        if filter_start and filter_end and filter_start > filter_end:
+            date_range_error = "From date must be earlier than or equal to To date."
+        if date_range_error:
+            filter_start = filter_end = None
 
     payments = Payment.objects.select_related("cashier").order_by("-payment_date")
     expenses = Expense.objects.order_by("-expense_date")
@@ -2944,12 +3660,24 @@ def admin_payments(request):
     elif filter_end:
         payments = payments.filter(payment_date__lte=filter_end)
         expenses = expenses.filter(expense_date__lte=filter_end)
+    elif date_range_error:
+        payments = payments.none()
+        expenses = expenses.none()
 
-    revenue_agg = SuitRequest.objects.filter(status__in=["Active", "Returned"]).aggregate(total=Sum('total_amount'))
+    revenue_agg = payments.aggregate(total=Sum('amount_paid'))
     total_revenue = revenue_agg.get('total') or Decimal('0')
 
     total_expenses = expenses.aggregate(total=Sum('amount'))['total'] or Decimal('0')
-    dry_cleaning_expenses = DryCleaning.objects.filter(status='approved').aggregate(total=Sum('amount'))['total'] or Decimal('0')
+    dry_cleaning_qs = DryCleaning.objects.filter(paid=True)
+    if filter_start and filter_end:
+        dry_cleaning_qs = dry_cleaning_qs.filter(date__range=(filter_start.date(), filter_end.date()))
+    elif filter_start:
+        dry_cleaning_qs = dry_cleaning_qs.filter(date__gte=filter_start.date())
+    elif filter_end:
+        dry_cleaning_qs = dry_cleaning_qs.filter(date__lte=filter_end.date())
+    elif date_range_error:
+        dry_cleaning_qs = dry_cleaning_qs.none()
+    dry_cleaning_expenses = dry_cleaning_qs.aggregate(total=Sum('amount'))['total'] or Decimal('0')
     other_expenses = total_expenses - dry_cleaning_expenses
     net_profit = total_revenue - total_expenses
     net_profit_before_cleaning = total_revenue - other_expenses
@@ -2999,7 +3727,7 @@ def add_expense(request):
 
     amount = request.POST.get("amount")
     category = request.POST.get("category", "Other")
-    date_str = request.POST.get("date")
+    date_str = request.POST.get("expense_date") or request.POST.get("date")
     description = request.POST.get("description", "").strip()
     assigned_user_id = request.POST.get("assigned_user")
     assigned_staff_id = request.POST.get("assigned_staff")
@@ -3008,6 +3736,13 @@ def add_expense(request):
         if is_ajax:
             return JsonResponse({'success': False, 'message': 'Please enter expense amount and description.'}, status=400)
         messages.error(request, "Please enter expense amount and description.")
+        return redirect("reports")
+
+    expense_date_value, expense_date_error = parse_historical_date(date_str, "expense date")
+    if expense_date_error:
+        if is_ajax:
+            return JsonResponse({'success': False, 'message': expense_date_error}, status=400)
+        messages.error(request, expense_date_error)
         return redirect("reports")
 
     try:
@@ -3025,10 +3760,11 @@ def add_expense(request):
         return redirect("reports")
 
     expense_date = timezone.now()
-    if date_str:
-        parsed_date = parse_date(date_str)
-        if parsed_date:
-            expense_date = timezone.make_aware(datetime.combine(parsed_date, datetime.min.time()))
+    if expense_date_value:
+        expense_date = timezone.make_aware(
+            datetime.combine(expense_date_value, datetime.min.time()),
+            timezone.get_current_timezone(),
+        )
 
     creator = request.user
     if assigned_staff_id:
@@ -3072,7 +3808,7 @@ def add_expense(request):
 
     messages.success(request, "Business expense recorded successfully.")
     if is_reception_or_admin(request.user):
-        return redirect("reception_reports")
+        return redirect("reports")
     return redirect("reports")
 
 
@@ -3171,13 +3907,13 @@ def mark_payment_as_paid(request, payment_id):
             if is_ajax:
                 return JsonResponse({'success': False, 'message': 'Please enter a valid payment amount.'}, status=400)
             messages.error(request, "Please enter a valid payment amount.")
-            return redirect(request.META.get('HTTP_REFERER') or 'reception_payments')
+            return redirect(request.META.get('HTTP_REFERER') or 'admin_payments')
 
         if amount <= 0:
             if is_ajax:
                 return JsonResponse({'success': False, 'message': 'Payment amount must be greater than zero.'}, status=400)
             messages.error(request, "Payment amount must be greater than zero.")
-            return redirect(request.META.get('HTTP_REFERER') or 'reception_payments')
+            return redirect(request.META.get('HTTP_REFERER') or 'admin_payments')
 
         # Do not allow paying more than the balance due
         balance = payment.rental.balance_due or Decimal('0.00')
@@ -3185,26 +3921,30 @@ def mark_payment_as_paid(request, payment_id):
             if is_ajax:
                 return JsonResponse({'success': False, 'message': f'Amount exceeds remaining balance (${balance}).'}, status=400)
             messages.error(request, f"Amount exceeds remaining balance (${balance}).")
-            return redirect(request.META.get('HTTP_REFERER') or 'reception_payments')
+            return redirect(request.META.get('HTTP_REFERER') or 'admin_payments')
 
         payment_method = request.POST.get('payment_method', '').strip() or (payment.payment_method or 'Cash')
 
         # Parse payment date (date input expected)
         if payment_date_raw:
-            parsed_date = parse_date(payment_date_raw)
-            if parsed_date:
-                payment_dt = timezone.make_aware(datetime.combine(parsed_date, time.min))
-            else:
-                payment_dt = timezone.now()
+            parsed_date, date_error = parse_historical_date(payment_date_raw, "payment date")
+            if date_error:
+                if is_ajax:
+                    return JsonResponse({'success': False, 'message': date_error}, status=400)
+                messages.error(request, date_error)
+                return redirect(request.META.get('HTTP_REFERER') or 'admin_payments')
+            payment_dt = timezone.make_aware(
+                datetime.combine(parsed_date, time.min),
+                timezone.get_current_timezone(),
+            )
         else:
             payment_dt = timezone.now()
 
-        # Past payment dates are allowed for record accuracy, no server-side past-date rejection.
         try:
             payment_date_only = timezone.localtime(payment_dt).date()
         except Exception:
             messages.error(request, "Invalid payment date.")
-            return redirect(request.META.get('HTTP_REFERER') or 'reception_payments')
+            return redirect(request.META.get('HTTP_REFERER') or 'admin_payments')
 
         # Create a new Payment record for the remaining amount or partial
         payment_status = 'paid' if amount >= balance else 'partial'
@@ -3236,14 +3976,14 @@ def mark_payment_as_paid(request, payment_id):
             })
 
         messages.success(request, f"Payment recorded (#{new_payment.id}).")
-        return redirect(request.META.get('HTTP_REFERER') or 'reception_payments')
+        return redirect(request.META.get('HTTP_REFERER') or 'admin_payments')
 
     # Non-POST fallback
     # Non-POST fallback
     if is_ajax:
         return JsonResponse({'success': False, 'message': f'Use the payment form to record an amount for Payment #{payment.id}.'}, status=400)
     messages.info(request, f"Use the payment form to record an amount for Payment #{payment.id}.")
-    return redirect("reception_payments")
+    return redirect("admin_payments")
 
 
 @login_required
@@ -3253,7 +3993,7 @@ def record_payment(request):
         return redirect("home")
 
     if request.method != "POST":
-        return redirect("reception_payments")
+        return redirect("admin_payments")
 
     rental_id = request.POST.get("rental_id")
     amount = request.POST.get("amount")
@@ -3262,32 +4002,32 @@ def record_payment(request):
 
     if not rental_id:
         messages.error(request, "Please select a rental to record payment.")
-        return redirect("reception_payments")
+        return redirect("admin_payments")
 
     req = get_object_or_404(SuitRequest, id=rental_id)
 
     if req.status not in ["Active", "Returned", "Approved"]:
         messages.error(request, "Selected rental is not eligible for manual payment.")
-        return redirect("reception_payments")
+        return redirect("admin_payments")
 
     try:
         amount_value = Decimal(amount)
     except (TypeError, ValueError, InvalidOperation):
         messages.error(request, "Please enter a valid payment amount.")
-        return redirect("reception_payments")
+        return redirect("admin_payments")
 
     if amount_value <= 0:
         messages.error(request, "Payment amount must be greater than zero.")
-        return redirect("reception_payments")
+        return redirect("admin_payments")
 
     balance_due = req.balance_due
     if balance_due <= Decimal('0.00'):
         messages.error(request, "This rental is already fully paid.")
-        return redirect("reception_payments")
+        return redirect("admin_payments")
 
     if amount_value > balance_due:
         messages.error(request, "Amount paid cannot exceed the remaining balance.")
-        return redirect("reception_payments")
+        return redirect("admin_payments")
 
     req.payment_method = method.title() if method else req.payment_method or "Cash"
     if reference:
@@ -3310,7 +4050,7 @@ def record_payment(request):
     req.save(update_fields=["is_paid", "payment_method", "payment_reference"])
 
     messages.success(request, "Payment recorded successfully.")
-    return redirect("reception_payments")
+    return redirect("admin_payments")
 
 
 @login_required
@@ -3328,11 +4068,11 @@ def payment_receipt(request, payment_id):
 
 @login_required
 def dry_cleaning_page(request):
-    """Admin dry cleaning page - shows items awaiting payment confirmation.
-    
-    Reception has marked items as paid, admin reviews and confirms payment here.
-    Admin can approve, reject, or view approved/rejected items.
-    """
+    """Admin review of reception laundry requests and active laundry jobs."""
+    if not is_admin(request.user):
+        messages.error(request, "Only an admin can approve laundry requests.")
+        return redirect("dashboard" if is_reception(request.user) else "home")
+
     if request.method == 'POST':
         action = request.POST.get('action')
         cleaning_id = request.POST.get('cleaning_id')
@@ -3342,14 +4082,23 @@ def dry_cleaning_page(request):
             return redirect('dry_cleaning')
         
         dry_clean_record = get_object_or_404(DryCleaning, id=cleaning_id)
-        
-        if action == 'approve_payment':
-            dry_clean_record.paid = True
-            dry_clean_record.status = 'approved'
-            dry_clean_record.save(update_fields=['paid', 'status'])
-            messages.success(request, f"✓ Payment approved for '{dry_clean_record.suit.suit_name}'. Reception can now mark it ready.")
 
-        elif action == 'reject_payment':
+        if dry_clean_record.status != 'pending':
+            messages.error(request, "This laundry request has already been reviewed.")
+            return redirect('dry_cleaning')
+        
+        if action in ['approve_request', 'approve_payment']:
+            now = timezone.now()
+            dry_clean_record.status = 'sent_to_laundry'
+            dry_clean_record.approved_by = request.user
+            dry_clean_record.approved_at = now
+            dry_clean_record.sent_to_laundry_at = now
+            dry_clean_record.save(update_fields=['status', 'approved_by', 'approved_at', 'sent_to_laundry_at'])
+            dry_clean_record.suit.status = 'Dry Cleaning'
+            dry_clean_record.suit.save(update_fields=['status'])
+            messages.success(request, f"'{dry_clean_record.suit.suit_name}' approved and sent to laundry.")
+
+        elif action in ['reject_request', 'reject_payment']:
             dry_clean_record.status = 'rejected'
             dry_clean_record.paid = False
             dry_clean_record.save(update_fields=['status', 'paid'])
@@ -3359,7 +4108,9 @@ def dry_cleaning_page(request):
     
     # Get all DryCleaning records by status
     pending_cleanings = DryCleaning.objects.filter(status='pending').select_related('suit').order_by('-created_at')
-    approved_cleanings = DryCleaning.objects.filter(status='approved').select_related('suit').order_by('-created_at')
+    approved_cleanings = DryCleaning.objects.filter(
+        status__in=['approved', 'sent_to_laundry', 'in_laundry', 'completed']
+    ).select_related('suit', 'requested_by', 'approved_by').order_by('-created_at')
     rejected_cleanings = DryCleaning.objects.filter(status='rejected').select_related('suit').order_by('-created_at')
     
     context = {
@@ -3370,12 +4121,17 @@ def dry_cleaning_page(request):
         'approved_count': approved_cleanings.count(),
         'rejected_count': rejected_cleanings.count(),
         'total_pending_amount': sum(c.amount for c in pending_cleanings),
+        'active_cleanings': approved_cleanings,
     }
     return render(request, 'admin/dry_cleaning.html', context)
 
 
 @login_required
 def mark_dry_cleaning_paid(request, entry_id):
+    if not is_admin(request.user):
+        messages.error(request, "Only an admin can confirm laundry payments.")
+        return redirect('dashboard' if is_reception(request.user) else 'home')
+
     if request.method != 'POST':
         return redirect('dry_cleaning')
 
@@ -3412,6 +4168,10 @@ def dry_cleaning_ledger(request):
     Creates an `Expense`, sets the `Suit.status` to `Available`, and
     redirects back to the dry cleaning page.
     """
+    if not is_reception_or_admin(request.user):
+        messages.error(request, "Access denied. Reception/Admin only.")
+        return redirect('home')
+
     if request.method == 'POST':
         suit_id = request.POST.get('suit_id')
         cleaning_cost = request.POST.get('cleaning_cost')
@@ -3433,17 +4193,41 @@ def dry_cleaning_ledger(request):
             messages.error(request, "Enter a valid cleaning cost amount.")
             return redirect('dry_cleaning')
 
-        # Create expense record
-        Expense.objects.create(
-            description=f"Cleaning for {suit.suit_name} (#{suit.id})",
-            amount=amount,
-            created_by=request.user,
-            notes=laundry_notes,
-        )
+        dry_clean = DryCleaning.objects.filter(suit=suit).order_by('-created_at').first()
+        if suit.status != 'Dry Cleaning' or not dry_clean or dry_clean.status not in ['completed', 'approved']:
+            messages.error(request, "The laundry job must be completed before recording its return and expense.")
+            return redirect('dry_cleaning')
 
-        # Mark suit as available
-        suit.status = 'Available'
-        suit.save(update_fields=['status'])
+        with transaction.atomic():
+            suit = Suit.objects.select_for_update().get(pk=suit_id)
+            dry_clean = DryCleaning.objects.select_for_update().get(pk=dry_clean.pk)
+            if suit.status != "Dry Cleaning" or dry_clean.status not in ["completed", "approved"]:
+                messages.error(request, "This cleaning job has already been returned or is not complete.")
+                return redirect("dry_cleaning")
+
+            quantity_delta = dry_clean.rental_request.quantity_requested if dry_clean.rental_request_id else 0
+            Expense.objects.create(
+                description=f"Cleaning for {suit.suit_name} (#{suit.id})",
+                amount=amount,
+                created_by=request.user,
+                notes=laundry_notes,
+            )
+
+            suit.quantity += quantity_delta
+            suit.status = 'Available'
+            suit.save(update_fields=['quantity', 'status'])
+            record_inventory_movement(
+                suit,
+                "cleaning_completed",
+                quantity_delta=quantity_delta,
+                performed_by=request.user,
+                rental_request=dry_clean.rental_request,
+                notes="Cleaning expense recorded and items returned to inventory.",
+            )
+            dry_clean.status = 'returned'
+            dry_clean.returned_at = timezone.now()
+            dry_clean.paid = True
+            dry_clean.save(update_fields=['status', 'returned_at', 'paid'])
 
         messages.success(request, f"Recorded cleaning expense and marked '{suit.suit_name}' as Available.")
         return redirect('dry_cleaning')
@@ -3485,20 +4269,32 @@ def dry_cleaning_ledger(request):
 
 @login_required
 def laundry_backlog_view(request):
-    """Handle the dry cleaning workflow.
-    
-    Step 1 (Reception): Mark as Paid → creates DryCleaning record (status='pending'), redirects to laundry page
-    Step 2 (Admin): Review payment on admin page and approve (status='approved') or reject (status='rejected')
-    Step 3 (Reception): Once admin approves, can click "Mark Ready" to finalize
-    
-    Rejected items: Don't appear in reception queue again (status='rejected')
-    """
+    """Reception requests laundry; staff can advance approved jobs to return."""
+    if not is_reception_or_admin(request.user):
+        messages.error(request, "Access denied. Reception/Admin only.")
+        return redirect('home')
+
     if request.method == 'POST':
         action = request.POST.get('action', 'mark_paid')
-        suit_id = request.POST.get('suit_id')
         request_id = request.POST.get('request_id')
         cleaning_cost = request.POST.get('cleaning_cost', '0')
         laundry_notes = request.POST.get('laundry_notes', '')
+
+        if action in ['start_laundry', 'complete_laundry']:
+            dry_clean = get_object_or_404(DryCleaning, id=request.POST.get('cleaning_id'))
+            expected_status = 'sent_to_laundry' if action == 'start_laundry' else 'in_laundry'
+            next_status = 'in_laundry' if action == 'start_laundry' else 'completed'
+            if dry_clean.status != expected_status:
+                messages.error(request, "This laundry job has already changed status.")
+                return redirect('laundry_backlog')
+            dry_clean.status = next_status
+            update_fields = ['status']
+            if next_status == 'completed':
+                dry_clean.completed_at = timezone.now()
+                update_fields.append('completed_at')
+            dry_clean.save(update_fields=update_fields)
+            messages.success(request, f"'{dry_clean.suit.suit_name}' is now {dry_clean.get_status_display().lower()}.")
+            return redirect('laundry_backlog')
 
         if not request_id:
             messages.error(request, "Ma jiro codsi dhar-dhaqin la tilmaamay.")
@@ -3513,76 +4309,108 @@ def laundry_backlog_view(request):
             messages.error(request, "Cillad baa dhacday: Suudhkaan lagama helin liiska dhar-dhaqista.")
             return redirect('laundry_backlog')
 
-        # Step 1: Reception marks as paid (creates record for admin review)
-        if action == 'mark_paid':
+        if action in ['submit_request', 'mark_paid']:
             try:
                 amount = Decimal(cleaning_cost)
             except (InvalidOperation, TypeError, ValueError):
                 messages.error(request, "Fadlan geli lacag sax ah oo nadiifinta ah.")
                 return redirect('laundry_backlog')
 
-            existing = DryCleaning.objects.filter(suit_id=suit_request.suit.id).order_by('-created_at').first()
-            if existing and existing.status == 'rejected':
-                messages.warning(request, f"'{suit_request.suit.suit_name}' was rejected by admin and cannot be submitted again.")
-                return redirect('laundry_backlog')
-
-            if existing and existing.status in ['pending', 'approved']:
+            existing = DryCleaning.objects.filter(
+                suit_id=suit_request.suit.id,
+                status__in=['pending', 'approved', 'sent_to_laundry', 'in_laundry', 'completed'],
+            ).order_by('-created_at').first()
+            if existing:
                 messages.info(request, f"'{suit_request.suit.suit_name}' is already in the queue.")
                 return redirect('laundry_backlog')
 
+            admin_sent = is_admin(request.user)
+            now = timezone.now()
             DryCleaning.objects.create(
                 suit_id=suit_request.suit.id,
+                rental_request=suit_request,
+                requested_by=request.user,
+                approved_by=request.user if admin_sent else None,
                 amount=amount,
                 paid=False,
-                status='pending',
-                notes=laundry_notes or "Pending admin payment confirmation"
+                status='sent_to_laundry' if admin_sent else 'pending',
+                notes=laundry_notes or ("Sent directly by admin" if admin_sent else "Pending admin laundry approval"),
+                approved_at=now if admin_sent else None,
+                sent_to_laundry_at=now if admin_sent else None,
             )
-            messages.success(request, f"✓ '{suit_request.suit.suit_name}' marked for payment review. Awaiting admin confirmation.")
+            if admin_sent:
+                suit_request.suit.status = 'Dry Cleaning'
+                suit_request.suit.save(update_fields=['status'])
+                messages.success(request, f"'{suit_request.suit.suit_name}' sent directly to laundry.")
+            else:
+                messages.success(request, f"'{suit_request.suit.suit_name}' laundry request submitted for admin approval.")
             return redirect('laundry_backlog')
 
-        # Step 3: Reception finalizes as ready (only after admin approves payment)
         elif action == 'mark_ready':
             dry_clean = DryCleaning.objects.filter(
-                suit_id=suit_request.suit.id,
-                status='approved'
+                rental_request=suit_request,
+                status__in=['completed', 'approved'],
             ).order_by('-created_at').first()
+            if not dry_clean:
+                dry_clean = DryCleaning.objects.filter(
+                    suit=suit_request.suit,
+                    rental_request__isnull=True,
+                    status='approved',
+                ).order_by('-created_at').first()
 
             if not dry_clean:
-                messages.error(request, f"Admin payment confirmation pending for '{suit_request.suit.suit_name}'. Please wait.")
+                messages.error(request, f"'{suit_request.suit.suit_name}' must be completed by laundry before returning to inventory.")
                 return redirect('laundry_backlog')
 
             with transaction.atomic():
+                suit_request = SuitRequest.objects.select_for_update().get(pk=suit_request.pk)
+                suit = Suit.objects.select_for_update().get(pk=suit_request.suit_id)
+                dry_clean = DryCleaning.objects.select_for_update().get(pk=dry_clean.pk)
+                if (
+                    suit_request.status != "Returned"
+                    or suit.status != "Dry Cleaning"
+                    or dry_clean.status not in {"completed", "approved"}
+                ):
+                    messages.error(request, "This cleaning job has already been returned or is not complete.")
+                    return redirect("laundry_backlog")
+
                 try:
                     amount = Decimal(cleaning_cost) if cleaning_cost not in [None, ''] else dry_clean.amount
                 except (InvalidOperation, TypeError, ValueError):
                     amount = dry_clean.amount
 
                 expense_exists = Expense.objects.filter(
-                    description__icontains=f"Dry cleaning for {suit_request.suit.suit_name}"
+                    description__icontains=f"Dry cleaning for {suit.suit_name}"
                 ).exists()
 
                 if not expense_exists:
                     Expense.objects.create(
-                        description=f"Dry cleaning for {suit_request.suit.suit_name} (Tag: #{suit_request.suit.id}). {laundry_notes}",
+                        description=f"Dry cleaning for {suit.suit_name} (Tag: #{suit.id}). {laundry_notes}",
                         amount=amount,
                         created_by=request.user,
-                        notes=laundry_notes or f"Dry cleaning cost for {suit_request.suit.suit_name}",
+                        notes=laundry_notes or f"Dry cleaning cost for {suit.suit_name}",
                     )
 
-                suit = suit_request.suit
-                suit.quantity += suit_request.quantity_requested
+                quantity_delta = suit_request.quantity_requested or 0
+                suit.quantity += quantity_delta
                 suit.status = 'Available'
                 suit.save(update_fields=['quantity', 'status'])
-                suit.refresh_from_db()
+                record_inventory_movement(
+                    suit,
+                    "cleaning_completed",
+                    quantity_delta=quantity_delta,
+                    performed_by=request.user,
+                    rental_request=suit_request,
+                    notes="Cleaning completed; items returned to available inventory.",
+                )
 
                 suit_request.status = 'Returned'
                 suit_request.save(update_fields=['status'])
-                suit_request.refresh_from_db()
 
                 dry_clean.paid = True
-                dry_clean.status = 'approved'
-                dry_clean.save(update_fields=['paid', 'status'])
-                dry_clean.refresh_from_db()
+                dry_clean.status = 'returned'
+                dry_clean.returned_at = timezone.now()
+                dry_clean.save(update_fields=['paid', 'status', 'returned_at'])
 
                 messages.success(request, f"🧼 {suit.suit_name} waa laga soo saaray dhar-dhaqista, kharashkiisana waa la diiwaangeliyey!")
 
@@ -3601,17 +4429,17 @@ def laundry_backlog_view(request):
         if not dry_clean:
             filtered_items.append(item)
             continue
-        if dry_clean.status == 'rejected':
+        if dry_clean.status in ['rejected', 'returned']:
             continue
-        if dry_clean.paid is True and dry_clean.status == 'approved':
+        if dry_clean.status in ['sent_to_laundry', 'in_laundry', 'completed', 'approved']:
             if active_tab == 'pending':
                 continue
             if active_tab == 'approved':
                 filtered_items.append(item)
                 continue
-        if active_tab == 'pending' and dry_clean.paid is True:
+        if active_tab == 'pending' and dry_clean.status != 'pending':
             continue
-        if active_tab == 'approved' and not (dry_clean.paid is True and dry_clean.status == 'approved'):
+        if active_tab == 'approved' and dry_clean.status not in ['sent_to_laundry', 'in_laundry', 'completed', 'approved']:
             continue
         filtered_items.append(item)
 
@@ -3619,10 +4447,12 @@ def laundry_backlog_view(request):
     paginator = Paginator(filtered_items, 10)
     page_obj = paginator.get_page(page_number)
 
-    return render(request, 'reception/laundry_page.html', {
+    template_name = 'admin/loundary_admin.html' if is_admin(request.user) else 'reception/laundry_page.html'
+    return render(request, template_name, {
         'laundry_items': page_obj.object_list,
         'page_obj': page_obj,
         'active_tab': active_tab,
+        'is_admin_user': is_admin(request.user),
     })
 
 
@@ -3634,25 +4464,25 @@ def apply_discount(request, rental_id=None):
 
     if request.method != "POST":
         messages.error(request, "Discount must be submitted via POST.")
-        return redirect("reception_payments")
+        return redirect("admin_payments")
 
     if rental_id is None:
         rental_id = request.POST.get("rental_id")
 
     if not rental_id:
         messages.error(request, "No rental was specified for discount.")
-        return redirect("reception_payments")
+        return redirect("admin_payments")
 
     try:
         rental_id_int = int(rental_id)
     except (TypeError, ValueError):
         messages.error(request, "Invalid rental identifier provided.")
-        return redirect("reception_payments")
+        return redirect("admin_payments")
 
     rental = SuitRequest.objects.filter(id=rental_id_int).first()
     if not rental:
         messages.error(request, f"Rental #{rental_id} was not found.")
-        return redirect("reception_payments")
+        return redirect("admin_payments")
 
     discount_type = request.POST.get("discount_type", "fixed")
     discount_value = Decimal(request.POST.get("discount_value", "0"))
@@ -3660,17 +4490,17 @@ def apply_discount(request, rental_id=None):
 
     if discount_value <= 0:
         messages.error(request, "Discount value must be greater than zero.")
-        return redirect("reception_payments")
+        return redirect("admin_payments")
 
     if discount_type == "percentage":
         if discount_value > 100:
             messages.error(request, "Percentage discount cannot exceed 100%.")
-            return redirect("reception_payments")
+            return redirect("admin_payments")
         discount_amount = rental.total_amount * (discount_value / Decimal(100))
     else:
         if discount_value > rental.total_amount:
             messages.error(request, "Fixed discount cannot exceed total rental amount.")
-            return redirect("reception_payments")
+            return redirect("admin_payments")
         discount_amount = discount_value
 
     final_total = rental.total_amount - discount_amount
@@ -3684,7 +4514,7 @@ def apply_discount(request, rental_id=None):
     )
 
     messages.success(request, f"Discount of ${discount_amount:.2f} applied to rental #{rental_id}.")
-    return redirect("reception_payments")
+    return redirect("admin_payments")
 
 
 @login_required
@@ -3695,28 +4525,28 @@ def process_refund(request):
 
     if request.method != "POST":
         messages.error(request, "Refund must be submitted via POST.")
-        return redirect("reception_payments")
+        return redirect("admin_payments")
 
     payment_id = request.POST.get("payment_id")
     if not payment_id:
         messages.error(request, "No payment was specified for refund.")
-        return redirect("reception_payments")
+        return redirect("admin_payments")
 
     # Validate payment_id is an integer and that the Payment exists.
     try:
         payment_id_int = int(payment_id)
     except (TypeError, ValueError):
         messages.error(request, "Invalid payment identifier provided.")
-        return redirect("reception_payments")
+        return redirect("admin_payments")
 
     payment = Payment.objects.filter(id=payment_id_int).first()
     if not payment:
         messages.error(request, f"Payment #{payment_id} was not found.")
-        return redirect("reception_payments")
+        return redirect("admin_payments")
     refund_amount = Decimal(request.POST.get("refund_amount", "0"))
     if refund_amount <= 0 or refund_amount > payment.amount_paid:
         messages.error(request, "Refund amount must be greater than zero and not exceed the original payment.")
-        return redirect("reception_payments")
+        return redirect("admin_payments")
 
     payment.refund_amount = refund_amount
     payment.refund_method = request.POST.get("refund_method", payment.payment_method)
@@ -3731,7 +4561,7 @@ def process_refund(request):
     rental.save(update_fields=['is_paid'])
 
     messages.success(request, f"Refund recorded for payment #{payment_id}.")
-    return redirect("reception_payments")
+    return redirect("admin_payments")
 
 
 @login_required
@@ -3765,117 +4595,78 @@ def export_payments(request):
 
 @login_required
 def download_report(request):
-    if not is_reception_or_cashier_or_admin(request.user):
-        messages.error(request, "Access denied.")
+    if not is_admin(request.user):
+        messages.error(request, "Access denied. Admin only.")
         return redirect("home")
 
-    report_type = request.GET.get('type', 'rentals').lower()
-    selected_period = request.GET.get('period', 'all').strip().lower()
-    from_date_str = request.GET.get('from_date', '').strip()
-    to_date_str = request.GET.get('to_date', '').strip()
-    now = timezone.localtime()
+    report_data = _get_report_data(request)
+    if report_data["date_range_error"]:
+        return HttpResponse(
+            f"Invalid report date range: {report_data['date_range_error']}",
+            status=400,
+            content_type="text/plain",
+        )
 
-    def get_month_range_12_25(year, month):
-        """Get date range from 12th to 25th of a month"""
-        start_date = datetime(year, month, 12, 0, 0, 0)
-        end_date = datetime(year, month, 25, 23, 59, 59, 999999)
-        tz = timezone.get_current_timezone()
-        return timezone.make_aware(start_date, tz), timezone.make_aware(end_date, tz)
+    rentals = report_data["rentals"]
+    payments = report_data["payments"]
+    expenses = report_data["expenses"]
+    revenue = rentals.filter(status__in=["Active", "Returned"]).aggregate(
+        total=Sum("total_amount")
+    )["total"] or Decimal("0.00")
+    expense_summary = expenses.aggregate(total=Sum("amount"), expense_count=Count("id"))
+    total_expenses = expense_summary["total"] or Decimal("0.00")
+    total_rentals = rentals.aggregate(total=Count("id"))["total"]
 
-    filter_start = None
-    filter_end = None
-    
-    # Priority: use new from_date/to_date if provided
-    if from_date_str or to_date_str:
-        try:
-            if from_date_str:
-                parsed_from = parse_date(from_date_str)
-                if parsed_from:
-                    filter_start = timezone.make_aware(datetime.combine(parsed_from, time.min), timezone.get_current_timezone())
-            if to_date_str:
-                parsed_to = parse_date(to_date_str)
-                if parsed_to:
-                    filter_end = timezone.make_aware(datetime.combine(parsed_to, time.max), timezone.get_current_timezone())
-        except Exception:
-            pass
-    
-    # Fallback to period filtering
-    if not filter_start and not filter_end:
-        if selected_period == 'daily':
-            filter_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
-            filter_end = now
-        elif selected_period == 'weekly':
-            filter_start = now - timedelta(days=7)
-            filter_end = now
-        elif selected_period == 'monthly':
-            filter_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
-            filter_end = now
-        elif selected_period == 'yearly':
-            filter_start = now.replace(month=1, day=1, hour=0, minute=0, second=0, microsecond=0)
-            filter_end = now
-        else:
-            # Default to all data
-            filter_end = now.replace(hour=23, minute=59, second=59, microsecond=999999)
-
-    response = HttpResponse(content_type='text/csv')
+    response = HttpResponse(content_type="text/csv; charset=utf-8")
+    response.write("\ufeff")
+    response["Content-Disposition"] = (
+        f'attachment; filename="report_{report_data["start_date"]}_to_{report_data["end_date"]}.csv"'
+    )
     writer = csv.writer(response)
+    writer.writerow(["Summary"])
+    writer.writerow(["Start date", report_data["start_date"]])
+    writer.writerow(["End date", report_data["end_date"]])
+    writer.writerow(["Total revenue", f"{revenue:.2f}"])
+    writer.writerow(["Total expenses", f"{total_expenses:.2f}"])
+    writer.writerow(["Net profit", f"{revenue - total_expenses:.2f}"])
+    writer.writerow(["Number of rentals", total_rentals])
+    writer.writerow([])
+    writer.writerow(["Rentals/Payments"])
+    writer.writerow(["Record type", "Date", "Customer", "Suit", "Reference", "Status", "Amount"])
 
-    if report_type == 'expenses':
-        response['Content-Disposition'] = 'attachment; filename="expenses_report.csv"'
-        writer.writerow(['Date', 'Category', 'Description', 'Amount', 'Created By', 'Notes'])
-        
-        expenses = Expense.objects.order_by('-expense_date')
-        if filter_start and filter_end:
-            expenses = expenses.filter(expense_date__range=(filter_start, filter_end))
-        elif filter_start:
-            expenses = expenses.filter(expense_date__gte=filter_start)
-        elif filter_end:
-            expenses = expenses.filter(expense_date__lte=filter_end)
-        
-        # Add expense details
-        for exp in expenses:
-            writer.writerow([
-                exp.expense_date.strftime('%Y-%m-%d %H:%M') if exp.expense_date else '',
-                exp.notes or 'Other',
-                exp.description or '',
-                f"${exp.amount:.2f}",
-                exp.created_by.username if exp.created_by else 'Unknown',
-                exp.notes or '',
-            ])
-        
-        # Add summary row
-        total_expenses = sum(e.amount for e in expenses)
-        writer.writerow([])  # Empty row
-        writer.writerow(['TOTAL EXPENSES', '', '', f"${total_expenses:.2f}", '', ''])
-    else:
-        # Default: export rentals
-        response['Content-Disposition'] = 'attachment; filename="financial_report.csv"'
-        writer.writerow(['Date', 'Customer', 'Suit', 'Quantity', 'Total Amount', 'Paid Amount', 'Balance Due', 'Status', 'Payment Status'])
+    for rental in rentals:
+        writer.writerow([
+            "Rental",
+            timezone.localtime(rental.request_date).strftime("%Y-%m-%d %H:%M"),
+            rental.name,
+            rental.suit.suit_name if rental.suit else "",
+            f"REQ-{rental.pk}",
+            rental.status,
+            rental.total_amount,
+        ])
+    for payment in payments:
+        rental = payment.rental
+        writer.writerow([
+            "Payment",
+            timezone.localtime(payment.payment_date).strftime("%Y-%m-%d %H:%M"),
+            rental.name if rental else "",
+            rental.suit.suit_name if rental and rental.suit else "",
+            payment.receipt_number or f"PAY-{payment.pk}",
+            payment.status,
+            payment.amount_paid,
+        ])
 
-        rentals = SuitRequest.objects.order_by('-request_date')
-        if filter_start and filter_end:
-            rentals = rentals.filter(request_date__range=(filter_start, filter_end))
-        elif filter_start:
-            rentals = rentals.filter(request_date__gte=filter_start)
-        elif filter_end:
-            rentals = rentals.filter(request_date__lte=filter_end)
-
-        for req in rentals:
-            paid = req.amount_paid or 0
-            balance = req.balance_due or 0
-            payment_status = "Paid" if req.is_paid else f"Due: ${balance:.2f}"
-            
-            writer.writerow([
-                req.request_date.strftime('%Y-%m-%d') if req.request_date else '',
-                req.name,
-                req.suit.suit_name,
-                req.quantity_requested or 1,
-                f"${req.total_amount:.2f}",
-                f"${paid:.2f}",
-                f"${balance:.2f}",
-                req.status,
-                payment_status,
-            ])
+    writer.writerow([])
+    writer.writerow(["Expenses"])
+    writer.writerow(["Date", "Description", "Amount", "Created by", "Notes"])
+    for expense in expenses:
+        writer.writerow([
+            timezone.localtime(expense.expense_date).strftime("%Y-%m-%d %H:%M"),
+            expense.description,
+            expense.amount,
+            expense.created_by.username if expense.created_by else "",
+            expense.notes or "",
+        ])
 
     return response
 
@@ -3915,7 +4706,7 @@ def deposit_management(request):
         return redirect("home")
 
     messages.info(request, "Deposit management is not yet implemented.")
-    return redirect("reception_payments")
+    return redirect("admin_payments")
 
 
 @login_required
@@ -3925,7 +4716,7 @@ def daily_report(request):
         return redirect("home")
 
     messages.info(request, "Daily reporting is not yet implemented.")
-    return redirect("reception_payments")
+    return redirect("admin_payments")
 
 
 @login_required
@@ -3935,7 +4726,7 @@ def close_shift(request):
         return redirect("home")
 
     messages.success(request, "Shift closed successfully.")
-    return redirect("reception_payments")
+    return redirect("admin_payments")
 
 
 # =========================
@@ -3976,12 +4767,12 @@ def send_notifications(request):
 # =========================
 @login_required
 def manage_users(request):
-    if not is_admin(request.user):
-        messages.error(request, "Access denied. Admin only.")
+    if not _can_manage_customer_rentals(request.user):
+        messages.error(request, "Access denied. Admin or Reception only.")
         return redirect("home")
     
     from django.contrib.auth.models import User
-    users = User.objects.all().order_by('-date_joined')
+    users = User.objects.filter(is_staff=False).order_by('-date_joined')
     for u in users:
         Profile.objects.get_or_create(user=u)
     
@@ -3992,37 +4783,156 @@ def manage_users(request):
             Q(email__icontains=current_q)
         )
     
-    total_users = User.objects.count()
-    staff_count = User.objects.filter(is_staff=True).count()
-    customer_count = total_users - staff_count
-    # Include Staff model entries (custom staff records)
-    try:
-        from .models import Staff
-        staff_list = Staff.objects.all().order_by('-hire_date')
-        staff_total = Staff.objects.count()
-        now = timezone.localtime()
-        for staff in staff_list:
-            staff.total_paid = staff.payrolls.aggregate(total=Sum('amount'))['total'] or Decimal('0.00')
-            staff.total_advance = staff.total_advances()
-            staff.monthly_paid = staff.total_paid_for_month(now.month, now.year)
-            staff.remaining_this_month = staff.remaining_salary_for_month(now.month, now.year)
-            staff.payrolls_history = staff.payrolls.order_by('-payment_date')
-    except Exception:
-        staff_list = []
-        staff_total = 0
+    total_users = users.count()
+    customer_count = total_users
+    admin_count = (
+        User.objects.filter(is_staff=True)
+        .exclude(profile__is_reception=True)
+        .exclude(profile__is_cashier=True)
+        .count()
+        if is_admin(request.user)
+        else 0
+    )
     
     context = {
         "users": users,
         "current_q": current_q,
         "total_users": total_users,
-        "staff_count": staff_count,
-        "active_users": User.objects.filter(is_active=True).count(),
+        "admin_count": admin_count,
+        "active_users": User.objects.filter(is_active=True, is_staff=False).count(),
         "customer_count": customer_count,
-        'staff_list': staff_list,
-        'staff_total': staff_total,
+        "is_reception_user": is_reception(request.user),
+        "hide_admin_sidebar": is_reception(request.user),
     }
     
     return render(request, "admin/manage_users.html", context)
+
+
+@login_required
+def edit_user(request, user_id):
+    if not is_admin(request.user):
+        messages.error(request, "Access denied. Admin only.")
+        return redirect("home")
+
+    user = get_object_or_404(User, pk=user_id)
+    profile, _ = Profile.objects.get_or_create(user=user)
+    is_protected_admin = user.is_superuser or (
+        user.is_staff and not profile.is_cashier and not profile.is_reception
+    )
+    can_edit_access = user.pk != request.user.pk and not is_protected_admin
+
+    if request.method == "POST":
+        username = request.POST.get("username", "").strip()
+        first_name = request.POST.get("first_name", "").strip()
+        last_name = request.POST.get("last_name", "").strip()
+        email = request.POST.get("email", "").strip()
+        new_password = request.POST.get("new_password", "")
+        password_confirmation = request.POST.get("password_confirmation", "")
+        customer_phone = request.POST.get("customer_phone", "").strip()
+        national_id = request.POST.get("national_id", "").strip()
+        present_address = request.POST.get("present_address", "").strip()
+        parents_address = request.POST.get("parents_address", "").strip()
+
+        if not username:
+            messages.error(request, "Username is required.")
+            return redirect("edit_user", user_id=user.pk)
+
+        try:
+            User._meta.get_field("username").clean(username, user)
+        except ValidationError as exc:
+            messages.error(request, " ".join(exc.messages))
+            return redirect("edit_user", user_id=user.pk)
+
+        if customer_phone:
+            try:
+                customer_phone = validate_phone_number(customer_phone)
+            except ValueError as exc:
+                messages.error(request, str(exc))
+                return redirect("edit_user", user_id=user.pk)
+        try:
+            national_id = validate_national_id(national_id)
+        except ValueError as exc:
+            messages.error(request, str(exc))
+            return redirect("edit_user", user_id=user.pk)
+
+        if User.objects.filter(username__iexact=username).exclude(pk=user.pk).exists():
+            messages.error(request, "That username is already in use.")
+            return redirect("edit_user", user_id=user.pk)
+
+        if email:
+            try:
+                validate_email(email)
+            except ValidationError as exc:
+                messages.error(request, " ".join(exc.messages))
+                return redirect("edit_user", user_id=user.pk)
+
+        if new_password or password_confirmation:
+            if len(new_password) < 4:
+                messages.error(request, "New password must be at least 4 characters long.")
+                return redirect("edit_user", user_id=user.pk)
+            if new_password != password_confirmation:
+                messages.error(request, "Password confirmation does not match.")
+                return redirect("edit_user", user_id=user.pk)
+
+        profile_photo = request.FILES.get("profile_photo")
+        id_document = request.FILES.get("id_document")
+        try:
+            if profile_photo:
+                validate_image_upload(profile_photo, "profile photo")
+            if id_document:
+                validate_image_upload(id_document, "ID document")
+        except ValidationError as exc:
+            messages.error(request, " ".join(exc.messages))
+            return redirect("edit_user", user_id=user.pk)
+
+        with transaction.atomic():
+            user.username = username
+            user.first_name = first_name
+            user.last_name = last_name
+            user.email = email
+            if can_edit_access:
+                role = request.POST.get("role", "")
+                if role != "customer":
+                    messages.error(request, "Choose a valid account role.")
+                    return redirect("edit_user", user_id=user.pk)
+                user.is_active = request.POST.get("is_active") == "true"
+                user.is_staff = False
+                profile.is_reception = False
+                profile.is_cashier = False
+            if new_password:
+                user.set_password(new_password)
+            if profile_photo:
+                profile.profile_photo = profile_photo
+            if id_document:
+                profile.id_document = id_document
+            profile.customer_phone = customer_phone
+            profile.national_id = national_id
+            profile.present_address = present_address
+            profile.parents_address = parents_address
+            user.save()
+            profile.save()
+
+        if new_password and user.pk == request.user.pk:
+            update_session_auth_hash(request, user)
+        messages.success(request, f"Profile for '{user.username}' updated successfully.")
+        return redirect("manage_users")
+
+    if is_protected_admin:
+        role = "admin"
+    elif profile.is_reception:
+        role = "reception"
+    elif profile.is_cashier:
+        role = "cashier"
+    else:
+        role = "customer"
+
+    return render(request, "admin/edit_user.html", {
+        "managed_user": user,
+        "profile": profile,
+        "role": role,
+        "is_protected_admin": is_protected_admin,
+        "can_edit_access": can_edit_access,
+    })
 
 
 @login_required
@@ -4102,7 +5012,10 @@ def add_staff(request):
             messages.error(request, "Salary cannot be negative.")
             return redirect("manage_users")
 
-        hire_date = parse_date(hire_date_raw) if hire_date_raw else None
+        hire_date, hire_date_error = parse_historical_date(hire_date_raw, "hire date")
+        if hire_date_error:
+            messages.error(request, hire_date_error)
+            return redirect("manage_users")
 
         staff_user = None
         if create_login:
@@ -4184,9 +5097,9 @@ def add_payroll(request):
             messages.error(request, "Payroll amount must be greater than zero.")
             return redirect("manage_users")
 
-        payment_date = parse_date(payment_date_str)
-        if not payment_date:
-            messages.error(request, "Enter a valid payment date.")
+        payment_date, payment_date_error = parse_historical_date(payment_date_str, "payment date")
+        if payment_date_error or not payment_date:
+            messages.error(request, payment_date_error or "Enter a valid payment date.")
             return redirect("manage_users")
 
         try:
@@ -4473,6 +5386,8 @@ def reception_inventory(request):
     if status_filter != 'all':
         if status_filter == 'retired':
             suits = suits.filter(condition_grade='retired')
+        elif status_filter == 'available':
+            suits = _available_inventory_queryset(suits)
         elif status_filter == 'out':
             suits = suits.filter(quantity__lte=0)
         else:
@@ -4488,7 +5403,7 @@ def reception_inventory(request):
     
     # Stats-ka guud
     total_suits = Suit.objects.count()
-    available_count = Suit.objects.filter(status='Available').count()
+    available_count = _available_inventory_queryset().count()
     rented_count = Suit.objects.filter(status='Rented').count()
     cleaning_count = Suit.objects.filter(status='Cleaning').count()
     out_of_stock_count = Suit.objects.filter(quantity=0).count()
@@ -4532,6 +5447,7 @@ def reception_inventory(request):
 
     context = {
         'suits': suits,
+        'is_admin_user': is_admin(request.user),
         'page_obj': page_obj,
         'selected_category': selected_category,
         'query': query,
@@ -4581,8 +5497,13 @@ def add_suit_view(request):
         color = request.POST.get('color', '').strip()
         try:
             quantity = int(request.POST.get('quantity', 1))
-        except Exception:
-            quantity = 1
+        except (TypeError, ValueError):
+            messages.error(request, "Enter a valid whole-number stock quantity.")
+            return redirect('add_suit_new')
+
+        if quantity < 0:
+            messages.error(request, "Stock quantity cannot be negative.")
+            return redirect('add_suit_new')
 
         price_raw = request.POST.get('price_per_day')
         # Only require price for items that use price (suits/shirts). For others, default to 0.00.
@@ -4593,40 +5514,48 @@ def add_suit_view(request):
                 price_per_day = Decimal(price_raw)
             except (InvalidOperation, TypeError):
                 messages.error(request, "Please enter a valid numeric price.")
-                return redirect('reception_add_item')
+                return redirect('add_suit_new')
 
         condition_grade = request.POST.get('condition_grade', 'new')
         damage_notes = request.POST.get('damage_notes', '').strip()
 
         if not suit_name or not color:
             messages.error(request, "Please fill in all required fields.")
-            return redirect('reception_add_item')
+            return redirect('add_suit_new')
 
         try:
-            suit = Suit.objects.create(
-                suit_name=suit_name,
-                collection=collection,
-                description=description,
-                size=size,
-                item_type=category,
-                color=color,
-                quantity=quantity,
-                price_per_day=price_per_day,
-                image=image_file,
-                status='Available',
-                condition_grade=condition_grade,
-                damage_notes=damage_notes,
-            )
+            with transaction.atomic():
+                suit = Suit.objects.create(
+                    suit_name=suit_name,
+                    collection=collection,
+                    description=description,
+                    size=size,
+                    item_type=category,
+                    color=color,
+                    quantity=quantity,
+                    price_per_day=price_per_day,
+                    image=image_file,
+                    status='Available',
+                    condition_grade=condition_grade,
+                    damage_notes=damage_notes,
+                )
+                record_inventory_movement(
+                    suit,
+                    "opening_balance",
+                    quantity_delta=suit.quantity,
+                    performed_by=request.user,
+                    notes="Opening stock entered when the item was added.",
+                )
             messages.success(request, f"Suit '{suit_name}' has been added successfully!")
-        except Exception as e:
+        except ValidationError as e:
             messages.error(request, f"Error adding suit: {str(e)}")
-            return redirect('reception_inventory')
+            return redirect('inventory')
 
         # After creating, redirect to the suit profile so the admin/reception can review details
         try:
             return redirect('suit_profile', suit.id)
         except Exception:
-            return redirect('reception_inventory')
+            return redirect('inventory')
     
     return render(request, 'reception/reception_add_item.html')
 
@@ -4641,13 +5570,15 @@ def edit_suit_view(request, suit_id):
     suit = get_object_or_404(Suit, id=suit_id)
     
     if request.method == 'POST':
+        if not _set_inventory_quantity(request, suit, request.POST.get('quantity', suit.quantity)):
+            return redirect('edit_suit_new', suit_id=suit_id)
+        suit.refresh_from_db()
         suit.suit_name = request.POST.get('suit_name', suit.suit_name)
         suit.collection = request.POST.get('collection', suit.collection)
         suit.description = request.POST.get('description', suit.description)
         suit.size = request.POST.get('size', suit.size)
         suit.item_type = request.POST.get('category', suit.item_type or 'suits')
         suit.color = request.POST.get('color', suit.color)
-        suit.quantity = int(request.POST.get('quantity', suit.quantity))
         suit.price_per_day = request.POST.get('price_per_day', suit.price_per_day)
         suit.condition_grade = request.POST.get('condition_grade', suit.condition_grade)
         suit.damage_notes = request.POST.get('damage_notes', suit.damage_notes)
@@ -4660,7 +5591,7 @@ def edit_suit_view(request, suit_id):
         messages.success(request, "Suit has been updated successfully!")
         if is_admin(request.user):
             return redirect('inventory')
-        return redirect('reception_inventory')
+        return redirect('inventory')
     
     return render(request, 'admin/edit_suit.html', {'suit': suit})
 
@@ -4678,7 +5609,7 @@ def delete_suit_view(request, suit_id):
     if request.method == 'POST':
         suit.delete()
         messages.success(request, f"Suit '{suit_name}' has been deleted successfully!")
-        return redirect('reception_inventory')
+        return redirect('inventory')
     
     return render(request, 'reception/confirm_delete_suit.html', {'suit': suit})
 
@@ -4707,7 +5638,7 @@ def update_suit_status(request, suit_id):
                 suit.save()
                 messages.success(request, f"Status updated to: {suit.get_status_display()}")
         
-        return redirect('reception_inventory')
+        return redirect('inventory')
     
     return render(request, 'reception/update_suit_status.html', {'suit': suit})
 
@@ -4727,7 +5658,7 @@ def suit_profile(request, suit_id):
         back_url = reverse('inventory')
         profile_template = 'admin/admin_suit_details.html'
     else:
-        back_url = reverse('reception_inventory')
+        back_url = reverse('inventory')
         profile_template = 'reception/suit_profile.html'
 
     context = {
@@ -4769,7 +5700,7 @@ def suit_api_detail(request, suit_id):
 
 @login_required
 def mark_suit_as_dry_cleaning(request, suit_id):
-    """Mark a suit as being sent to dry cleaning (Returned -> Dry Cleaning)"""
+    """Create a reception laundry request or let admin send directly."""
     if not is_reception_or_admin(request.user):
         if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
             return JsonResponse({'error': 'Access denied.'}, status=403)
@@ -4782,19 +5713,47 @@ def mark_suit_as_dry_cleaning(request, suit_id):
         if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
             return JsonResponse({'error': 'Only returned suits can be marked for dry cleaning.'}, status=400)
         messages.error(request, "Only returned suits can be marked for dry cleaning.")
-        return redirect("reception_inventory")
+        return redirect("inventory")
     
-    if request.method == 'POST':
-        suit.status = "Dry Cleaning"
-        suit.save()
-        
+    if request.method != 'POST':
+        return redirect("inventory")
+
+    active_statuses = ['pending', 'approved', 'sent_to_laundry', 'in_laundry', 'completed']
+    if DryCleaning.objects.filter(suit=suit, status__in=active_statuses).exists():
+        message = "A laundry request for this item is already active."
         if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-            return JsonResponse({'success': True, 'new_status': suit.status})
-        messages.success(request, f"{suit.suit_name} marked as Dry Cleaning.")
-        return redirect("reception_inventory")
-    
-    # For GET requests, just redirect
-    return redirect("reception_inventory")
+            return JsonResponse({'error': message}, status=409)
+        messages.warning(request, message)
+        return redirect("inventory")
+
+    rental_request = SuitRequest.objects.filter(suit=suit, status='Returned').order_by('-return_date', '-request_date').first()
+    now = timezone.now()
+    admin_sent = is_admin(request.user)
+    dry_clean = DryCleaning.objects.create(
+        suit=suit,
+        rental_request=rental_request,
+        requested_by=request.user,
+        approved_by=request.user if admin_sent else None,
+        amount=Decimal('0.00'),
+        status='sent_to_laundry' if admin_sent else 'pending',
+        notes='Sent directly by admin' if admin_sent else 'Requested by reception; awaiting admin approval',
+        approved_at=now if admin_sent else None,
+        sent_to_laundry_at=now if admin_sent else None,
+    )
+
+    if admin_sent:
+        suit.status = "Dry Cleaning"
+        suit.save(update_fields=['status'])
+        message = f"{suit.suit_name} sent directly to laundry."
+        new_status = 'Dry Cleaning'
+    else:
+        message = f"Laundry request for {suit.suit_name} sent to admin for approval."
+        new_status = 'Returned'
+
+    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+        return JsonResponse({'success': True, 'new_status': new_status, 'request_status': dry_clean.status})
+    messages.success(request, message)
+    return redirect("inventory")
 
 
 @login_required
@@ -4812,17 +5771,51 @@ def mark_suit_as_available(request, suit_id):
         if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
             return JsonResponse({'error': 'Only suits in dry cleaning can be marked as available.'}, status=400)
         messages.error(request, "Only suits in dry cleaning can be marked as available.")
-        return redirect("reception_inventory")
+        return redirect("inventory")
+
+    dry_clean = DryCleaning.objects.filter(suit=suit).order_by('-created_at').first()
+    if not dry_clean or dry_clean.status not in ['completed', 'approved']:
+        message = "The laundry job must be completed before this item can return to inventory."
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return JsonResponse({'error': message}, status=409)
+        messages.error(request, message)
+        return redirect("inventory")
     
     if request.method == 'POST':
-        suit.status = "Available"
-        suit.save()
+        with transaction.atomic():
+            suit = Suit.objects.select_for_update().get(pk=suit_id)
+            dry_clean = DryCleaning.objects.select_for_update().get(pk=dry_clean.pk)
+            if suit.status != "Dry Cleaning" or dry_clean.status not in ["completed", "approved"]:
+                message = "This cleaning job has already been returned or is not complete."
+                if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                    return JsonResponse({'error': message}, status=409)
+                messages.error(request, message)
+                return redirect("inventory")
+
+            rental_request = dry_clean.rental_request or SuitRequest.objects.filter(
+                suit=suit,
+                status='Returned',
+            ).order_by('-return_date', '-request_date').first()
+            if rental_request:
+                suit.quantity += rental_request.quantity_requested
+            suit.status = "Available"
+            suit.save(update_fields=['quantity', 'status'])
+            record_inventory_movement(
+                suit,
+                "cleaning_completed",
+                quantity_delta=rental_request.quantity_requested if rental_request else 0,
+                performed_by=request.user,
+                rental_request=rental_request,
+                notes="Cleaning completed; items confirmed returned to stock.",
+            )
+            dry_clean.status = 'returned'
+            dry_clean.returned_at = timezone.now()
+            dry_clean.save(update_fields=['status', 'returned_at'])
         
         if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
             return JsonResponse({'success': True, 'new_status': suit.status})
         messages.success(request, f"{suit.suit_name} is now available for rent.")
-        return redirect("reception_inventory")
+        return redirect("inventory")
     
     # For GET requests, just redirect
-    return redirect("reception_inventory")
-
+    return redirect("inventory")

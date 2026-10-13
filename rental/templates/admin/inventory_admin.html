@@ -1,4 +1,4 @@
-{% extends "rental/base.html" %}
+{% extends "rental/base_admin.html" %}
 {% load static %}
 
 {% block content %}
@@ -432,9 +432,15 @@
               <a href="{% url 'suit_profile' suit.id %}" class="action-btn" title="View Details"><i class="fa-solid fa-eye"></i></a>
               <button type="button" class="action-btn edit js-edit-suit" title="Edit" onclick="editSuit(this)"><i class="fa-solid fa-pen"></i></button>
               {% if suit.status == 'Returned' %}
-                <a href="{% url 'mark_dry_cleaning' suit.id %}" class="action-btn" title="Mark Dry Cleaning" style="color: var(--gold);"><i class="fa-solid fa-water"></i></a>
+                <form method="POST" action="{% url 'mark_dry_cleaning' suit.id %}" style="display:inline;">
+                  {% csrf_token %}
+                  <button type="submit" class="action-btn" title="Send directly to laundry" style="color: var(--gold);"><i class="fa-solid fa-water"></i></button>
+                </form>
               {% elif suit.status == 'Dry Cleaning' %}
-                <a href="{% url 'mark_available' suit.id %}" class="action-btn" title="Mark Available" style="color: var(--success);"><i class="fa-solid fa-check"></i></a>
+                <form method="POST" action="{% url 'mark_available' suit.id %}" style="display:inline;">
+                  {% csrf_token %}
+                  <button type="submit" class="action-btn" title="Return completed laundry to inventory" style="color: var(--success);"><i class="fa-solid fa-check"></i></button>
+                </form>
               {% endif %}
               {% if not suit.is_retired %}
                 <button type="button" class="action-btn archive" title="Retire Suit" onclick="retireSuit('{{ suit.id }}', '{{ suit.suit_name|escapejs }}')"><i class="fa-solid fa-box-archive"></i></button>
@@ -657,7 +663,7 @@ function editSuit(btnElement) {
   
   document.getElementById('modalTitle').innerHTML = '<i class="fa-solid fa-pen"></i> Edit Suit Details';
   document.getElementById('suitId').value = data.id;
-  document.getElementById('suitForm').action = "{% url 'inventory_edit_suit' 0 %}".replace('/0/', '/' + data.id + '/');
+  document.getElementById('suitForm').action = "{% url 'edit_suit_new' 0 %}".replace('/0/', '/' + data.id + '/');
 
   const form = document.getElementById('suitForm');
   form.suit_name.value = data.name || '';

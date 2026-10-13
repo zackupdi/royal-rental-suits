@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import Suit, SuitRequest, Notification, Payment, Expense, ContactMessage, Staff, Payroll
+from .models import Suit, SuitRequest, Notification, Payment, Expense, ContactMessage, Staff, Payroll, LateFeeTransaction
 
 @admin.register(Suit)
 class SuitAdmin(admin.ModelAdmin):
@@ -60,3 +60,28 @@ class PayrollAdmin(admin.ModelAdmin):
     list_display = ('staff', 'payment_date', 'amount', 'payment_type', 'month', 'year', 'created_by')
     list_filter = ('payment_type', 'payment_date', 'year')
     search_fields = ('staff__name', 'notes')
+
+
+@admin.register(LateFeeTransaction)
+class LateFeeTransactionAdmin(admin.ModelAdmin):
+    list_display = ('rental', 'amount', 'overdue_seconds', 'hourly_rate', 'partial_hour_policy', 'assessed_by', 'assessed_at')
+    list_filter = ('partial_hour_policy', 'assessed_at')
+    search_fields = ('rental__name', 'rental__phone', 'rental__suit__suit_name')
+    readonly_fields = (
+        'rental',
+        'amount',
+        'overdue_seconds',
+        'hourly_rate',
+        'partial_hour_policy',
+        'assessed_by',
+        'assessed_at',
+    )
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False

@@ -1,225 +1,288 @@
-{% extends "rental/base.html" %}
+{% extends "rental/base_admin.html" %}
 
 {% block title %}Admin Profile{% endblock %}
 
 {% block content %}
 <style>
-    .card {
-        background: #1e293b !important;
-        border: 1px solid rgba(56, 189, 248, 0.1) !important;
-    }
-    
-    .card-header {
-        background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%) !important;
-        border-bottom: 1px solid rgba(56, 189, 248, 0.2) !important;
-    }
-    
-    .card-title {
-        color: #e2e8f0;
-    }
-    
-    .card-body {
-        color: #e2e8f0;
-    }
-    
-    h1 {
-        color: #e2e8f0;
-    }
-    
-    h6 {
-        color: #cbd5e1;
-    }
-    
-    .text-secondary {
-        color: #e2e8f0 !important;
-    }
-    
-    hr {
-        border-color: rgba(56, 189, 248, 0.1);
-    }
-    
-    .border-bottom {
-        border-color: rgba(56, 189, 248, 0.1) !important;
+    .ap {
+        --ap-bg: #0f172a;
+        --ap-card: #1e293b;
+        --ap-border: rgba(148, 163, 184, .15);
+        --ap-text: #e2e8f0;
+        --ap-muted: #94a3b8;
+        --ap-gold: #d4af37;
+        --ap-gold-soft: #f4d76a;
+        --ap-accent: #38bdf8;
+        color: var(--ap-text);
     }
 
-    .profile-card {
-        text-align: center;
-        padding: 25px;
-        background: rgba(255,255,255,.04);
-        border-radius: 18px;
-        border: 1px solid rgba(255,255,255,.08);
-        backdrop-filter: blur(20px);
-        margin-bottom: 20px;
-    }
-
-    .profile-avatar {
-        width: 90px;
-        height: 90px;
-        margin: auto;
-        border-radius: 50%;
-        background: linear-gradient(135deg, #d4af37, #f4d76a);
+    .ap-header {
         display: flex;
         align-items: center;
-        justify-content: center;
-        font-size: 42px;
-        color: #111;
-        margin-bottom: 15px;
+        justify-content: space-between;
+        flex-wrap: wrap;
+        gap: 12px;
+        padding: 18px 0;
+        margin-bottom: 24px;
+        border-bottom: 1px solid var(--ap-border);
     }
+    .ap-header h1 { font-size: 1.6rem; font-weight: 700; margin: 0; color: var(--ap-text); }
+    .ap-header p  { margin: 2px 0 0; color: var(--ap-muted); font-size: .9rem; }
+
+    .ap .card {
+        background: var(--ap-card) !important;
+        border: 1px solid var(--ap-border) !important;
+        border-radius: 16px;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, .25);
+        overflow: hidden;
+        color: var(--ap-text);
+    }
+    .ap .card-header {
+        background: transparent !important;
+        border-bottom: 1px solid var(--ap-border) !important;
+        padding: 16px 22px;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+    .ap .card-header i { color: var(--ap-gold); }
+    .ap .card-title { color: var(--ap-text); font-weight: 600; font-size: 1.05rem; margin: 0; }
+    .ap .card-body { padding: 22px; }
+
+    /* Profile summary */
+    .ap-profile { text-align: center; padding: 30px 22px; }
+    .ap-avatar {
+        width: 96px; height: 96px;
+        margin: 0 auto 16px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, var(--ap-gold), var(--ap-gold-soft));
+        color: #111;
+        display: flex; align-items: center; justify-content: center;
+        font-size: 2.4rem; font-weight: 700;
+        box-shadow: 0 0 0 5px rgba(212, 175, 55, .18);
+    }
+    .ap-name { font-size: 1.2rem; font-weight: 600; margin-bottom: 4px; color: var(--ap-text); }
+    .ap-email { color: var(--ap-muted); font-size: .88rem; margin-bottom: 14px; word-break: break-all; }
 
     .role-badge {
-        display: inline-flex;
-        align-items: center;
-        gap: 8px;
-        padding: 8px 18px;
-        border-radius: 30px;
-        font-weight: 700;
-        box-shadow: 0 8px 20px rgba(0,0,0,.15);
+        display: inline-flex; align-items: center; gap: 8px;
+        padding: 7px 18px; border-radius: 30px;
+        font-weight: 600; font-size: .85rem;
+        box-shadow: 0 6px 16px rgba(0, 0, 0, .25);
     }
+    .role-badge.admin     { background: linear-gradient(135deg, #d4af37, #f4d76a); color: #111; }
+    .role-badge.reception { background: linear-gradient(135deg, #0ea5e9, #38bdf8); color: #fff; }
+    .role-badge.customer  { background: linear-gradient(135deg, #10b981, #34d399); color: #fff; }
 
-    .role-badge.admin {
-        background: linear-gradient(135deg, #d4af37, #f4d76a);
-        color: #111;
+    /* Info list */
+    .ap-info { list-style: none; margin: 0; padding: 0; }
+    .ap-info li {
+        display: flex; align-items: center; justify-content: space-between;
+        gap: 16px; padding: 14px 0;
+        border-bottom: 1px solid var(--ap-border);
     }
+    .ap-info li:last-child { border-bottom: 0; padding-bottom: 0; }
+    .ap-info li:first-child { padding-top: 0; }
+    .ap-label { color: var(--ap-muted); font-size: .88rem; display: flex; align-items: center; gap: 10px; }
+    .ap-label i { width: 18px; text-align: center; color: var(--ap-accent); }
+    .ap-value { font-weight: 500; color: var(--ap-text); text-align: right; word-break: break-word; }
+    .ap-empty { color: var(--ap-muted); font-style: italic; font-weight: 400; }
 
-    .role-badge.reception {
-        background: linear-gradient(135deg, #0ea5e9, #38bdf8);
-        color: #fff;
+    /* Form */
+    .ap .form-label { color: var(--ap-muted); font-size: .85rem; font-weight: 500; }
+    .ap .form-control, .ap .form-select, .ap .input-group-text {
+        background: var(--ap-bg);
+        border: 1px solid var(--ap-border);
+        color: var(--ap-text);
+        border-radius: 10px;
     }
+    .ap .input-group .form-control { border-radius: 0 10px 10px 0; }
+    .ap .input-group-text { border-radius: 10px 0 0 10px; color: var(--ap-gold); }
+    .ap .form-control:focus, .ap .form-select:focus {
+        background: var(--ap-bg);
+        color: var(--ap-text);
+        border-color: var(--ap-gold);
+        box-shadow: 0 0 0 .2rem rgba(212, 175, 55, .2);
+    }
+    .ap .form-select option { background: var(--ap-bg); color: var(--ap-text); }
+    .ap-note {
+        background: rgba(56, 189, 248, .08);
+        border: 1px solid rgba(56, 189, 248, .2);
+        border-radius: 10px;
+        padding: 12px 14px;
+        color: var(--ap-muted);
+        font-size: .87rem;
+        margin-bottom: 20px;
+    }
+    .ap-note i { color: var(--ap-accent); margin-right: 6px; }
 
-    .role-badge.customer {
-        background: linear-gradient(135deg, #10b981, #34d399);
-        color: #fff;
+    .ap .btn-gold {
+        background: linear-gradient(135deg, var(--ap-gold), var(--ap-gold-soft));
+        color: #111; font-weight: 600; border: 0; border-radius: 10px;
+        padding: 10px 18px;
+        transition: transform .15s ease, box-shadow .15s ease;
     }
+    .ap .btn-gold:hover { transform: translateY(-1px); box-shadow: 0 8px 18px rgba(212, 175, 55, .3); color: #111; }
+
+    /* Quick actions */
+    .ap-actions { display: grid; gap: 10px; }
+    .ap-actions .btn { border-radius: 10px; text-align: left; padding: 10px 16px; font-weight: 500; }
+    .ap-actions .btn i { width: 22px; }
 </style>
 
-<div class="container-fluid">
+<div class="container-fluid ap">
     <div class="row">
-        <!-- Sidebar -->
-        <div class="col-md-3 col-lg-2 px-0">
-            <div class="sidebar">
-                <h4><i class="fa-solid fa-tie"></i> SUIT RENTAL</h4>
-                <hr class="mx-3 opacity-25">
-                <a href="{% url 'dashboard' %}"><i class="fa-solid fa-gauge"></i> Dashboard</a>
-                <a href="{% url 'requests' %}"><i class="fa-solid fa-hand-holding-dollar"></i> Requests</a>
-                <a href="{% url 'all_suits' %}"><i class="fa-solid fa-shirt"></i> View Suits</a>
-                <a href="{% url 'inventory' %}"><i class="fa-solid fa-boxes"></i> Inventory</a>
-                <a href="{% url 'admin_profile' %}"><i class="fa-solid fa-user"></i> Profile</a>
-                <a href="{% url 'home' %}"><i class="fa-solid fa-house"></i> Home</a>
-                <hr class="mx-3 opacity-25">
-                <a href="{% url 'logout' %}" class="text-danger"><i class="fa-solid fa-right-from-bracket"></i> Logout</a>
-            </div>
-        </div>
+        <div class="col-12 px-md-4">
 
-        <!-- Main Content -->
-        <div class="col-md-9 col-lg-10 ms-sm-auto px-md-4">
-            <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
-                <h1 class="h2">Admin Profile</h1>
+            <div class="ap-header">
+                <div>
+                    <h1>Admin Profile</h1>
+                    <p>Manage your account details and business rules</p>
+                </div>
             </div>
 
-            <div class="row">
-                <div class="col-md-8">
-                    <div class="card">
+            <div class="row g-4">
+
+                <!-- LEFT COLUMN -->
+                <div class="col-lg-8">
+
+                    <!-- Profile information -->
+                    <div class="card mb-4">
                         <div class="card-header">
-                            <h5 class="card-title mb-0">Profile Information</h5>
+                            <i class="fas fa-id-card"></i>
+                            <h5 class="card-title">Profile Information</h5>
                         </div>
                         <div class="card-body">
-                            <div class="row">
-                                <div class="col-sm-3">
-                                    <h6 class="mb-0">Username:</h6>
-                                </div>
-                                <div class="col-sm-9 text-secondary">
-                                    {{ user.username }}
-                                </div>
+                            <ul class="ap-info">
+                                <li>
+                                    <span class="ap-label"><i class="fas fa-user"></i> Username</span>
+                                    <span class="ap-value">{{ user.username }}</span>
+                                </li>
+                                <li>
+                                    <span class="ap-label"><i class="fas fa-envelope"></i> Email</span>
+                                    <span class="ap-value">
+                                        {% if user.email %}{{ user.email }}{% else %}<span class="ap-empty">Not provided</span>{% endif %}
+                                    </span>
+                                </li>
+                                <li>
+                                    <span class="ap-label"><i class="fas fa-signature"></i> First Name</span>
+                                    <span class="ap-value">
+                                        {% if user.first_name %}{{ user.first_name }}{% else %}<span class="ap-empty">Not provided</span>{% endif %}
+                                    </span>
+                                </li>
+                                <li>
+                                    <span class="ap-label"><i class="fas fa-signature"></i> Last Name</span>
+                                    <span class="ap-value">
+                                        {% if user.last_name %}{{ user.last_name }}{% else %}<span class="ap-empty">Not provided</span>{% endif %}
+                                    </span>
+                                </li>
+                                <li>
+                                    <span class="ap-label"><i class="fas fa-calendar-plus"></i> Date Joined</span>
+                                    <span class="ap-value">{{ user.date_joined|date:"F j, Y" }}</span>
+                                </li>
+                                <li>
+                                    <span class="ap-label"><i class="fas fa-clock"></i> Last Login</span>
+                                    <span class="ap-value">
+                                        {% if user.last_login %}{{ user.last_login|date:"F j, Y, g:i a" }}{% else %}<span class="ap-empty">Never</span>{% endif %}
+                                    </span>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <!-- Late-fee business rule -->
+                    <div class="card">
+                        <div class="card-header">
+                            <i class="fas fa-hourglass-half"></i>
+                            <h5 class="card-title">Late-Fee Business Rule</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="ap-note">
+                                <i class="fas fa-circle-info"></i>
+                                Set the hourly late fee and how partial overdue hours are billed.
+                                Changes apply to future returns; previously assessed fees remain unchanged.
                             </div>
-                            <hr>
-                            <div class="row">
-                                <div class="col-sm-3">
-                                    <h6 class="mb-0">Email:</h6>
+
+                            <form method="post" action="{% url 'admin_profile' %}">
+                                {% csrf_token %}
+                                <div class="row g-3 align-items-end">
+                                    <div class="col-12 col-md-4">
+                                        <label class="form-label" for="late-fee-rate">Fee per overdue hour</label>
+                                        <div class="input-group">
+                                            <span class="input-group-text">$</span>
+                                            <input class="form-control" id="late-fee-rate" type="number"
+                                                   name="late_fee_per_hour" min="0" max="999999.99" step="0.01"
+                                                   value="{{ late_fee_policy.late_fee_per_hour }}" required>
+                                        </div>
+                                    </div>
+                                    <div class="col-12 col-md-5">
+                                        <label class="form-label" for="partial-hour-policy">Partial overdue hour</label>
+                                        <select class="form-select" id="partial-hour-policy" name="partial_hour_policy" required>
+                                            {% for value, label in late_fee_choices %}
+                                                <option value="{{ value }}" {% if late_fee_policy.partial_hour_policy == value %}selected{% endif %}>{{ label }}</option>
+                                            {% endfor %}
+                                        </select>
+                                    </div>
+                                    <div class="col-12 col-md-3 d-grid">
+                                        <button class="btn btn-gold" type="submit">
+                                            <i class="fa-solid fa-floppy-disk me-1"></i> Save Rule
+                                        </button>
+                                    </div>
                                 </div>
-                                <div class="col-sm-9 text-secondary">
-                                    {{ user.email|default:"Not provided" }}
-                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- RIGHT COLUMN -->
+                <div class="col-lg-4">
+
+                    <!-- Profile summary -->
+                    <div class="card mb-4">
+                        <div class="card-body ap-profile">
+                            <div class="ap-avatar">
+                                {{ request.user.username|slice:":1"|upper }}
                             </div>
-                            <hr>
-                            <div class="row">
-                                <div class="col-sm-3">
-                                    <h6 class="mb-0">First Name:</h6>
-                                </div>
-                                <div class="col-sm-9 text-secondary">
-                                    {{ user.first_name|default:"Not provided" }}
-                                </div>
-                            </div>
-                            <hr>
-                            <div class="row">
-                                <div class="col-sm-3">
-                                    <h6 class="mb-0">Last Name:</h6>
-                                </div>
-                                <div class="col-sm-9 text-secondary">
-                                    {{ user.last_name|default:"Not provided" }}
-                                </div>
-                            </div>
-                            <hr>
-                            <div class="row">
-                                <div class="col-sm-3">
-                                    <h6 class="mb-0">Date Joined:</h6>
-                                </div>
-                                <div class="col-sm-9 text-secondary">
-                                    {{ user.date_joined|date:"F j, Y" }}
-                                </div>
-                            </div>
-                            <hr>
-                            <div class="row">
-                                <div class="col-sm-3">
-                                    <h6 class="mb-0">Last Login:</h6>
-                                </div>
-                                <div class="col-sm-9 text-secondary">
-                                    {{ user.last_login|date:"F j, Y, g:i a"|default:"Never" }}
-                                </div>
+                            <div class="ap-name">{{ request.user.get_full_name|default:request.user.username }}</div>
+                            {% if request.user.email %}
+                                <div class="ap-email">{{ request.user.email }}</div>
+                            {% endif %}
+
+                            {% if request.user.is_superuser %}
+                                <span class="role-badge admin"><i class="fas fa-crown"></i> Administrator</span>
+                            {% elif request.user.groups.first.name == "Reception" %}
+                                <span class="role-badge reception"><i class="fas fa-user-tie"></i> Reception Officer</span>
+                            {% else %}
+                                <span class="role-badge customer"><i class="fas fa-user"></i> Customer</span>
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    <!-- Quick actions -->
+                    <div class="card">
+                        <div class="card-header">
+                            <i class="fas fa-bolt"></i>
+                            <h5 class="card-title">Quick Actions</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="ap-actions">
+                                <a href="{% url 'dashboard' %}" class="btn btn-primary">
+                                    <i class="fas fa-tachometer-alt"></i> Dashboard
+                                </a>
+                                <a href="{% url 'inventory' %}" class="btn btn-secondary">
+                                    <i class="fas fa-boxes"></i> Inventory
+                                </a>
+                                <a href="{% url 'all_suits' %}" class="btn btn-info">
+                                    <i class="fas fa-list"></i> All Suits
+                                </a>
+                                <a href="{% url 'logout' %}" class="btn btn-outline-danger">
+                                    <i class="fas fa-sign-out-alt"></i> Logout
+                                </a>
                             </div>
                         </div>
                     </div>
                 </div>
-                <div class="col-md-4">
-                    <div class="profile-card">
-                        <div class="profile-avatar">
-                            <i class="fas fa-user-circle"></i>
-                        </div>
-                        <h5 class="mb-2">{{ request.user.get_full_name|default:request.user.username }}</h5>
-                        {% if request.user.is_superuser %}
-                            <span class="role-badge admin">
-                                <i class="fas fa-crown"></i> Administrator
-                            </span>
-                        {% elif request.user.groups.first.name == "Reception" %}
-                            <span class="role-badge reception">
-                                <i class="fas fa-user-tie"></i> Reception Officer
-                            </span>
-                        {% else %}
-                            <span class="role-badge customer">
-                                <i class="fas fa-user"></i> Customer
-                            </span>
-                        {% endif %}
-                    </div>
 
-                    <div class="card">
-                        <div class="card-header">
-                            <h5 class="card-title mb-0">Quick Actions</h5>
-                        </div>
-                        <div class="card-body">
-                            <a href="{% url 'dashboard' %}" class="btn btn-primary w-100 mb-2">
-                                <i class="fas fa-tachometer-alt"></i> Dashboard
-                            </a>
-                            <a href="{% url 'inventory' %}" class="btn btn-secondary w-100 mb-2">
-                                <i class="fas fa-boxes"></i> Inventory
-                            </a>
-                            <a href="{% url 'all_suits' %}" class="btn btn-info w-100 mb-2">
-                                <i class="fas fa-list"></i> All Suits
-                            </a>
-                            <a href="{% url 'logout' %}" class="btn btn-danger w-100">
-                                <i class="fas fa-sign-out-alt"></i> Logout
-                            </a>
-                        </div>
-                    </div>
-                </div>
             </div>
         </div>
     </div>

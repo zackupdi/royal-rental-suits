@@ -861,7 +861,7 @@
                 </li>
 
                 <!-- Admin/Staff Navigation -->
-                {% if user.is_authenticated and user.is_staff %}
+                {% if user.is_authenticated and user.is_staff and not user.profile.is_reception and not user.profile.is_cashier %}
                     <li class="nav-item admin-nav-dropdown">
                         <button class="nav-link admin-nav-btn">
                             <i class="fa-solid fa-gauge-high"></i>
@@ -869,22 +869,7 @@
                             <i class="fa-solid fa-chevron-down" style="font-size: 0.7rem;"></i>
                         </button>
                         <div class="admin-dropdown-menu">
-                            {% if user.profile.is_reception or user.profile.is_cashier %}
-                                <!-- Staff Links -->
-                                <a href="{% url 'reception_requests' %}" class="admin-dropdown-item">
-                                    <i class="fa-solid fa-file-lines"></i> Requests
-                                </a>
-                                <a href="{% url 'reception_payments' %}" class="admin-dropdown-item">
-                                    <i class="fa-solid fa-receipt"></i> Payments
-                                </a>
-                                <a href="{% url 'reception_inventory' %}" class="admin-dropdown-item">
-                                    <i class="fa-solid fa-warehouse"></i> Inventory
-                                </a>
-                                <a href="{% url 'reception_reports' %}" class="admin-dropdown-item">
-                                    <i class="fa-solid fa-chart-line"></i> Reports
-                                </a>
-                            {% else %}
-                                <!-- Admin Links -->
+                            <!-- Admin Links -->
                                 <a href="{% url 'dashboard' %}" class="admin-dropdown-item">
                                     <i class="fa-solid fa-gauge-high"></i> Dashboard
                                 </a>
@@ -907,7 +892,6 @@
                                 <a href="{% url 'manage_users' %}" class="admin-dropdown-item">
                                     <i class="fa-solid fa-users-gear"></i> Manage Users
                                 </a>
-                            {% endif %}
                         </div>
                     </li>
                 {% endif %}
@@ -1097,38 +1081,41 @@
                         {% endif %}
                     </div>
 
-                    {% if suit.quantity == 0 %}
-                        <button class="btn-book" disabled>
-                            <i class="fa-solid fa-times-circle"></i> Out of Stock
-                        </button>
-                    {% elif suit.is_available_for_booking %}
-                        {% if user.is_authenticated %}
-                            <a href="{% url 'request_form' suit.id %}" class="btn-book text-decoration-none d-inline-flex align-items-center justify-content-center">
-                                <i class="fa-solid fa-calendar-check me-2"></i> Request Rental
-                            </a>
+                    {% if not user.is_authenticated or not user.is_staff %}
+                        {% if suit.quantity == 0 %}
+                            <button class="btn-book" disabled>
+                                <i class="fa-solid fa-times-circle"></i> Out of Stock
+                            </button>
+                        {% elif suit.is_available_for_booking %}
+                            {% if user.is_authenticated %}
+                                <a href="{% url 'request_form' suit.id %}" class="btn-book text-decoration-none d-inline-flex align-items-center justify-content-center">
+                                    <i class="fa-solid fa-calendar-check me-2"></i> Request Rental
+                                </a>
+                            {% else %}
+                                <button class="btn-book"
+                                        data-bs-toggle="modal"
+                                        data-bs-target="#loginModal"
+                                        data-suitid="{{ suit.id }}"
+                                        data-suitname="{{ suit.suit_name }}"
+                                        data-price="{{ suit.price_per_day }}"
+                                        data-collection="{{ suit.collection }}"
+                                        data-size="{{ suit.size }}"
+                                        data-color="{{ suit.color }}">
+                                    <i class="fa-solid fa-calendar-check"></i> Request Rental
+                                </button>
+                            {% endif %}
                         {% else %}
-                            <button class="btn-book"
-                                    data-bs-toggle="modal"
-                                    data-bs-target="#loginModal"
-                                    data-suitid="{{ suit.id }}"
-                                    data-suitname="{{ suit.suit_name }}"
-                                    data-price="{{ suit.price_per_day }}"
-                                    data-collection="{{ suit.collection }}"
-                                    data-size="{{ suit.size }}"
-                                    data-color="{{ suit.color }}">
-                                <i class="fa-solid fa-calendar-check"></i> Request Rental
+                            {% if suit.rental_end_time %}
+                                <small class="text-danger d-block mb-2 text-center">
+                                    <i class="fa-solid fa-hourglass-half"></i>
+                                Return: {{ suit.rental_end_time|date:'d M Y, H:i' }}<br>
+                                <span class="countdown" data-endtime="{{ suit.rental_end_time|date:'c' }}">Calculating...</span>
+                                </small>
+                            {% endif %}
+                            <button class="btn-book" disabled>
+                                <i class="fa-solid fa-clock-rotate-left"></i> Currently Booked
                             </button>
                         {% endif %}
-                    {% else %}
-                        {% if suit.rental_end_time %}
-                            <small class="text-danger d-block mb-2 text-center">
-                                <i class="fa-solid fa-hourglass-half"></i>
-                                Ends in <span class="countdown" data-endtime="{{ suit.rental_end_time|date:'c' }}">Loading...</span>
-                            </small>
-                        {% endif %}
-                        <button class="btn-book" disabled>
-                            <i class="fa-solid fa-clock-rotate-left"></i> Currently Booked
-                        </button>
                     {% endif %}
                 </div>
             </div>
@@ -1307,13 +1294,16 @@
         document.querySelectorAll('.countdown').forEach(function(el) {
             var diff = new Date(el.dataset.endtime) - new Date();
             if (diff <= 0) { 
-                el.textContent = 'Expired'; 
+                el.textContent = 'EXPIRED';
+                el.classList.add('expired');
                 return; 
             }
-            var h = Math.floor(diff/1000/60/60);
-            var m = Math.floor((diff/1000/60)%60);
-            var s = Math.floor((diff/1000)%60);
-            el.textContent = h + 'h ' + m + 'm ' + s + 's';
+            var totalSeconds = Math.floor(diff / 1000);
+            var d = Math.floor(totalSeconds / 86400);
+            var h = Math.floor((totalSeconds % 86400) / 3600);
+            var m = Math.floor((totalSeconds % 3600) / 60);
+            var s = totalSeconds % 60;
+            el.textContent = d + 'd ' + h + 'h ' + m + 'm ' + s + 's';
         });
     }
     updateCountdowns();

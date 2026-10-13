@@ -1,4 +1,4 @@
-{% extends "rental/base.html" %}
+{% extends "rental/base_admin.html" %}
 {% block title %}Enterprise Dashboard | Royal Rental Suits{% endblock %}
 
 {% block content %}
@@ -330,7 +330,7 @@
     <div>
       <h1 class="page-title"><i class="fas fa-crown"></i> Royal Rental Management</h1>
       <p class="page-subtitle">
-        {% if request.user.is_superuser %}System Administration & Core Analytics{% else %}Reception POS & Live Booking Terminal{% endif %}
+        Admin Operations & Live Booking Overview
       </p>
     </div>
     <div style="display: flex; align-items: center; gap: 15px;">
@@ -571,11 +571,11 @@
               {% for req in pending_requests %}
               <tr>
                 <td>
-                  <strong>{{ req.customer.name|default:"Unknown" }}</strong><br>
-                  <small style="color: var(--text-muted);">{{ req.customer.phone|default:"N/A" }}</small>
+                  <strong>{{ req.name|default:"Unknown" }}</strong><br>
+                  <small style="color: var(--text-muted);">{{ req.phone|default:"N/A" }}</small>
                 </td>
                 <td>{{ req.suit.suit_name|default:"N/A" }}</td>
-                <td><span class="badge bg-secondary">x{{ req.quantity }}</span></td>
+                <td><span class="badge bg-secondary">x{{ req.quantity_requested }}</span></td>
                 <td>{{ req.days_requested }} Days</td>
                 <td style="color: #4caf82; font-weight:600;">${{ req.total_amount|floatformat:2 }}</td>
                 <td style="text-align:right;">
@@ -612,8 +612,8 @@
             <tbody>
               {% for rental in active_rentals %}
               <tr>
-                <td><strong>{{ rental.customer.name|default:"Unknown" }}</strong></td>
-                <td>{{ rental.suit.suit_name|default:"N/A" }} <small style="color: var(--text-muted);">(x{{ rental.quantity }})</small></td>
+                <td><strong>{{ rental.name|default:"Unknown" }}</strong></td>
+                <td>{{ rental.suit.suit_name|default:"N/A" }} <small style="color: var(--text-muted);">(x{{ rental.quantity_requested }})</small></td>
                 <td>
                   {% if rental.is_overdue %}
                     <span class="status-badge status-overdue">Overdue</span>

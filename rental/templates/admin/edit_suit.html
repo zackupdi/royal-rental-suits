@@ -1,4 +1,4 @@
-{% extends "rental/base.html" %}
+{% extends "rental/base_admin.html" %}
 
 {% block title %}Edit Suit{% endblock %}
 
@@ -120,7 +120,7 @@
                                 <div class="mb-2">
                                     <img src="{{ suit.image_url }}" alt="Current Image" style="max-width: 200px; max-height: 200px;">
                                 </div>
-                                {% if request.user.is_staff or request.user.profile.is_reception %}
+                                {% if request.user.is_staff %}
                                 <div class="form-check mb-2">
                                     <input class="form-check-input" type="checkbox" name="clear_image" id="clear_image">
                                     <label class="form-check-label" for="clear_image">

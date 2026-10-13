@@ -804,26 +804,23 @@
                         <i class="fa-solid fa-phone"></i> Contact
                     </a>
                 </li>
-                {% if user.is_authenticated and user.is_staff %}
+                {% if user.is_authenticated and user.is_staff and not user.profile.is_reception and not user.profile.is_cashier %}
                 <li class="nav-item">
-                    {% if user.profile.is_reception or user.profile.is_cashier %}
-                    <a class="nav-link-custom" href="{% url 'reception_inventory' %}">
-                        <i class="fa-solid fa-warehouse"></i> Inventory
-                    </a>
-                    {% else %}
                     <a class="nav-link-custom" href="{% url 'inventory' %}">
                         <i class="fa-solid fa-warehouse"></i> Inventory
                     </a>
-                    {% endif %}
+                    <a class="nav-link-custom" href="{% url 'admin_booking' %}">
+                        <i class="fa-solid fa-calendar-plus"></i> Create Booking
+                    </a>
                 </li>
                 {% endif %}
             </ul>
 
             <div class="d-flex align-items-center gap-2 mt-3 mt-lg-0">
-                {% if user.is_authenticated and user.is_staff %}
-                    <a href="{% url 'dashboard' %}" class="btn-nav-login">
-                        <i class="fa-solid fa-gauge"></i> Dashboard
-                    </a>
+                {% if user.is_authenticated and user.is_staff and not user.profile.is_reception and not user.profile.is_cashier %}
+                        <a href="{% url 'dashboard' %}" class="btn-nav-login">
+                            <i class="fa-solid fa-gauge"></i> Admin Dashboard
+                        </a>
                     <a href="{% url 'logout' %}" class="btn-nav-register">
                         <i class="fa-solid fa-right-from-bracket"></i> Logout
                     </a>
@@ -834,12 +831,20 @@
                     <a href="{% url 'customer_logout' %}" class="btn-nav-login">
                         <i class="fa-solid fa-right-from-bracket"></i> Logout
                     </a>
+                    {% if not user.is_staff %}
+                        <a href="{% url 'all_suits' %}" class="btn-nav-register">
+                            <i class="fa-solid fa-calendar-check"></i> Book Now
+                        </a>
+                    {% endif %}
                 {% else %}
                     <a href="{% url 'customer_login' %}" class="btn-nav-login">
                         <i class="fa-solid fa-right-to-bracket"></i> Login
                     </a>
                     <a href="{% url 'register' %}" class="btn-nav-register">
                         <i class="fa-solid fa-user-plus"></i> Register
+                    </a>
+                    <a href="{% url 'all_suits' %}" class="btn-nav-register">
+                        <i class="fa-solid fa-calendar-check"></i> Book Now
                     </a>
                 {% endif %}
             </div>
@@ -882,6 +887,11 @@
                 </p>
 
                 <div class="d-flex gap-3 flex-wrap" data-aos="fade-up" data-aos-delay="300">
+                    {% if not user.is_authenticated or not user.is_staff %}
+                        <a href="{% url 'all_suits' %}" class="btn-hero-primary">
+                            <i class="fa-solid fa-calendar-check"></i> Book Now
+                        </a>
+                    {% endif %}
                     <a href="{% url 'all_suits' %}" class="btn-hero-primary">
                         <i class="fa-solid fa-shirt"></i> Browse Collection
                     </a>
@@ -1148,7 +1158,7 @@
         <div class="footer-bottom">
             <p>© 2026 Royal Rental Suits. All rights reserved.</p>
             {% if not user.is_authenticated %}
-            <a href="{% url 'admin_login' %}" class="admin-corner-link" title="Admin Login">
+            <a href="{% url 'admin_login' %}" class="admin-corner-link" title="Staff Login">
                 <i class="fa-solid fa-user-lock" style="font-size:13px"></i>
             </a>
             {% endif %}

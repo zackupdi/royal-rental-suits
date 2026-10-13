@@ -374,8 +374,8 @@
 
         <div class="laundry-card-body">
             <div class="tab-nav">
-                <a href="{% url 'laundry_backlog' %}?tab=pending" class="{% if active_tab == 'pending' %}active{% endif %}">Pending Review</a>
-                <a href="{% url 'laundry_backlog' %}?tab=approved" class="{% if active_tab == 'approved' %}active{% endif %}">Approved</a>
+                <a href="{% url 'laundry_backlog' %}?tab=pending" class="{% if active_tab == 'pending' %}active{% endif %}">Pending Admin Approval</a>
+                <a href="{% url 'laundry_backlog' %}?tab=approved" class="{% if active_tab == 'approved' %}active{% endif %}">Sent / Active</a>
                 <a href="{% url 'laundry_backlog' %}?tab=all" class="{% if active_tab == 'all' or not active_tab %}active{% endif %}">All</a>
             </div>
 
@@ -407,7 +407,7 @@
                                 <div class="status-section" style="display: flex; flex-direction: column; gap: 8px;">
                                     {% if not dry_clean %}
                                         <span class="status-badge" style="background: rgba(224,160,64,0.15); color: #f39c12; padding: 6px 12px; border-radius: 8px; font-weight: 600; font-size: 0.75rem; display: inline-block; width: fit-content;">
-                                            📋 Pending Review
+                                            📋 Ready to Request
                                         </span>
                                         <div style="display: flex; align-items: center; gap: 8px;">
                                             <span class="cost-prefix" style="background: rgba(255,255,255,0.02); color: var(--cleaning-blue); font-weight: 700; padding: 4px 8px; border-radius: 6px;">$</span>
@@ -417,18 +417,22 @@
                                         <span class="status-badge" style="background: rgba(243,156,18,0.15); color: #f39c12; padding: 6px 12px; border-radius: 8px; font-weight: 600; font-size: 0.75rem; display: inline-block; width: fit-content;">
                                             ⏳ Awaiting Approval
                                         </span>
-                                        <span style="color: var(--text-muted); font-size: 0.78rem;">Admin must approve before the suit can be marked ready.</span>
+                                        <span style="color: var(--text-muted); font-size: 0.78rem;">Requested by {{ dry_clean.requested_by_display }} · {{ dry_clean.requested_at|date:"d M Y, H:i" }}</span>
                                         <span class="cost-badge" style="background: rgba(56,189,248,0.15); color: #38bdf8; padding: 6px 12px; border-radius: 8px; font-weight: 700; font-size: 0.75rem; display: inline-block; width: fit-content;">
                                             ${{ dry_clean.amount }}
                                         </span>
-                                    {% elif dry_clean.status == 'approved' %}
+                                    {% elif dry_clean.status == 'sent_to_laundry' or dry_clean.status == 'approved' %}
                                         <span class="status-badge" style="background: rgba(76,175,130,0.15); color: var(--success); padding: 6px 12px; border-radius: 8px; font-weight: 600; font-size: 0.75rem; display: inline-block; width: fit-content;">
-                                            ✓ Approved Ready
+                                            ✓ Sent to Laundry
                                         </span>
-                                        <span style="color: var(--text-muted); font-size: 0.78rem;">Approved by admin — you can now mark it ready.</span>
+                                        <span style="color: var(--text-muted); font-size: 0.78rem;">Approved by {{ dry_clean.approved_by_display }} · {{ dry_clean.sent_to_laundry_at|date:"d M Y, H:i" }}</span>
                                         <span class="cost-badge" style="background: rgba(56,189,248,0.15); color: #38bdf8; padding: 6px 12px; border-radius: 8px; font-weight: 700; font-size: 0.75rem; display: inline-block; width: fit-content;">
                                             ${{ dry_clean.amount }}
                                         </span>
+                                    {% elif dry_clean.status == 'in_laundry' %}
+                                        <span class="status-badge" style="background: rgba(56,189,248,0.15); color: var(--cleaning-blue); padding: 6px 12px; border-radius: 8px; font-weight: 600; font-size: 0.75rem; display: inline-block; width: fit-content;">In Laundry</span>
+                                    {% elif dry_clean.status == 'completed' %}
+                                        <span class="status-badge" style="background: rgba(76,175,130,0.15); color: var(--success); padding: 6px 12px; border-radius: 8px; font-weight: 600; font-size: 0.75rem; display: inline-block; width: fit-content;">Cleaning Completed</span>
                                     {% else %}
                                         <span class="status-badge" style="background: rgba(224,92,92,0.15); color: var(--danger); padding: 6px 12px; border-radius: 8px; font-weight: 600; font-size: 0.75rem; display: inline-block; width: fit-content;">
                                             ✗ Rejected
@@ -441,14 +445,14 @@
                                 {% if not dry_clean %}
                                     <form method="POST" action="{% url 'laundry_backlog' %}" id="form-{{ req.id }}" style="display:inline;">
                                         {% csrf_token %}
-                                        <input type="hidden" name="action" value="mark_paid">
+                                        <input type="hidden" name="action" value="submit_request">
                                         <input type="hidden" name="request_id" value="{{ req.id }}">
                                         <input type="hidden" name="suit_id" value="{{ req.suit.id }}">
                                         <input type="hidden" name="cleaning_cost" id="hidden-cost-{{ req.id }}" value="5.00">
                                         <input type="hidden" name="laundry_notes" value="Submitted via Reception Laundry Terminal">
                                         <button type="button" id="btn-submit-{{ req.id }}" class="btn-ready" onclick="submitPayment('{{ req.id }}')">
                                             <i class="fas fa-check-circle"></i>
-                                            <span>Submit Payment</span>
+                                            <span>{% if is_admin_user %}Send to Laundry{% else %}Request Laundry{% endif %}</span>
                                         </button>
                                     </form>
                                 {% elif dry_clean.status == 'pending' %}
@@ -456,17 +460,28 @@
                                         <i class="fas fa-hourglass"></i>
                                         <span>Awaiting Approval</span>
                                     </button>
-                                {% elif dry_clean.status == 'approved' %}
+                                {% elif dry_clean.status == 'sent_to_laundry' %}
+                                    <form method="POST" action="{% url 'laundry_backlog' %}" style="display:inline;">
+                                        {% csrf_token %}<input type="hidden" name="action" value="start_laundry"><input type="hidden" name="cleaning_id" value="{{ dry_clean.id }}">
+                                        <button type="submit" class="btn-ready"><i class="fas fa-play"></i><span>Start Laundry</span></button>
+                                    </form>
+                                {% elif dry_clean.status == 'in_laundry' %}
+                                    <form method="POST" action="{% url 'laundry_backlog' %}" style="display:inline;">
+                                        {% csrf_token %}<input type="hidden" name="action" value="complete_laundry"><input type="hidden" name="cleaning_id" value="{{ dry_clean.id }}">
+                                        <button type="submit" class="btn-ready"><i class="fas fa-check"></i><span>Mark Completed</span></button>
+                                    </form>
+                                {% elif dry_clean.status == 'completed' or dry_clean.status == 'approved' %}
                                     <form method="POST" action="{% url 'laundry_backlog' %}" id="form-ready-{{ req.id }}" style="display:inline;">
                                         {% csrf_token %}
                                         <input type="hidden" name="action" value="mark_ready">
                                         <input type="hidden" name="request_id" value="{{ req.id }}">
+                                        <input type="hidden" name="cleaning_id" value="{{ dry_clean.id }}">
                                         <input type="hidden" name="suit_id" value="{{ req.suit.id }}">
                                         <input type="hidden" name="cleaning_cost" value="{{ dry_clean.amount }}">
                                         <input type="hidden" name="laundry_notes" value="Marked ready via Reception Terminal">
                                         <button type="submit" class="btn-ready" onclick="this.disabled=true; this.innerHTML='<i class=\'fas fa-spinner fa-spin\'></i> <span>Processing...</span>'; this.closest('form').submit();">
                                             <i class="fas fa-check-circle"></i>
-                                            <span>Mark Ready</span>
+                                            <span>Return to Inventory</span>
                                         </button>
                                     </form>
                                 {% else %}

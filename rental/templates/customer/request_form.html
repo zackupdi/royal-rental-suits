@@ -20,14 +20,14 @@
                             <p class="text-muted mb-0">{{ suit.collection }} • {{ suit.color }} • ${{ suit.price_per_day }}/day</p>
                         </div>
                         <div class="bg-white bg-opacity-10 rounded-3 p-3">
-                            <h6 class="text-uppercase small mb-2">Booking info</h6>
-                            <p class="small mb-0">Please complete the booking details below so our team can review your request.</p>
+                            <h6 class="text-uppercase small mb-2">Booking Information</h6>
+                            <p class="small mb-0">Fill in the details below for the Reception to review your request.</p>
                         </div>
                     </div>
 
                     <div class="col-md-8 p-4 p-lg-5 bg-light">
                         <h2 class="fw-bold mb-3">Booking Form</h2>
-                        <p class="text-muted mb-4">Please complete the form below so your booking request can be reviewed.</p>
+                        <p class="text-muted mb-4">Select your desired dates and rental duration.</p>
 
                         {% if messages %}
                             {% for message in messages %}
@@ -37,7 +37,7 @@
                             {% endfor %}
                         {% endif %}
 
-                        <form method="post" enctype="multipart/form-data">
+                        <form method="post" enctype="multipart/form-data" id="bookingRequestForm">
                             {% csrf_token %}
                             <div class="row g-3">
                                 <div class="col-12">
@@ -45,20 +45,35 @@
                                     <input type="text" class="form-control" name="full_name" value="{{ form_values.full_name|default:'' }}" required>
                                 </div>
                                 <div class="col-md-6">
-                                    <label class="form-label">Email Address</label>
+                                    <label class="form-label">Email</label>
                                     <input type="email" class="form-control" name="email" value="{{ form_values.email|default:'' }}">
                                 </div>
                                 <div class="col-md-6">
                                     <label class="form-label">Phone</label>
                                     <input type="tel" class="form-control" name="phone" value="{{ form_values.phone|default:'' }}" required>
                                 </div>
-                                <div class="col-12">
-                                    <label class="form-label">Delivery Address</label>
+                                <div class="col-md-6">
+                                    <label class="form-label">Present Address</label>
                                     <input type="text" class="form-control" name="address" value="{{ form_values.address|default:'' }}" required>
                                 </div>
                                 <div class="col-md-6">
-                                    <label class="form-label">Days (1-7)</label>
-                                    <input type="number" class="form-control" name="days_requested" min="1" max="7" value="{{ form_values.days_requested|default:'1' }}" required>
+                                    <label class="form-label">Parents Address (optional)</label>
+                                    <input type="text" class="form-control" name="parents_address" value="{{ form_values.parents_address|default:'' }}">
+                                </div>
+                               
+                                <div class="col-md-6">
+                                    <label class="form-label">National ID (optional)</label>
+                                    <input type="text" class="form-control" name="national_id" value="{{ form_values.national_id|default:'' }}">
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label" for="bookingStartDate">Start Date</label>
+                                    <input type="date" class="form-control" id="bookingStartDate" name="start_date"
+                                           min="{{ today|date:'Y-m-d' }}" value="{{ form_values.start_date|default:'' }}" required>
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label" for="bookingEndDate">End Date</label>
+                                    <input type="date" class="form-control" id="bookingEndDate" name="end_date"
+                                           min="{{ today|date:'Y-m-d' }}" value="{{ form_values.end_date|default:'' }}" required>
                                 </div>
                                 <div class="col-md-6">
                                     <label class="form-label">Quantity (1-5)</label>
@@ -67,7 +82,7 @@
                                 <div class="col-12">
                                     <label class="form-label">Upload ID or Photo</label>
                                     <input type="file" class="form-control" name="customer_image" accept="image/*">
-                                    <small class="text-muted">ID-kaaga ama sawirkaaga ku dar si booking-ka loo xaqiijiyo.</small>
+                                    <small class="text-muted">Attach your ID or photo to verify the booking.</small>
                                 </div>
                                 <div class="col-12">
                                     <label class="form-label">Notes (optional)</label>
@@ -87,4 +102,34 @@
         </div>
     </div>
 </div>
+<script>
+    (function () {
+        const start = document.getElementById("bookingStartDate");
+        const end = document.getElementById("bookingEndDate");
+        function updateDateLimits() {
+            end.min = start.value || start.min;
+            if (start.value) {
+                const maximum = new Date(start.value + "T00:00:00");
+                maximum.setDate(maximum.getDate() + 6);
+                end.max = maximum.toISOString().slice(0, 10);
+            } else {
+                end.removeAttribute("max");
+            }
+            if (end.value && start.value && end.value < start.value) {
+                end.value = start.value;
+            }
+        }
+        start.addEventListener("change", updateDateLimits);
+        updateDateLimits();
+        document.getElementById("bookingRequestForm").addEventListener("submit", function (event) {
+            if (!start.value || !end.value || start.value < start.min || end.value < start.value) {
+                event.preventDefault();
+                end.setCustomValidity("Please select valid dates; the end date must be the same as or later than the start date.");
+                end.reportValidity();
+            } else {
+                end.setCustomValidity("");
+            }
+        });
+    })();
+</script>
 {% endblock %}

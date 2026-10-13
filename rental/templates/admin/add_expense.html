@@ -1,4 +1,4 @@
-{% extends "rental/base.html" %}
+{% extends "rental/base_admin.html" %}
 {% block title %}Record Expense | Suit Luxe{% endblock %}
 {% block page_title %}Record Business Expense{% endblock %}
 
@@ -114,7 +114,7 @@
                     
                     <div class="mb-3">
                         <label class="form-label text-white">Date</label>
-                        <input type="date" name="date" class="form-control" id="expenseDate" value="{{ now|date:'Y-m-d' }}" max="{{ now|date:'Y-m-d' }}" required>
+                        <input type="date" name="date" class="form-control" id="expenseDate" value="{{ now|date:'Y-m-d' }}" data-date-policy="historical" required>
                         <small class="form-text text-muted">Only dates from today backwards are allowed</small>
                     </div>
                     

@@ -1,0 +1,175 @@
+{% extends "rental/base_admin.html" %}
+{% block title %}Edit User Profile | Royal Rental Suits{% endblock %}
+{% block page_title %}Edit User Profile{% endblock %}
+
+{% block content %}
+<style>
+    .edit-user-card {
+        max-width: 900px;
+        margin: 0 auto;
+        padding: 28px;
+        border: 1px solid rgba(255,255,255,.09);
+        border-radius: 16px;
+        background: #11111a;
+        color: #f0ede8;
+        box-shadow: 0 18px 45px rgba(0,0,0,.22);
+    }
+    .edit-user-card h2 { color: #e8c96a; font-size: 1.35rem; }
+    .edit-user-card .form-label { color: rgba(240,237,232,.78); font-weight: 600; }
+    .edit-user-card .form-control, .edit-user-card .form-select {
+        min-height: 46px;
+        border-color: rgba(255,255,255,.13);
+        background-color: #1a1a25;
+        color: #f0ede8;
+    }
+    .edit-user-card .form-control:focus, .edit-user-card .form-select:focus {
+        border-color: #c9a84c;
+        box-shadow: 0 0 0 .2rem rgba(201,168,76,.16);
+    }
+    .edit-user-card .form-text, .edit-user-card .text-muted { color: rgba(240,237,232,.56) !important; }
+    .edit-user-card .section-title {
+        margin: 24px 0 14px;
+        padding-bottom: 9px;
+        border-bottom: 1px solid rgba(255,255,255,.09);
+        color: #e8c96a;
+        font-size: 1rem;
+        font-weight: 700;
+    }
+</style>
+
+<section class="edit-user-card">
+    <div class="d-flex justify-content-between align-items-start flex-wrap gap-3 mb-3">
+        <div>
+            <h2 class="mb-1"><i class="fa-solid fa-user-pen me-2"></i>Edit account details</h2>
+            <p class="text-muted mb-0">Update the customer's name, login details, and profile files.</p>
+        </div>
+        <a href="{% url 'manage_users' %}" class="btn btn-outline-light">
+            <i class="fa-solid fa-arrow-left me-1"></i> Back to users
+        </a>
+    </div>
+
+    {% if is_protected_admin or not can_edit_access %}
+    <div class="alert alert-warning">
+        {% if is_protected_admin %}
+        This is a protected administrator account. You can update profile details, but its administrator role and active status cannot be changed here.
+        {% else %}
+        You are editing your own account. Your role and active status are locked to prevent accidental lockout.
+        {% endif %}
+    </div>
+    {% endif %}
+
+    <form method="post" enctype="multipart/form-data">
+        {% csrf_token %}
+        <h3 class="section-title">Account and name</h3>
+        <div class="row g-3">
+            <div class="col-md-6">
+                <label class="form-label" for="username">Username</label>
+                <input class="form-control" id="username" name="username" value="{{ managed_user.username }}" maxlength="150" required>
+            </div>
+            <div class="col-md-6">
+                <label class="form-label" for="email">Email</label>
+                <input class="form-control" id="email" name="email" type="email" value="{{ managed_user.email }}" maxlength="254">
+            </div>
+            <div class="col-md-6">
+                <label class="form-label" for="first_name">First name</label>
+                <input class="form-control" id="first_name" name="first_name" value="{{ managed_user.first_name }}" maxlength="150">
+            </div>
+            <div class="col-md-6">
+                <label class="form-label" for="last_name">Last name</label>
+                <input class="form-control" id="last_name" name="last_name" value="{{ managed_user.last_name }}" maxlength="150">
+            </div>
+        </div>
+
+        <h3 class="section-title">Role and account status</h3>
+        {% if can_edit_access %}
+        <div class="row g-3">
+            <div class="col-md-6">
+                <label class="form-label" for="role">Role</label>
+                <select class="form-select" id="role" name="role" required>
+                    <option value="customer" {% if role == "customer" %}selected{% endif %}>Customer</option>
+                </select>
+                <div class="form-text">Administrator privileges cannot be assigned from this form.</div>
+            </div>
+            <div class="col-md-6">
+                <label class="form-label" for="is_active">Account status</label>
+                <select class="form-select" id="is_active" name="is_active">
+                    <option value="true" {% if managed_user.is_active %}selected{% endif %}>Active</option>
+                    <option value="false" {% if not managed_user.is_active %}selected{% endif %}>Inactive</option>
+                </select>
+            </div>
+        </div>
+        {% else %}
+        <div class="row g-3">
+            <div class="col-md-6">
+                <label class="form-label">Role</label>
+                <input class="form-control" value="{% if role == 'admin' %}Administrator{% else %}Customer{% endif %}" disabled>
+            </div>
+            <div class="col-md-6">
+                <label class="form-label">Account status</label>
+                <input class="form-control" value="{% if managed_user.is_active %}Active{% else %}Inactive{% endif %}" disabled>
+            </div>
+        </div>
+        {% endif %}
+
+        <h3 class="section-title">Customer details</h3>
+        <div class="row g-3">
+            <div class="col-md-6">
+                <label class="form-label" for="customer_phone">Phone</label>
+                <input class="form-control" id="customer_phone" name="customer_phone" value="{{ profile.customer_phone }}" maxlength="20">
+            </div>
+            <div class="col-md-6">
+                <label class="form-label" for="national_id">National ID</label>
+                <input class="form-control" id="national_id" name="national_id" value="{{ profile.national_id }}" maxlength="50">
+            </div>
+            <div class="col-md-6">
+                <label class="form-label" for="present_address">Address</label>
+                <input class="form-control" id="present_address" name="present_address" value="{{ profile.present_address }}" maxlength="255">
+            </div>
+            <div class="col-md-6">
+                <label class="form-label" for="parents_address">Parent/Alternate address</label>
+                <input class="form-control" id="parents_address" name="parents_address" value="{{ profile.parents_address }}" maxlength="255">
+            </div>
+        </div>
+
+        <h3 class="section-title">Profile files</h3>
+        <div class="row g-3">
+            <div class="col-md-6">
+                <label class="form-label" for="profile_photo">Profile photo</label>
+                {% if profile.profile_photo %}
+                    <p class="form-text">Current: <a href="{{ profile.profile_photo.url }}" target="_blank" rel="noopener">View photo</a></p>
+                {% endif %}
+                <input class="form-control" id="profile_photo" name="profile_photo" type="file" accept="image/*">
+                <div class="form-text">Upload a replacement image (maximum 2 MB).</div>
+            </div>
+            <div class="col-md-6">
+                <label class="form-label" for="id_document">ID document</label>
+                {% if profile.id_document %}
+                    <p class="form-text">Current: <a href="{{ profile.id_document.url }}" target="_blank" rel="noopener">View document</a></p>
+                {% endif %}
+                <input class="form-control" id="id_document" name="id_document" type="file" accept="image/*">
+                <div class="form-text">Upload an image replacement (maximum 2 MB).</div>
+            </div>
+        </div>
+
+        <h3 class="section-title">Change password</h3>
+        <div class="row g-3">
+            <div class="col-md-6">
+                <label class="form-label" for="new_password">New password</label>
+                <input class="form-control" id="new_password" name="new_password" type="password" autocomplete="new-password">
+                <div class="form-text">Leave blank to keep the current password. Minimum 4 characters.</div>
+            </div>
+            <div class="col-md-6">
+                <label class="form-label" for="password_confirmation">Confirm new password</label>
+                <input class="form-control" id="password_confirmation" name="password_confirmation" type="password" autocomplete="new-password">
+            </div>
+        </div>
+
+        <div class="d-flex justify-content-end gap-2 mt-4">
+            <a href="{% url 'manage_users' %}" class="btn btn-outline-light">Cancel</a>
+            <button type="submit" class="btn btn-warning fw-bold">
+                <i class="fa-solid fa-floppy-disk me-1"></i> Save changes
+            </button>
+        </div>
+    </form>
+</section>
+{% endblock %}

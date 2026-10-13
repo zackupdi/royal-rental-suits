@@ -1,4 +1,4 @@
-{% extends "rental/base.html" %}
+{% extends "rental/base_admin.html" %}
 {% block title %}Payments | Suit Rental{% endblock %}
 {% block page_title %}Payments{% endblock %}
 
@@ -450,7 +450,7 @@
       <div class="stat-card" style="--card-accent:#4caf82">
         <div class="stat-label">Revenue</div>
         <div class="stat-value" style="color:#4caf82">${{ total_revenue|floatformat:2 }}</div>
-        <div class="stat-sub">Collected from cashier payments</div>
+        <div class="stat-sub">Collected from rental payments</div>
       </div>
     </div>
     <div class="col-md-3">
@@ -488,14 +488,14 @@
       <div class="stat-card" style="--card-accent:#33a1ff">
         <div class="stat-label">Expense Records</div>
         <div class="stat-value" style="color:#33a1ff">{{ expense_count }}</div>
-        <div class="stat-sub">Costs logged by staff</div>
+        <div class="stat-sub">Business expenses recorded</div>
       </div>
     </div>
     <div class="col-md-3">
       <div class="stat-card" style="--card-accent:#4caf50">
-        <div class="stat-label">Cashier Payments</div>
+        <div class="stat-label">Recorded Payments</div>
         <div class="stat-value" style="color:#4caf50">{{ payment_count }}</div>
-        <div class="stat-sub">Payments logged by cashiers</div>
+        <div class="stat-sub">Payments recorded in the system</div>
       </div>
     </div>
   </div>
@@ -517,12 +517,12 @@
         <form method="get" id="dateFilterPaymentForm" style="display:flex; gap:18px; flex-wrap:wrap; align-items:flex-end;">
             <div>
                 <label class="filter-label" for="dateFromPayment"><i class="fa-solid fa-calendar-day"></i> From Date</label>
-                <input type="date" name="from_date" id="dateFromPayment" class="filter-input"
+                <input type="date" name="from_date" id="dateFromPayment" class="filter-input" data-date-policy="historical"
                        value="{{ from_date|default:'' }}">
             </div>
             <div>
                 <label class="filter-label" for="dateToPayment"><i class="fa-solid fa-calendar-day"></i> To Date</label>
-                <input type="date" name="to_date" id="dateToPayment" class="filter-input"
+                <input type="date" name="to_date" id="dateToPayment" class="filter-input" data-date-policy="historical"
                        value="{{ to_date|default:'' }}">
             </div>
             <button type="submit" class="btn-filter" style="background: rgba(201,168,76,0.15); border-color: rgba(201,168,76,0.3); color: #c9a84c; padding: 9px 18px;">
@@ -564,7 +564,7 @@
             <th>Receipt #</th>
             <th>Customer</th>
             <th>Suit</th>
-            <th>Cashier</th>
+            <th>Recorded By</th>
             <th>Status</th>
             <th>Amount</th>
             <th>Method</th>
@@ -693,7 +693,7 @@
 
           <div class="mb-3">
             <label class="form-label small">Payment Date</label>
-            <input type="date" class="form-control" id="modalCollectDate" name="payment_date" required>
+            <input type="date" class="form-control" id="modalCollectDate" name="payment_date" data-date-policy="historical" required>
           </div>
           
           <div class="mb-2 text-warning small">
@@ -845,7 +845,7 @@ function openMarkPaidModal(paymentId, balanceDue) {
   const dateInp = document.getElementById('markPaidDate');
   const today = new Date().toISOString().slice(0,10);
   dateInp.value = today;
-  dateInp.min = today; // Limit to today and future
+  dateInp.removeAttribute('min');
   modal.style.display = 'flex';
   modal.setAttribute('aria-hidden','false');
   setTimeout(()=> amountInp.focus(),50);
@@ -880,10 +880,10 @@ function onRecentMonthChange(){
 document.addEventListener('DOMContentLoaded', function(){ 
   populateRecentMonths('filterRecentMonth'); 
   
-  // Restrict all date inputs on the page to today and future dates
+  // Historical date fields permit prior dates but reject future dates.
   const today = new Date().toISOString().slice(0,10);
-  document.querySelectorAll('input[type="date"]').forEach(input => {
-    input.min = today;
+  document.querySelectorAll('[data-date-policy="historical"]').forEach(input => {
+    input.max = today;
   });
 
   // Kici filter-ka markii ugu horreysay si pagination-ka 15 u shaqeeyo
@@ -922,7 +922,7 @@ function openCollectPaymentModal(id, name, amountPaid){
   
   const collectDate = document.getElementById('modalCollectDate');
   collectDate.value = today;
-  collectDate.min = today; // Limit to today and future
+  collectDate.removeAttribute('min');
   
   const modal = new bootstrap.Modal(document.getElementById('collectPaymentModal'));
   modal.show();

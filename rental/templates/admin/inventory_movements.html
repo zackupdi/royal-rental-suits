@@ -1,0 +1,93 @@
+{% extends "rental/base_admin.html" %}
+
+{% block title %}Inventory History | Royal Rental Suits{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-3">
+  <div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-4">
+    <div>
+      <h1 class="h3 mb-1">Inventory History</h1>
+      <p class="text-muted mb-0">Auditable record of stock reservations, rentals, returns, and adjustments.</p>
+    </div>
+    <a class="btn btn-outline-warning" href="{% url 'inventory' %}">
+      <i class="fa-solid fa-boxes-stacked me-1"></i> Inventory
+    </a>
+  </div>
+
+  <form method="get" class="row g-2 mb-3">
+    <div class="col-12 col-md-6">
+      <label class="visually-hidden" for="movement-search">Search history</label>
+      <input id="movement-search" class="form-control" type="search" name="q" value="{{ query }}"
+             placeholder="Search item, customer, phone, or notes">
+    </div>
+    <div class="col-8 col-md-4">
+      <label class="visually-hidden" for="movement-type">Movement type</label>
+      <select id="movement-type" class="form-select" name="type">
+        <option value="">All movement types</option>
+        {% for value, label in movement_types %}
+          <option value="{{ value }}" {% if selected_type == value %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="col-4 col-md-2 d-grid">
+      <button class="btn btn-warning" type="submit"><i class="fa-solid fa-filter me-1"></i> Filter</button>
+    </div>
+  </form>
+
+  <div class="table-responsive rounded border">
+    <table class="table table-dark table-hover align-middle mb-0">
+      <thead>
+        <tr>
+          <th scope="col">Date &amp; time</th>
+          <th scope="col">Item</th>
+          <th scope="col">Movement</th>
+          <th scope="col" class="text-end">Change</th>
+          <th scope="col" class="text-end">Stock after</th>
+          <th scope="col">Customer / rental</th>
+          <th scope="col">Recorded by</th>
+          <th scope="col">Notes</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for movement in movements %}
+          <tr>
+            <td class="text-nowrap">{{ movement.created_at|date:"d M Y, H:i" }}</td>
+            <td class="fw-semibold">{{ movement.suit_name }}</td>
+            <td>{{ movement.get_movement_type_display }}</td>
+            <td class="text-end {% if movement.quantity_delta > 0 %}text-success{% elif movement.quantity_delta < 0 %}text-danger{% endif %}">
+              {% if movement.quantity_delta > 0 %}+{% endif %}{{ movement.quantity_delta }}
+            </td>
+            <td class="text-end">{{ movement.quantity_after }}</td>
+            <td>
+              {% if movement.rental_request %}
+                {{ movement.rental_request.name }}<br>
+                <small class="text-muted">#{{ movement.rental_request_id }}</small>
+              {% else %}
+                <span class="text-muted">—</span>
+              {% endif %}
+            </td>
+            <td>{% if movement.performed_by %}{{ movement.performed_by.get_full_name|default:movement.performed_by.username }}{% else %}<span class="text-muted">System</span>{% endif %}</td>
+            <td>{{ movement.notes|default:"—"|truncatechars:100 }}</td>
+          </tr>
+        {% empty %}
+          <tr><td colspan="8" class="text-center text-muted py-5">No inventory movements match your filters.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  {% if page_obj.paginator.num_pages > 1 %}
+    <nav class="d-flex justify-content-between align-items-center mt-3" aria-label="Inventory history pages">
+      <span class="text-muted small">Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
+      <div class="btn-group">
+        {% if page_obj.has_previous %}
+          <a class="btn btn-outline-secondary btn-sm" href="?q={{ query|urlencode }}&amp;type={{ selected_type|urlencode }}&amp;page={{ page_obj.previous_page_number }}">Previous</a>
+        {% endif %}
+        {% if page_obj.has_next %}
+          <a class="btn btn-outline-secondary btn-sm" href="?q={{ query|urlencode }}&amp;type={{ selected_type|urlencode }}&amp;page={{ page_obj.next_page_number }}">Next</a>
+        {% endif %}
+      </div>
+    </nav>
+  {% endif %}
+</div>
+{% endblock %}

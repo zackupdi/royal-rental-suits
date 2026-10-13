@@ -1,13 +1,72 @@
+from datetime import timedelta
+
 from django import forms
 from django.contrib import messages
 from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.decorators import login_required
 from django.db.models import Q
 from django.shortcuts import get_object_or_404, redirect, render
+from django.utils import timezone
+from django.utils.dateparse import parse_date
 from django.views.decorators.cache import never_cache
 
 from .forms import validate_image_upload
-from .models import ContactMessage, FavoriteSuit, Suit, SuitRequest
+from .models import ContactMessage, FavoriteSuit, Profile, Suit, SuitRequest
+from .workflow import WorkflowError, build_steps, expire_overdue, validate_booking_dates
+
+
+def _resolve_booking_date_range(request, *, default_days=1):
+    quantity_requested_raw = (request.POST.get("quantity_requested") or request.POST.get("quantity") or "1").strip()
+    days_requested_raw = (request.POST.get("days_requested") or request.POST.get("days") or str(default_days)).strip()
+
+    try:
+        quantity_requested = int(quantity_requested_raw)
+    except ValueError:
+        quantity_requested = 1
+
+    try:
+        days_requested = int(days_requested_raw)
+    except ValueError:
+        days_requested = default_days
+
+    days_requested = max(days_requested, 1)
+    quantity_requested = max(quantity_requested, 1)
+
+    start_date = parse_date(request.POST.get("start_date") or request.POST.get("requested_start_date") or "")
+    end_date = parse_date(request.POST.get("end_date") or request.POST.get("requested_end_date") or "")
+    today = timezone.localdate()
+
+    if start_date and end_date:
+        return start_date, end_date, quantity_requested, days_requested
+    if not start_date and not end_date:
+        start_date = today
+        end_date = today + timedelta(days=days_requested - 1)
+        return start_date, end_date, quantity_requested, days_requested
+    if start_date and not end_date:
+        end_date = start_date + timedelta(days=days_requested - 1)
+        return start_date, end_date, quantity_requested, days_requested
+    if end_date and not start_date:
+        start_date = max(end_date - timedelta(days=days_requested - 1), today)
+        return start_date, end_date, quantity_requested, days_requested
+    return start_date, end_date, quantity_requested, days_requested
+
+
+def _save_customer_profile(user, *, first_name, last_name, email, phone,
+                           national_id, present_address, parents_address):
+    user.first_name = first_name
+    user.last_name = last_name
+    if email:
+        user.email = email
+    user.save(update_fields=["first_name", "last_name", "email"])
+
+    profile, _ = Profile.objects.get_or_create(user=user)
+    profile.customer_phone = phone
+    profile.national_id = national_id or ""
+    profile.present_address = present_address
+    profile.parents_address = parents_address
+    profile.save(update_fields=[
+        "customer_phone", "national_id", "present_address", "parents_address", "updated_at",
+    ])
 
 
 def home(request):
@@ -137,9 +196,23 @@ def all_suits(request):
     })
 
 
+def _redirect_staff_booking_request(request):
+    if not request.user.is_staff:
+        return None
+
+    from .views import is_admin
+
+    messages.info(request, "Administrator accounts should manage rentals from the admin dashboard.")
+    return redirect("dashboard" if is_admin(request.user) else "home")
+
+
 @login_required(login_url="customer_login")
 def book_suit(request):
-    from .views import is_admin, validate_phone_number
+    staff_redirect = _redirect_staff_booking_request(request)
+    if staff_redirect is not None:
+        return staff_redirect
+
+    from .views import validate_national_id, validate_phone_number
 
     if request.method == "POST":
         suit_id_raw = request.POST.get("suit_id", "").strip()
@@ -176,6 +249,13 @@ def book_suit(request):
             messages.error(request, "This suit is not available.")
             return redirect("all_suits")
 
+        start_date, end_date, quantity_requested, days_requested = _resolve_booking_date_range(request, default_days=days_requested)
+        try:
+            validate_booking_dates(suit, start_date, end_date)
+        except WorkflowError as exc:
+            messages.error(request, str(exc))
+            return redirect("request_form", suit_id=suit.pk)
+
         phone = (request.POST.get("phone") or request.POST.get("phone_number") or "").strip()
         try:
             validate_phone_number(phone)
@@ -193,23 +273,52 @@ def book_suit(request):
             or (request.user.get_full_name().strip() if request.user.get_full_name().strip() else request.user.username)
         )
         address_value = (request.POST.get("present_address") or request.POST.get("address") or "").strip()
+        national_id = (request.POST.get("national_id") or "").strip()
+        parents_address = (request.POST.get("parents_address") or "").strip()
+        try:
+            national_id = validate_national_id(national_id)
+        except ValueError as e:
+            messages.error(request, str(e))
+            return redirect("all_suits")
 
-        SuitRequest.objects.create(
-            suit=suit,
-            first_name=first_name or None,
-            second_name=second_name or None,
-            name=customer_name,
-            phone=phone,
-            customer_email=submitted_email or (request.user.email if request.user else None),
-            present_address=address_value or None,
-            parents_address=request.POST.get("parents_address") or None,
-            notes=request.POST.get("notes") or None,
-            days_requested=days_requested,
-            quantity_requested=quantity_requested,
-            customer_image=request.FILES.get("customer_image") or request.FILES.get("image"),
-            user=request.user,
-            status="Pending",
-        )
+        from django.db import transaction
+        booking_type = "reservation" if start_date > timezone.localdate() else "rental"
+        with transaction.atomic():
+            try:
+                validate_booking_dates(suit, start_date, end_date)
+            except WorkflowError as exc:
+                messages.error(request, str(exc))
+                return redirect("request_form", suit_id=suit.pk)
+            SuitRequest.objects.create(
+                suit=suit,
+                first_name=first_name or None,
+                second_name=second_name or None,
+                name=customer_name,
+                phone=phone,
+                customer_email=submitted_email or (request.user.email if request.user else None),
+                present_address=address_value or None,
+                parents_address=parents_address or None,
+                national_id=national_id or None,
+                notes=request.POST.get("notes") or None,
+                days_requested=days_requested,
+                quantity_requested=quantity_requested,
+                requested_start_date=start_date,
+                requested_end_date=end_date,
+                booking_type=booking_type,
+                customer_image=request.FILES.get("customer_image") or request.FILES.get("image"),
+                user=request.user,
+                status="Pending",
+            )
+            _save_customer_profile(
+                request.user,
+                first_name=first_name,
+                last_name=second_name,
+                email=submitted_email,
+                phone=phone,
+                national_id=national_id,
+                present_address=address_value,
+                parents_address=parents_address,
+            )
 
         suit.status = "Pending Request"
         suit.save()
@@ -222,7 +331,11 @@ def book_suit(request):
 
 @login_required(login_url="customer_login")
 def request_suit(request, suit_id):
-    from .views import is_admin, validate_national_id, validate_phone_number
+    staff_redirect = _redirect_staff_booking_request(request)
+    if staff_redirect is not None:
+        return staff_redirect
+
+    from .views import validate_national_id, validate_phone_number
 
     suit = get_object_or_404(Suit.objects.exclude(condition_grade='retired'), id=suit_id)
 
@@ -248,6 +361,17 @@ def request_suit(request, suit_id):
         if not suit.is_available_for_booking:
             messages.error(request, "Suit not available.")
             return render(request, "customer/request_form.html", {"suit": suit, "form_values": request.POST})
+
+        start_date, end_date, quantity_requested, days_requested = _resolve_booking_date_range(request, default_days=days_requested)
+        try:
+            validate_booking_dates(suit, start_date, end_date)
+        except WorkflowError as exc:
+            messages.error(request, str(exc))
+            return render(request, "customer/request_form.html", {
+                "suit": suit,
+                "form_values": request.POST,
+                "today": timezone.localdate(),
+            })
 
         full_name_value = (request.POST.get("full_name") or request.POST.get("name") or request.POST.get("first_name") or "").strip()
         first_name_value = (request.POST.get("first_name") or full_name_value or "").strip()
@@ -282,34 +406,80 @@ def request_suit(request, suit_id):
         image_file = request.FILES.get("customer_image") or request.FILES.get("image")
         if image_file:
             try:
-                if not is_admin(request.user):
-                    validate_image_upload(image_file, "customer image")
+                validate_image_upload(image_file, "customer image")
             except forms.ValidationError as e:
                 messages.error(request, str(e))
                 return render(request, "customer/request_form.html", {"suit": suit, "form_values": request.POST})
 
-        SuitRequest.objects.create(
-            suit=suit,
-            first_name=first_name_value or None,
-            second_name=second_name_value or None,
-            name=full_name_value or (request.POST.get("name") or ""),
-            phone=phone_value,
-            customer_email=submitted_email or (request.user.email if request.user else None),
-            national_id=national_id_value or None,
-            present_address=address_value,
-            parents_address=request.POST.get("parents_address") or None,
-            notes=request.POST.get("notes") or None,
-            days_requested=days_requested,
-            quantity_requested=quantity_requested,
-            customer_image=image_file,
-            user=request.user,
-            status="Pending",
-        )
+        parents_address = (request.POST.get("parents_address") or "").strip()
+        day_count = (end_date - start_date).days + 1
+        if day_count > 7:
+            messages.error(request, "Muddada booking-gu kama badnaan karto 7 maalmood.")
+            return render(request, "customer/request_form.html", {
+                "suit": suit,
+                "form_values": request.POST,
+                "today": timezone.localdate(),
+            })
+        from django.db import transaction
+        with transaction.atomic():
+            try:
+                validate_booking_dates(suit, start_date, end_date)
+            except WorkflowError as exc:
+                messages.error(request, str(exc))
+                return render(request, "customer/request_form.html", {
+                    "suit": suit,
+                    "form_values": request.POST,
+                    "today": timezone.localdate(),
+                })
+            SuitRequest.objects.create(
+                suit=suit,
+                first_name=first_name_value or None,
+                second_name=second_name_value or None,
+                name=full_name_value or (request.POST.get("name") or ""),
+                phone=phone_value,
+                customer_email=submitted_email or (request.user.email if request.user else None),
+                national_id=national_id_value or None,
+                present_address=address_value,
+                parents_address=parents_address or None,
+                notes=request.POST.get("notes") or None,
+                days_requested=day_count,
+                quantity_requested=quantity_requested,
+                requested_start_date=start_date,
+                requested_end_date=end_date,
+                booking_type="reservation" if start_date > timezone.localdate() else "rental",
+                customer_image=image_file,
+                user=request.user,
+                status="Pending",
+            )
+            _save_customer_profile(
+                request.user,
+                first_name=first_name_value,
+                last_name=second_name_value,
+                email=submitted_email,
+                phone=phone_value,
+                national_id=national_id_value,
+                present_address=address_value,
+                parents_address=parents_address,
+            )
 
         messages.success(request, "Your suit request has been submitted for admin approval.")
         return redirect("customer_history")
 
-    return render(request, "customer/request_form.html", {"suit": suit, "form_values": {}})
+    profile, _ = Profile.objects.get_or_create(user=request.user)
+    return render(request, "customer/request_form.html", {
+        "suit": suit,
+        "today": timezone.localdate(),
+        "form_values": {
+            "full_name": request.user.get_full_name() or request.user.username,
+            "email": request.user.email,
+            "phone": profile.customer_phone,
+            "address": profile.present_address,
+            "parents_address": profile.parents_address,
+            "national_id": profile.national_id,
+            "start_date": timezone.localdate().isoformat(),
+            "end_date": timezone.localdate().isoformat(),
+        },
+    })
 
 
 def customer_login(request):
@@ -319,7 +489,7 @@ def customer_login(request):
         user = authenticate(request, username=username, password=password)
         if user is not None and user.is_active:
             login(request, user)
-            request.session.set_expiry(28800)
+            request.session.set_expiry(60 * 60 * 24)
             messages.success(request, "Login successful!")
             return redirect("all_suits")
         messages.error(request, "Invalid username or password")
@@ -330,26 +500,37 @@ def customer_login(request):
 @never_cache
 @login_required(login_url="customer_login")
 def customer_history(request):
+    expire_overdue()
     bookings = SuitRequest.objects.filter(user=request.user).order_by("-request_date")
-    return render(request, "customer/customer_history.html", {"bookings": bookings})
+    profile, _ = Profile.objects.get_or_create(user=request.user)
+    items = [
+        {"booking": booking, "steps": build_steps(booking)}
+        for booking in bookings.prefetch_related("status_history")
+    ]
+    return render(request, "customer/customer_history.html", {
+        "bookings": bookings,
+        "items": items,
+        "customer_profile": profile,
+    })
 
 
 def login_view(request):
-    from .views import is_admin, is_cashier, is_reception
+    from .views import is_admin, is_reception
 
     if request.method == "POST":
         username = request.POST.get("username")
         password = request.POST.get("password")
         user = authenticate(request, username=username, password=password)
-        if user is not None and user.is_active and (is_reception(user) or is_cashier(user) or is_admin(user)):
+        if user is not None and user.is_active and is_admin(user):
             login(request, user)
-            if is_reception(user) or is_cashier(user):
-                messages.success(request, "Reception login successful! Welcome to your reception dashboard.")
-                return redirect("reception_dashboard")
-            messages.success(request, "Admin login successful! Welcome to your admin dashboard.")
+            messages.success(request, "Admin login successful. Welcome to your dashboard.")
             return redirect("dashboard")
-        if user is not None and user.is_active and not (is_reception(user) or is_cashier(user) or is_admin(user)):
-            messages.error(request, "This account is not allowed on the reception/admin login page.")
+        if user is not None and user.is_active and is_reception(user):
+            login(request, user)
+            messages.success(request, "Reception login successful. Open the customer directory to continue.")
+            return redirect("manage_users")
+        if user is not None and user.is_active and not is_admin(user):
+            messages.error(request, "This account is not authorized for staff access.")
         else:
             messages.error(request, "Invalid username or password.")
         return redirect("admin_login")

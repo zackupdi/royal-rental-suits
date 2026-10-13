@@ -1,5 +1,5 @@
-{% extends "rental/base.html" %}
-{% block title %}Reception Requests | Suit Rental{% endblock %}
+{% extends "rental/base_admin.html" %}
+{% block title %}Rental Requests | Suit Rental{% endblock %}
 {% block page_title %}ADMIN Requests{% endblock %}
 
 {% block content %}
@@ -100,13 +100,26 @@
 
     /* ✅ NEW: Inline return panel (Bannaan-yaal si toos ah u muuqda) */
     .inline-panel-custom {
-        background: #13131a;
-        border: 1px solid rgba(201,168,76,0.3);
-        border-radius: 16px;
-        width: 100%;
-        box-shadow: 0 10px 30px rgba(0,0,0,0.4);
-        margin-top: 30px;
+        position: fixed; inset: 0; z-index: 1060;
+        display: none; align-items: center; justify-content: center;
+        padding: 20px; background: rgba(7,7,10,0.85); backdrop-filter: blur(8px);
+        box-sizing: border-box;
     }
+    .inline-panel-custom.show { display: flex; }
+    .return-modal-card {
+        background: #13131a; border: 1px solid rgba(201,168,76,0.3);
+        border-radius: 16px; width: 100%; max-width: 900px; max-height: 92vh;
+        overflow-y: auto; box-shadow: 0 10px 30px rgba(0,0,0,0.4);
+    }
+    .requests-toolbar { display:flex; gap:12px; align-items:center; justify-content:space-between; flex-wrap:wrap; margin: 0 0 18px; }
+    .requests-search { display:flex; gap:8px; width:min(100%, 430px); }
+    .requests-search input { flex:1; min-width:120px; }
+    .requests-tabs { display:flex; gap:8px; overflow-x:auto; margin: 0 0 18px; padding-bottom:4px; }
+    .requests-tabs .filter-chip { white-space:nowrap; }
+    .pagination-bar { display:flex; justify-content:space-between; align-items:center; gap:10px; padding:12px 24px 20px; color:rgba(240,237,232,0.6); }
+    .pagination-links { display:flex; gap:8px; }
+    .request-reason { width:125px; padding:6px 8px; border:1px solid rgba(255,255,255,0.15); border-radius:7px; background:#1b1b23; color:#f0ede8; font-size:.75rem; }
+    .reservation-countdown { display:block; margin-top:4px; color:#ffca28; font-size:.75rem; }
 
     .pay-grid-custom { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 15px; }
     .pay-box-custom {
@@ -201,17 +214,23 @@
 </style>
 
 <div class="container-fluid px-0">
-    
-    <!-- Status Quick Navigation Ribbon -->
-    <div class="filter-ribbon">
-        <a href="?status=all" class="filter-chip {% if not request.GET.status or request.GET.status == 'all' %}active{% endif %}">All Registry</a>
-        <a href="?status=available" class="filter-chip {% if request.GET.status == 'available' %}active{% endif %}">Available</a>
-        <a href="?status=pending" class="filter-chip {% if request.GET.status == 'pending' %}active{% endif %}">Pending Request</a>
-        <a href="?status=reserved" class="filter-chip {% if request.GET.status == 'reserved' %}active{% endif %}">Reserved</a>
-        <a href="?status=active" class="filter-chip {% if request.GET.status == 'active' %}active{% endif %}">Rented (Active)</a>
-        <a href="?status=returned" class="filter-chip {% if request.GET.status == 'returned' %}active{% endif %}">Returned</a>
-        <a href="?status=dry-cleaning" class="filter-chip {% if request.GET.status == 'dry-cleaning' %}active{% endif %}"><i class="fa-solid fa-soap me-1"></i> Dry Cleaning</a>
+    <div class="requests-toolbar">
+        <form method="get" action="{% url 'requests' %}" class="requests-search">
+            <input type="hidden" name="tab" value="{{ active_tab }}">
+            <input class="form-input" type="search" name="q" value="{{ current_q }}"
+                   placeholder="Search name, phone, ID, suit, request #">
+            <button class="action-btn-success" type="submit"><i class="fa-solid fa-magnifying-glass"></i> Search</button>
+        </form>
+        {% if current_q %}<a class="filter-chip" href="{% url 'requests' %}?tab={{ active_tab }}">Clear search</a>{% endif %}
     </div>
+    <nav class="requests-tabs" aria-label="Request status">
+        {% for tab in tabs %}
+        <a class="filter-chip{% if tab.key == active_tab %} active{% endif %}"
+           href="{% url 'requests' %}?tab={{ tab.key }}{% if current_q %}&q={{ current_q|urlencode }}{% endif %}">
+            <i class="fa-solid {{ tab.icon }}"></i> {{ tab.label }} <span>({{ tab.count }})</span>
+        </a>
+        {% endfor %}
+    </nav>
 
     <!-- Quick Insights Metrics Grid -->
     <div class="row g-3 mb-4">
@@ -302,7 +321,7 @@
                         <th>Suit Model</th>
                         <th style="text-align: center;">Qty</th>
                         <th>Status</th>
-                        <th>Requested Date</th>
+                        <th>Requested / Hold Expiry</th>
                         <th style="text-align:right; padding-right: 24px;">Action Workflow</th>
                     </tr>
                 </thead>
@@ -331,7 +350,17 @@
                             {% elif req.status == "Expired" %}<span class="badge-expired">Expired</span>
                             {% else %}{{ req.status }}{% endif %}
                         </td>
-                        <td style="color: rgba(240,237,232,0.6);">{{ req.request_date|date:"M d, Y" }}</td>
+                        <td style="color: rgba(240,237,232,0.6);">
+                            {{ req.request_date|date:"M d, Y" }}
+                            {% if req.status == "Reserved" and req.waiting_deadline %}
+                            <span class="reservation-countdown" data-expiry="{{ req.waiting_deadline|date:'c' }}">Hold expires {{ req.waiting_deadline|date:"M d, Y H:i" }}</span>
+                            {% elif req.status == "Reserved" and req.due_date %}
+                            <span class="reservation-countdown" data-expiry="{{ req.due_date|date:'c' }}">Hold expires {{ req.due_date|date:"M d, Y H:i" }}</span>
+                            {% endif %}
+                            {% if req.status == "Rejected" and req.rejected_reason %}
+                            <span style="display:block; margin-top:4px; color:#e05c5c; font-size:.75rem;">Reason: {{ req.rejected_reason }}</span>
+                            {% endif %}
+                        </td>
                         <td style="text-align: right; white-space: nowrap; padding-right: 24px;">
                             {% if req.status == 'Pending' %}
                                 <a href="{% url 'approve_and_rent' req.id %}?mode=pickup" class="action-btn-success" title="Collect items & initiate active tracking period">
@@ -340,8 +369,9 @@
                                 <button type="button" class="action-btn-warning" onclick="triggerReserveModal('{{ req.id }}', '{{ req.name }}')" title="Reserve Item" style="margin-left: 6px;">
                                     <i class="fas fa-bookmark"></i> Reserve
                                 </button>
-                                <form method="post" action="{% url 'reject_request' req.id %}" style="display:inline; margin-left:8px;">
+                                <form method="post" action="{% url 'reject_request' req.id %}" style="display:inline-flex; gap:6px; align-items:center; margin-left:8px;">
                                     {% csrf_token %}
+                                    <input class="request-reason" type="text" name="reason" maxlength="255" placeholder="Reason (optional)" aria-label="Optional rejection reason">
                                     <button type="submit" class="action-btn-danger" onclick="return confirm('Reject this request?');" title="Reject request">
                                         <i class="fas fa-times"></i> Reject
                                     </button>
@@ -351,9 +381,16 @@
                                     <i class="fas fa-shopping-bag"></i> Pick up & Rent
                                 </a>
                                 <a href="{% url 'receipt' req.id %}" class="action-btn-success" title="View receipt" style="margin-left: 6px;"><i class="fas fa-receipt"></i> Receipt</a>
+                                <form method="post" action="{% url 'reject_request' req.id %}" style="display:inline-flex; gap:6px; align-items:center; margin-left:8px;">
+                                    {% csrf_token %}
+                                    <input class="request-reason" type="text" name="reason" maxlength="255" placeholder="Reason (optional)" aria-label="Optional rejection reason">
+                                    <button type="submit" class="action-btn-danger" onclick="return confirm('Cancel this reservation?');" title="Reject reserved request">
+                                        <i class="fas fa-times"></i> Reject
+                                    </button>
+                                </form>
                             {% elif req.status == 'Active' %}
                                 <button type="button" class="action-btn-success" onclick="focusReturnSection('{{ req.id }}')" title="Process Return">
-                                    <i class="fas fa-undo-alt"></i> Receive Return
+                                        <i class="fas fa-undo-alt"></i> Return
                                 </button>
                                 <a href="{% url 'receipt' req.id %}" class="action-btn-success" title="View receipt" style="margin-left: 6px;"><i class="fas fa-receipt"></i> Receipt</a>
                             {% elif req.status == 'Returned' %}
@@ -375,6 +412,15 @@
                 </tbody>
             </table>
         </div>
+        {% if page_obj.paginator.num_pages > 1 %}
+        <div class="pagination-bar">
+            <span>Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }} · {{ page_obj.paginator.count }} requests</span>
+            <div class="pagination-links">
+                {% if page_obj.has_previous %}<a class="filter-chip" href="?tab={{ active_tab }}{% if current_q %}&q={{ current_q|urlencode }}{% endif %}&page={{ page_obj.previous_page_number }}">Previous</a>{% endif %}
+                {% if page_obj.has_next %}<a class="filter-chip" href="?tab={{ active_tab }}{% if current_q %}&q={{ current_q|urlencode }}{% endif %}&page={{ page_obj.next_page_number }}">Next</a>{% endif %}
+            </div>
+        </div>
+        {% endif %}
         {% else %}
         <div class="empty-state">
             <i class="fa-solid fa-inbox"></i>
@@ -384,15 +430,20 @@
         {% endif %}
     </div>
 
-    <!-- ================= ✅ INLINE RETURN PROCESSING PANEL (Bannaan-yaal si toos ah u muuqda) ================= -->
+    <!-- Return processing panel -->
     <div id="returnPanelSection" class="inline-panel-custom section-wrapper">
+        <div class="return-modal-card">
         <div class="table-card-header" style="background: rgba(201,168,76,0.05);">
             <h4><i class="fas fa-clipboard-check"></i> Professional Return Audit & Settlement</h4>
+            <button type="button" onclick="closeReturnPanel()" aria-label="Close return dialog" style="background:transparent;border:0;color:#f0ede8;font-size:1.5rem;">&times;</button>
         </div>
-        
+
         <div style="padding: 24px;">
-            <form method="POST" action="{% url 'process_return' %}" id="returnSuitForm">
+            <form method="POST" action="{% url 'process_return' %}" id="returnSuitForm"
+                  data-late-fee-rate="{{ late_fee_policy.late_fee_per_hour }}"
+                  data-partial-hour-policy="{{ late_fee_policy.partial_hour_policy }}">
                 {% csrf_token %}
+                <input type="hidden" name="payment_idempotency_key" value="{{ return_payment_key }}">
                 
                 <!-- Qaybta Doorashada Rental ID oo muuqata si gacantana looga dooran karo -->
                 <div class="form-group" style="margin-bottom: 20px;">
@@ -403,11 +454,11 @@
                         <option value="{{ req.id }}"
                                 data-customer="{{ req.name }}"
                                 data-suit="{{ req.suit.suit_name }}"
-                                data-price="{{ req.suit.price_per_day }}"
-                                data-qty="{{ req.quantity_requested|default:1 }}"
+                            data-rental-total="{{ req.total_amount|floatformat:2 }}"
+                            data-paid="{{ req.amount_paid|floatformat:2 }}"
                                 data-return-items="{{ req.returnable_items|join:'||' }}"
-                                data-expected-end="{{ req.end_time|date:'Y-m-d' }}"
-                                data-start-date="{{ req.start_time|date:'Y-m-d' }}"
+                            data-expected-end="{{ req.end_time|date:'c' }}"
+                            data-start-date="{{ req.start_time|date:'c' }}"
                                 data-pending-balance="{{ req.balance_due|floatformat:2 }}">
                             ID #{{ req.id }} - {{ req.name }} ({{ req.suit.suit_name }})
                         </option>
@@ -425,19 +476,27 @@
                         <span class="form-label">Primary Model</span>
                         <strong id="focusedSuitName" style="color: var(--gold); font-size: 1.1rem;">--</strong>
                     </div>
+                    </div>
                 </div>
 
                 <!-- Section 2: Item Condition Audit -->
                 <div style="margin-bottom: 20px;">
                     <label class="form-label" style="color: var(--gold); margin-bottom: 10px;"><i class="fas fa-search me-1"></i> Physical Condition Audit</label>
+                    <select name="return_condition" class="form-input" required>
+                        <option value="good">Good condition</option>
+                        <option value="damaged">Damaged</option>
+                    </select>
                     <div class="audit-checklist">
                         <label class="checklist-item"><input type="checkbox" name="condition_excellent" value="1"> Excellent Condition</label>
                         <label class="checklist-item"><input type="checkbox" name="condition_stains" value="1"> Minor Stains</label>
-                        <label class="checklist-item"><input type="checkbox" name="condition_tears" value="1"> Lundary</label>
+                        <label class="checklist-item"><input type="checkbox" name="condition_tears" value="1"> Torn / damaged</label>
                         <label class="checklist-item"><input type="checkbox" name="condition_missing" value="1"> Missing Accessories</label>
-                        <label class="checklist-item" style="grid-column: 1 / -1; margin-top: 8px; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 8px;">
-                            <input type="checkbox" name="requires_laundry" id="requiresLaundryCheck" value="1" onchange="toggleLaundryFee()"> damage (+$<input type="number" name="laundry_fee" id="laundryFeeInput" value="0" min="0" step="0.01" style="width: 60px; background: transparent; border: 1px solid rgba(255,255,255,0.2); border-radius: 4px; color: #fff; padding: 2px 4px; margin-left: 5px;" oninput="recalculateReturnFinance()">)
-                        </label>
+                        <div class="checklist-item" style="grid-column: 1 / -1; margin-top: 8px; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 8px;">
+                            <label style="display:flex; align-items:center; gap:8px; margin:0;">
+                                <input type="checkbox" name="requires_laundry" id="requiresLaundryCheck" value="1" onchange="toggleLaundryFee()"> Damage fee
+                            </label>
+                            <input type="number" name="laundry_fee" id="laundryFeeInput" value="0" min="0" step="0.01" aria-label="Damage fee amount" style="width: 90px; background: transparent; border: 1px solid rgba(255,255,255,0.2); border-radius: 4px; color: #fff; padding: 4px 6px; margin-left: 8px;" oninput="recalculateReturnFinance()" disabled>
+                        </div>
                     </div>
                 </div>
 
@@ -446,20 +505,28 @@
                     <label class="form-label" style="color: var(--gold); margin-bottom: 12px;"><i class="fas fa-calculator me-1"></i> Financial Settlement</label>
                     
                     <div class="finance-row">
-                        <span class="finance-label">Original Remaining Balance</span>
+                        <span class="finance-label">Rental Amount</span>
+                        <span class="finance-value" id="rentalAmountDisplay">$0.00</span>
+                    </div>
+                    <div class="finance-row">
+                        <span class="finance-label">Amount Paid</span>
+                        <span class="finance-value success" id="amountPaidDisplay">$0.00</span>
+                    </div>
+                    <div class="finance-row">
+                        <span class="finance-label">Remaining Balance</span>
                         <span class="finance-value" id="auditOrigBalance">$0.00</span>
                     </div>
                     <div class="finance-row">
-                        <span class="finance-label">Expected Return: <span id="auditExpectedDate" style="color:#fff;">--/--/----</span></span>
-                        <input type="date" name="actual_return_date" id="actualReturnDate" class="form-input" style="width: 160px; padding: 4px 8px; font-size: 0.8rem;" onchange="validateReturnDate(this); recalculateReturnFinance()" onblur="validateReturnDate(this)" required>
+                        <span class="finance-label">Expected Return: <span id="auditExpectedDate" style="color:#fff;">--</span></span>
+                        <input type="datetime-local" name="actual_return_date" id="actualReturnDate" class="form-input" data-date-policy="historical-datetime" style="width: 210px; padding: 4px 8px; font-size: 0.8rem;" onchange="validateReturnDate(this); recalculateReturnFinance()" onblur="validateReturnDate(this)" required>
                         <small id="dateWarning" style="display:none; color:#e05c5c; font-size:0.7rem; margin-left:8px;"><i class="fas fa-exclamation-triangle"></i> Future date not allowed</small>
                     </div>
                     <div class="finance-row">
-                        <span class="finance-label">Late Fee (<span id="overdueMinutesDisplay">0</span> min overdue)</span>
+                        <span class="finance-label">Late Fee (<span id="overdueMinutesDisplay">0.00</span> hours overdue)</span>
                         <span class="finance-value danger" id="penaltyFineDisplay">$0.00</span>
                     </div>
                     <div class="finance-row">
-                        <span class="finance-label">Damage Fees</span>
+                        <span class="finance-label">Damage Fee</span>
                         <span class="finance-value danger" id="laundryDamageDisplay">$0.00</span>
                     </div>
                     <div class="finance-row" style="border-top: 1px dashed rgba(255,255,255,0.1); margin-top: 8px; padding-top: 12px;">
@@ -469,24 +536,24 @@
                     
                     <div class="finance-total">
                         <div class="finance-row" style="border: none; padding: 0;">
-                            <span class="finance-label">Final Total Due</span>
+                            <span class="finance-label">Total to Pay</span>
                             <span class="finance-value" id="finalTotalDue">$0.00</span>
                         </div>
                     </div>
 
                     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 16px;">
                         <div>
-                            <label class="form-label">Amount Paid Now</label>
+                            <label class="form-label">Amount Received</label>
                             <input type="number" name="return_amount_paid" id="returnAmountPaid" class="form-input" min="0" value="0" step="0.01" style="border-color: rgba(76,175,130,0.4);" oninput="recalculateReturnFinance()">
                         </div>
                         <div>
-                            <label class="form-label">Remaining Debt</label>
+                            <label class="form-label">Balance Remaining</label>
                             <strong id="finalNetBalance" style="font-size: 1.3rem; color: #4cd137; display: block; margin-top: 6px;">$0.00</strong>
                         </div>
                     </div>
                 </div>
 
-                <!-- Section 4: Payment & Staff Details -->
+                <!-- Section 4: Payment & Rental Details -->
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 20px;">
                     <div>
                         <label class="form-label">Payment Method</label>
@@ -512,8 +579,8 @@
 
                 <!-- Actions -->
                 <div style="display:flex; gap:12px; justify-content: flex-end; margin-top:20px; border-top: 1px solid rgba(255,255,255,0.05); padding-top: 20px;">
-                    <button type="button" class="action-btn-danger" style="padding: 10px 24px;" onclick="resetReturnForm()">Reset Form</button>
-                    <button type="submit" class="action-btn-success" style="padding: 10px 30px; background: #4caf82; color: #000; font-weight: 800; border:none;">
+                    <button type="button" class="action-btn-danger" style="padding: 10px 24px;" onclick="closeReturnPanel()">Cancel</button>
+                    <button type="submit" id="returnSubmitButton" class="action-btn-success" style="padding: 10px 30px; background: #4caf82; color: #000; font-weight: 800; border:none;" disabled>
                         <i class="fas fa-check-circle me-1"></i> Complete Return
                     </button>
                 </div>
@@ -523,6 +590,24 @@
 </div>
 
 <script>
+document.querySelectorAll('.reservation-countdown[data-expiry]').forEach((element) => {
+    const expiry = new Date(element.dataset.expiry);
+    const refresh = () => {
+        const remaining = expiry.getTime() - Date.now();
+        if (remaining <= 0) {
+            element.textContent = 'Hold expired — refresh to release';
+            return;
+        }
+        const totalMinutes = Math.floor(remaining / 60000);
+        const days = Math.floor(totalMinutes / 1440);
+        const hours = Math.floor((totalMinutes % 1440) / 60);
+        const minutes = totalMinutes % 60;
+        element.textContent = `Expires in ${days ? `${days}d ` : ''}${hours}h ${minutes}m`;
+    };
+    refresh();
+    window.setInterval(refresh, 60000);
+});
+
 /* Reservation Modal Automation controls */
 function triggerReserveModal(rentalId, customerName) {
     const modal = document.getElementById('reserveModalOverlay');
@@ -541,19 +626,21 @@ function closeReservePanel() {
     }
 }
 
-/* ================= INLINE RETURN PANEL OPERATIONS ================= */
-// Markaynu riixno 'Receive Return' ee shaxda sare, boggu wuxuu si toos ah hoos ugu dego panel-ka return-ka isagoo dooranaya macmiilkaas.
+/* Return panel operations */
 function focusReturnSection(rentalId) {
     const selectEl = document.getElementById('returnRentalSelect');
     const returnPanel = document.getElementById('returnPanelSection');
     
     if (!selectEl || !returnPanel) return;
 
+    returnPanel.classList.add('show');
     selectEl.value = rentalId;
     populateReturnDetails();
+}
 
-    // Scroll si habsmooth ah ugu dega qaybta return-ka
-    returnPanel.scrollIntoView({ behavior: 'smooth' });
+function toLocalDateTimeValue(date) {
+    const localDate = new Date(date.getTime() - date.getTimezoneOffset() * 60000);
+    return localDate.toISOString().slice(0, 16);
 }
 
 function populateReturnDetails() {
@@ -568,27 +655,23 @@ function populateReturnDetails() {
     document.getElementById('focusedSuitName').textContent = opt.dataset.suit || '--';
     
     const dateInput = document.getElementById('actualReturnDate');
-    dateInput.disabled = false;
-    
-    // Set max date to today (prevents future dates)
-    const today = new Date();
-    const todayStr = today.toISOString().split('T')[0];
-    dateInput.max = todayStr;
-    dateInput.value = todayStr;
-    
+    const now = new Date();
+    dateInput.max = toLocalDateTimeValue(now);
+    dateInput.value = toLocalDateTimeValue(now);
     if (opt.dataset.startDate) {
-        dateInput.min = opt.dataset.startDate;
+        dateInput.min = toLocalDateTimeValue(new Date(opt.dataset.startDate));
     }
     
-    document.getElementById('auditExpectedDate').textContent = opt.dataset.expectedEnd || '--/--/----';
+    const expectedEnd = opt.dataset.expectedEnd ? new Date(opt.dataset.expectedEnd) : null;
+    document.getElementById('auditExpectedDate').textContent = expectedEnd ? expectedEnd.toLocaleString() : '--';
     document.getElementById('dateWarning').style.display = 'none';
-    
-    const origBalance = parseFloat(opt.dataset.pendingBalance) || 0;
-    document.getElementById('auditOrigBalance').textContent = '$' + origBalance.toFixed(2);
-    
-    // Reset fees
+
+    document.getElementById('rentalAmountDisplay').textContent = '$' + (parseFloat(opt.dataset.rentalTotal) || 0).toFixed(2);
+    document.getElementById('amountPaidDisplay').textContent = '$' + (parseFloat(opt.dataset.paid) || 0).toFixed(2);
+    document.getElementById('auditOrigBalance').textContent = '$' + (parseFloat(opt.dataset.pendingBalance) || 0).toFixed(2);
     document.getElementById('requiresLaundryCheck').checked = false;
     document.getElementById('laundryFeeInput').value = 0;
+    document.getElementById('laundryFeeInput').disabled = true;
     document.getElementById('returnDiscount').value = 0;
     document.getElementById('returnAmountPaid').value = 0;
     
@@ -597,28 +680,24 @@ function populateReturnDetails() {
 
 function validateReturnDate(input) {
     const warning = document.getElementById('dateWarning');
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    
+    const now = new Date();
     const selectedDate = new Date(input.value);
-    selectedDate.setHours(0, 0, 0, 0);
-    
-    if (selectedDate > today) {
+    if (selectedDate > now) {
         warning.style.display = 'inline-block';
-        input.value = today.toISOString().split('T')[0];
+        input.value = toLocalDateTimeValue(now);
         input.style.borderColor = '#e05c5c';
         setTimeout(() => { input.style.borderColor = ''; }, 2000);
         return false;
-    } else {
-        warning.style.display = 'none';
-        input.style.borderColor = '';
-        return true;
     }
+    warning.style.display = 'none';
+    input.style.borderColor = '';
+    return true;
 }
 
 function toggleLaundryFee() {
     const checkbox = document.getElementById('requiresLaundryCheck');
     const input = document.getElementById('laundryFeeInput');
+    input.disabled = !checkbox.checked;
     if (!checkbox.checked) {
         input.value = 0;
     } else if (parseFloat(input.value) === 0) {
@@ -635,48 +714,54 @@ function recalculateReturnFinance() {
     if (!validateReturnDate(dateInput)) return;
 
     const opt = sel.options[sel.selectedIndex];
-    const expectedDateStr = opt.dataset.expectedEnd;
-    const actualDateStr = dateInput.value;
-    const originalBalance = parseFloat(opt.dataset.pendingBalance) || 0;
+    const expectedDate = opt.dataset.expectedEnd ? new Date(opt.dataset.expectedEnd) : null;
+    const actualDate = dateInput.value ? new Date(dateInput.value) : null;
+    const originalBalanceCents = Math.round((parseFloat(opt.dataset.pendingBalance) || 0) * 100);
 
-    let overdueMinutes = 0;
-    let penaltyFine = 0;
-    
-    if (expectedDateStr && actualDateStr) {
-        const expected = new Date(expectedDateStr);
-        const actual = new Date(actualDateStr);
-        const diffMs = actual - expected;
-        const diffMinutes = Math.floor(diffMs / (1000 * 60));
-        if (diffMinutes > 0) {
-            overdueMinutes = diffMinutes;
-            penaltyFine = diffMinutes;
-        }
-    }
+    const overdueSeconds = expectedDate && actualDate && actualDate > expectedDate
+        ? Math.floor((actualDate - expectedDate) / 1000)
+        : 0;
+    const returnForm = document.getElementById('returnSuitForm');
+    const rateCents = Math.round((parseFloat(returnForm.dataset.lateFeeRate) || 0) * 100);
+    const overdueHours = overdueSeconds / 3600;
+    const billedHours = returnForm.dataset.partialHourPolicy === 'prorate'
+        ? overdueHours
+        : Math.ceil(overdueHours);
+    const lateFeeCents = Math.round(rateCents * billedHours);
 
-    document.getElementById('overdueMinutesDisplay').textContent = overdueMinutes;
-    document.getElementById('penaltyFineDisplay').textContent = '$' + penaltyFine.toFixed(2);
+    document.getElementById('overdueMinutesDisplay').textContent = overdueHours.toFixed(2);
+    document.getElementById('penaltyFineDisplay').textContent = '$' + (lateFeeCents / 100).toFixed(2);
     
-    const laundryFee = parseFloat(document.getElementById('laundryFeeInput').value) || 0;
+    const laundryFee = document.getElementById('requiresLaundryCheck').checked ? (parseFloat(document.getElementById('laundryFeeInput').value) || 0) : 0;
     document.getElementById('laundryDamageDisplay').textContent = '$' + laundryFee.toFixed(2);
-    
-    const finalTotalDue = originalBalance + penaltyFine + laundryFee;
-    document.getElementById('finalTotalDue').textContent = '$' + finalTotalDue.toFixed(2);
-    
     const discount = parseFloat(document.getElementById('returnDiscount').value) || 0;
     const amountPaid = parseFloat(document.getElementById('returnAmountPaid').value) || 0;
-    
-    let netRemainingBalance = finalTotalDue - discount - amountPaid;
-    if (netRemainingBalance < 0) netRemainingBalance = 0;
-    
+    const laundryFeeCents = Math.round(laundryFee * 100);
+    const discountCents = Math.round(discount * 100);
+    const amountPaidCents = Math.round(amountPaid * 100);
+    const finalTotalDueCents = Math.max(originalBalanceCents + lateFeeCents + laundryFeeCents - discountCents, 0);
+    const netRemainingBalanceCents = Math.max(finalTotalDueCents - amountPaidCents, 0);
+    document.getElementById('finalTotalDue').textContent = '$' + (finalTotalDueCents / 100).toFixed(2);
     const balanceDisplay = document.getElementById('finalNetBalance');
-    balanceDisplay.textContent = '$' + netRemainingBalance.toFixed(2);
-    balanceDisplay.style.color = netRemainingBalance > 0 ? '#e05c5c' : '#4cd137';
+    balanceDisplay.textContent = '$' + (netRemainingBalanceCents / 100).toFixed(2);
+    balanceDisplay.style.color = netRemainingBalanceCents > 0 ? '#e05c5c' : '#4cd137';
+
+    const submitButton = document.getElementById('returnSubmitButton');
+    if (submitButton) {
+        const invalidPayment = amountPaidCents > finalTotalDueCents || (netRemainingBalanceCents > 0 && amountPaidCents === 0) || (netRemainingBalanceCents > 0 && (discountCents > 0 || laundryFeeCents > 0));
+        submitButton.disabled = !sel.value || invalidPayment;
+        submitButton.innerHTML = netRemainingBalanceCents > 0
+            ? '<i class="fas fa-coins me-1"></i> Record Partial Payment'
+            : '<i class="fas fa-check-circle me-1"></i> Complete Return';
+    }
 }
 
 function resetReturnDetails() {
     document.getElementById('focusedCustomerName').textContent = '--';
     document.getElementById('focusedSuitName').textContent = '--';
     document.getElementById('auditExpectedDate').textContent = '--/--/----';
+    document.getElementById('rentalAmountDisplay').textContent = '$0.00';
+    document.getElementById('amountPaidDisplay').textContent = '$0.00';
     document.getElementById('auditOrigBalance').textContent = '$0.00';
     document.getElementById('overdueMinutesDisplay').textContent = '0';
     document.getElementById('penaltyFineDisplay').textContent = '$0.00';
@@ -684,16 +769,18 @@ function resetReturnDetails() {
     document.getElementById('finalTotalDue').textContent = '$0.00';
     document.getElementById('finalNetBalance').textContent = '$0.00';
     document.getElementById('finalNetBalance').style.color = '#4cd137';
+    document.getElementById('returnSubmitButton').disabled = true;
 }
 
-function resetReturnForm() {
+function closeReturnPanel() {
     const form = document.getElementById('returnSuitForm');
     if (form) form.reset();
-    
     const selectEl = document.getElementById('returnRentalSelect');
     if (selectEl) selectEl.value = "";
-    
     resetReturnDetails();
+    document.getElementById('requiresLaundryCheck').checked = false;
+    document.getElementById('laundryFeeInput').disabled = true;
+    document.getElementById('returnPanelSection').classList.remove('show');
 }
 </script>
 {% endblock %}

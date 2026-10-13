@@ -24,6 +24,16 @@
         .table thead th {
             border-bottom: 1px solid rgba(255,255,255,0.1);
         }
+        .profile-summary {
+            border-color: rgba(201,168,76,0.2);
+            background: linear-gradient(135deg, rgba(201,168,76,0.1), rgba(255,255,255,0.025));
+        }
+        .profile-summary .profile-label {
+            color: rgba(240,237,232,0.55);
+            font-size: .72rem;
+            text-transform: uppercase;
+            letter-spacing: .08em;
+        }
     </style>
 </head>
 <body>
@@ -49,6 +59,32 @@
         <h1 class="fw-bold">My Bookings</h1>
         <p class="text-muted">Review all your suit requests and track their current status.</p>
         <a href="{% url 'all_suits' %}" class="btn btn-warning rounded-pill px-4 mt-3">New Rent</a>
+    </div>
+
+    <div class="card profile-summary p-4 mb-4">
+        <h2 class="h5 mb-3"><i class="fa-solid fa-address-card text-warning me-2"></i>Your saved profile</h2>
+        <div class="row g-3">
+            <div class="col-md-4">
+                <div class="profile-label">Name</div>
+                <div>{{ request.user.get_full_name|default:request.user.username }}</div>
+            </div>
+            <div class="col-md-4">
+                <div class="profile-label">Email</div>
+                <div>{{ request.user.email|default:"Not provided" }}</div>
+            </div>
+            <div class="col-md-4">
+                <div class="profile-label">Phone</div>
+                <div>{{ customer_profile.customer_phone|default:"Not provided" }}</div>
+            </div>
+            <div class="col-md-6">
+                <div class="profile-label">Address</div>
+                <div>{{ customer_profile.present_address|default:"Not provided" }}</div>
+            </div>
+            <div class="col-md-6">
+                <div class="profile-label">Parent / alternate address</div>
+                <div>{{ customer_profile.parents_address|default:"Not provided" }}</div>
+            </div>
+        </div>
     </div>
 
     <div class="card p-4">

@@ -8,9 +8,6 @@ urlpatterns = [
     path("logout/", views.logout_view, name="logout"),
     path("dashboard/", views.dashboard, name="dashboard"),
     path("admin-desk/", views.dashboard, name="admin_desk"),
-    path("cashier-dashboard/", views.cashier_dashboard, name="cashier_dashboard"),
-    path("reception-dashboard/", views.reception_dashboard, name="reception_dashboard"),
-    path("reception-desk/", views.reception_reception, name="reception_desk"),
     path("requests/", views.requests_page, name="requests"),
     path("pending-requests/", views.requests_page, name="pending_requests"),
     
@@ -24,7 +21,6 @@ urlpatterns = [
     path("process-return/", views.process_return, name="process_return"),
     path("process-reservation/", views.process_reservation, name="process_reservation"),
     path("receipt/<int:req_id>/", views.receipt_view, name="receipt"),
-    path("reception/receipt/<int:req_id>/", views.reception_recept_sheet, name="reception_recept_sheet"),
     # Kani waa qaybtii dhimnayd
 
     # Codsiga Macmiilka
@@ -44,7 +40,7 @@ urlpatterns = [
     # Backwards-compatible aliases used by the admin inventory template/modal
     path('inventory/add/', views.add_suit, name='inventory_add_suit'),
     path('inventory/', views.inventory_management, name='inventory'),
-    path('inventory/', views.inventory_management, name='admin_inventory'),
+    path('inventory/movements/', views.inventory_movement_history, name='inventory_movements'),
     path('export-inventory/', views.export_inventory, name='export_inventory'),
     path('admin-profile/', views.admin_profile, name='admin_profile'),
     path('settings/', views.admin_profile, name='settings'),
@@ -54,25 +50,14 @@ urlpatterns = [
     path('payments/', views.payments, name='payments'),
     path('admin/payments/', views.admin_payments, name='admin_payments'),
     path('payments/admin/', views.admin_payments, name='admin_payments_legacy'),
-    path('reception/payments/', views.reception_payments, name='reception_payments'),
-    path('reception-payments/', views.reception_payments, name='reception_payments_legacy'),
     path('add-expense/', views.add_expense, name='add_expense'),
-    path('reception-inventory/', views.reception_inventory, name='reception_inventory'),
-    path('reception-requests/', views.reception_requests, name='reception_requests'),
-    path('reception-home/', views.reception_home, name='reception_home'),
-    path('reception-profile/', views.reception_profile, name='reception_profile'),
-    path('reception-reception/', views.reception_reception, name='reception_reception'),
     path('admin-booking/', views.admin_booking, name='admin_booking'),
-    path('reception-suits/', views.all_suits_reception, name='all_suits_reception'),
-    path('reception/customer-search/', views.customer_search, name='customer_search'),
     path('create-rental/', views.create_rental, name='create_rental'),
     path('create-booking/', views.create_rental, name='create_booking'),
     path('customer-detail/<str:customer_name>/', views.customer_detail, name='customer_detail'),
     path('customer-detail/user/<int:user_id>/', views.customer_detail_by_user, name='customer_detail_by_user'),
     path('new-rent/<int:user_id>/', views.new_rent_for_customer, name='new_rent_for_customer'),
     path('send-return-reminder/<int:req_id>/', views.send_return_reminder, name='send_return_reminder'),
-    path('reception-reports/', views.reception_reports, name='reception_reports'),
-    path('reception-payments/', views.reception_payments, name='reception_payments'),
     path('dry-cleaning/', views.dry_cleaning_page, name='dry_cleaning'),
     path('dry-cleaning/page/', views.dry_cleaning_page, name='dry_cleaning_page'),
     path('dry-cleaning/mark-paid/<int:entry_id>/', views.mark_dry_cleaning_paid, name='mark_cleaning_paid'),
@@ -89,8 +74,6 @@ urlpatterns = [
     path('payments/pending/', views.pending_balances, name='pending_balances'),
     path('payments/deposits/', views.deposit_management, name='deposit_management'),
     path('payments/report/daily/', views.daily_report, name='daily_report'),
-    path('reception/shift/close/', views.close_shift, name='close_shift'),
-    path('reception-send-sms/<int:req_id>/', views.reception_send_sms, name='reception_send_sms'),
     # POST endpoint for deleting suits from the inventory modal
     path('inventory/delete/', views.inventory_delete_suit, name='inventory_delete_suit'),
     path('pay/<int:req_id>/', views.pay_request, name='pay_request'),
@@ -111,18 +94,12 @@ urlpatterns = [
     
     # User Management (Admin Only)
     path('manage-users/', views.manage_users, name='manage_users'),
-    path('add-staff/', views.add_staff, name='add_staff'),
-    path('add-payroll/', views.add_payroll, name='add_payroll'),
-    path('create-cashier/', views.create_cashier, name='create_cashier'),
-    path('reception-form/', views.reception_form, name='reception_form'),
-    path('create-reception/', views.create_reception, name='create_reception'),
-    path('toggle-reception-role/<int:user_id>/', views.toggle_reception_role, name='toggle_reception_role'),
+    path('manage-users/<int:user_id>/edit/', views.edit_user, name='edit_user'),
     path('delete-user/<int:user_id>/', views.delete_user, name='delete_user'),
     path('toggle-user-active/<int:user_id>/', views.toggle_user_active, name='toggle_user_active'),
     
     # Inventory Management Views
     path('inventory/add-suit/', views.add_suit_view, name='add_suit_new'),
-    path('inventory/add-suit/', views.add_suit_view, name='reception_add_item'),
     path('inventory/edit-suit/<int:suit_id>/', views.edit_suit_view, name='edit_suit_new'),
     path('inventory/edit-suit/<int:suit_id>/', views.edit_suit_view, name='inventory_edit_suit'),
     path('inventory/delete-suit/<int:suit_id>/', views.delete_suit_view, name='delete_suit_new'),

@@ -1,4 +1,4 @@
-{% extends 'rental/base.html' %}
+{% extends 'rental/base_admin.html' %}
 {% block title %}Manage Users | Suit Luxe{% endblock %}
 
 {% block content %}
@@ -851,12 +851,6 @@
                 <p>View, manage and remove users from the system</p>
             </div>
             <div class="d-flex gap-2 flex-wrap">
-                <button type="button" class="btn-header-action variant-reception" onclick="openUserModal('createStaffModal')">
-                    <i class="fa-solid fa-user-tie"></i> Add Staff
-                </button>
-                <button type="button" class="btn-header-action variant-payroll" onclick="openPayrollModal()">
-                    <i class="fa-solid fa-money-check-dollar"></i> Add Payroll
-                </button>
                 <div class="date-badge">
                     <i class="fa-regular fa-calendar"></i>
                     <span id="live-date">—</span>
@@ -893,9 +887,9 @@
                     <div class="stat-icon" style="background:rgba(224,92,92,0.1);color:var(--danger)">
                         <i class="fa-solid fa-shield"></i>
                     </div>
-                    <div class="stat-label">Staff Members</div>
-                    <div class="stat-value" style="color:var(--danger)">{{ staff_count }}</div>
-                    <div class="stat-sub">Admin & staff accounts</div>
+                    <div class="stat-label">Administrator Accounts</div>
+                    <div class="stat-value" style="color:var(--danger)">{{ admin_count }}</div>
+                    <div class="stat-sub">Staff access accounts</div>
                 </div>
             </div>
             <div class="col-md-3 col-sm-6">
@@ -930,13 +924,11 @@
             </form>
         </div>
 
-        <!-- Staff List -->
+        {% comment %}
+        Staff and payroll records are retained for future use but hidden from the current admin/customer interface.
         <div class="mb-4">
             <div class="d-flex justify-content-between align-items-center mb-2">
                 <h3 style="margin:0;">Staff</h3>
-                <div>
-                    <a href="/admin/rental/staff/" class="btn-clear">Open Staff Admin</a>
-                </div>
             </div>
             <div class="usr-card">
                 <div class="usr-table-wrap">
@@ -977,9 +969,6 @@
                                 </td>
                                 <td>
                                     <div class="action-group">
-                                        <button type="button" class="btn-act-payroll" onclick="openPayrollModal('{{ staff.id }}', '{{ staff.name|escapejs }}')" title="Add Payroll for {{ staff.name }}">
-                                            <i class="fa-solid fa-money-bill"></i> Pay
-                                        </button>
                                         <button type="button" class="btn btn-sm btn-outline-light" style="border-color:rgba(201,168,76,0.25);color:#e8c96a;padding:6px 10px;font-size:0.74rem;" data-bs-toggle="modal" data-bs-target="#staffHistoryModal{{ staff.id }}">History</button>
                                     </div>
                                 </td>
@@ -990,7 +979,7 @@
                                     <div class="empty-state">
                                         <i class="fa-solid fa-user-tie"></i>
                                         <p style="font-weight:600;margin-bottom:4px;color:var(--text-main)">No staff records</p>
-                                        <p style="font-size:0.82rem">Click "Add Staff" above to register your first staff member.</p>
+                                        <p style="font-size:0.82rem">No staff records are available.</p>
                                     </div>
                                 </td>
                             </tr>
@@ -1068,6 +1057,7 @@
             </div>
         </div>
         {% endfor %}
+        {% endcomment %}
 
         <div class="usr-card">
             <div class="usr-table-wrap">
@@ -1136,33 +1126,30 @@
                             <td class="date-cell">{{ user.date_joined|date:"M d, Y" }}</td>
                             <td>
                                 <div class="action-group">
+                                    {% if not is_reception_user %}
+                                        <a href="{% url 'edit_user' user.id %}" class="btn-act btn-act-toggle" title="Edit user profile" aria-label="Edit {{ user.username }} profile">
+                                            <i class="fa-solid fa-pen-to-square"></i>
+                                        </a>
+                                    {% endif %}
                                     <a href="{% url 'customer_detail_by_user' user.id %}" class="btn btn-sm btn-outline-light" style="border-color:rgba(201,168,76,0.25);color:#e8c96a;padding:6px 10px;font-size:0.74rem;display:inline-flex;align-items:center;gap:6px;">
                                         <i class="fa-solid fa-id-card"></i> Customer Details
                                     </a>
-                                    
-                                    {# New Rent: Macaamiisha caadiga ah oo kaliya ayaa arki kara #}
                                     {% if not user.is_staff and not user.profile.is_cashier and not user.profile.is_reception %}
                                         <a href="{% url 'new_rent_for_customer' user.id %}" class="btn btn-sm btn-success" style="padding:6px 10px;font-size:0.74rem;display:inline-flex;align-items:center;gap:6px;">
                                             <i class="fa-solid fa-plus-circle"></i> New Rent
                                         </a>
                                     {% endif %}
 
-                                    {# TRTIRIS & EDIT: Halkan waxaa laga beddelay `not user.is_staff` oo loogu daray xaaladda Reception `user.profile.is_reception` si uu isna u tirtirmi karo #}
-                                    {% if not user.is_staff or user.profile.is_reception %}
+                                    {% if not is_reception_user and not user.is_staff %}
                                         <a href="{% url 'toggle_user_active' user.id %}" class="btn-act btn-act-toggle" title="Toggle Active Status">
                                             <i class="fa-solid fa-toggle-{% if user.is_active %}on{% else %}off{% endif %}"></i>
                                         </a>
                                         {% if user.id != request.user.id %}
-                                            <a href="{% url 'toggle_reception_role' user.id %}" class="btn-act btn-act-toggle" title="{% if user.profile.is_reception %}Remove reception role{% else %}Grant reception role{% endif %}">
-                                                <i class="fa-solid fa-user-gear"></i>
-                                            </a>
-                                            {% if not request.user.profile.is_reception %}
                                             <button class="btn-act btn-act-del" title="Delete User" data-bs-toggle="modal" data-bs-target="#deleteModal{{ user.id }}">
                                                 <i class="fa-solid fa-trash"></i>
                                             </button>
-                                            {% endif %}
                                         {% endif %}
-                                    {% else %}
+                                    {% elif not is_reception_user %}
                                         {# Admin-ka caadiga ah wuxuu ahaanayaa Protected #}
                                         <span style="color:var(--text-muted); font-size:0.76rem; display:inline-flex; align-items:center; gap:5px; padding: 0 8px;">
                                             <i class="fa-solid fa-lock" style="color:var(--warning)"></i> Protected
@@ -1191,7 +1178,8 @@
 
 
 
-<!-- Add Staff Modal (replaces old Add Reception link) -->
+{% comment %}
+Staff and payroll creation are disabled. The existing records are retained.
 <div class="modal fade" id="createStaffModal" tabindex="-1" aria-hidden="true" role="dialog">
     <div class="modal-dialog modal-dialog-centered" style="max-width:460px">
         <div class="modal-content">
@@ -1228,7 +1216,7 @@
                     <div class="form-row-2">
                         <div class="glass-form-group">
                             <label>Hire Date</label>
-                            <input type="date" name="hire_date" class="glass-input">
+                            <input type="date" name="hire_date" class="glass-input" data-date-policy="historical">
                         </div>
                         <div class="glass-form-group">
                             <label>Monthly Salary</label>
@@ -1324,7 +1312,7 @@
                     </div>
                     <div class="glass-form-group">
                         <label>Payment Date</label>
-                        <input type="date" name="payment_date" id="payrollDate" class="glass-input" required>
+                        <input type="date" name="payment_date" id="payrollDate" class="glass-input" data-date-policy="historical" required>
                     </div>
                     <div class="form-row-2">
                         <div class="glass-form-group">
@@ -1366,11 +1354,12 @@
         </div>
     </div>
 </div>
+{% endcomment %}
 
-{# DELETE MODAL LOOP: Halkan waxaa laga saaray xannibaaddii `not user.is_staff` si modal-ka tirtirista uu u abuurmo sidoo kale marka uu yahay Reception #}
+{# Delete confirmation for customer accounts. #}
+{% if not is_reception_user %}
 {% for user in users %}
-{% if user.id != request.user.id and not request.user.profile.is_reception %}
-{% if not user.is_staff or user.profile.is_reception %}
+{% if user.id != request.user.id and not user.is_staff %}
 <div class="modal fade" id="deleteModal{{ user.id }}" tabindex="-1">
     <div class="modal-dialog modal-dialog-centered" style="max-width:400px">
         <div class="modal-content">
@@ -1396,7 +1385,7 @@
                     <div class="modal-detail-row">
                         <span class="modal-detail-label">Role</span>
                         <span class="modal-detail-value">
-                            {% if user.profile.is_reception %}Reception{% elif user.profile.is_cashier %}Cashier{% elif user.is_staff %}Admin{% else %}Customer{% endif %}
+                            {% if user.is_staff %}Admin{% else %}Customer{% endif %}
                         </span>
                     </div>
                 </div>
@@ -1417,8 +1406,8 @@
     </div>
 </div>
 {% endif %}
-{% endif %}
 {% endfor %}
+{% endif %}
 
 <script>
     document.getElementById('live-date').textContent = new Date().toLocaleDateString('en-US', {
@@ -1441,57 +1430,9 @@
         instance.hide();
     }
 
-    function toggleStaffLoginFields(checkbox) {
-        var fields = document.getElementById('staffLoginFields');
-        var username = document.getElementById('staffUsername');
-        var password = document.getElementById('staffPassword');
-        var password2 = document.getElementById('staffPassword2');
-        if (checkbox.checked) {
-            fields.style.display = 'block';
-            username.required = true;
-            password.required = true;
-            password2.required = true;
-        } else {
-            fields.style.display = 'none';
-            username.required = false;
-            password.required = false;
-            password2.required = false;
-        }
-    }
-
-    // Opens the Add Payroll modal. If staffId is passed, preselects that staff member.
-    function openPayrollModal(staffId, staffName) {
-        var select = document.getElementById('payrollStaffSelect');
-        var dateInput = document.getElementById('payrollDate');
-        var yearInput = document.getElementById('payrollYear');
-
-        if (staffId && select) {
-            select.value = staffId;
-        }
-
-        var today = new Date();
-        if (dateInput && !dateInput.value) {
-            dateInput.value = today.toISOString().slice(0, 10);
-        }
-        if (yearInput && !yearInput.value) {
-            yearInput.value = today.getFullYear();
-        }
-
-        openUserModal('addPayrollModal');
-    }
-
     document.addEventListener('DOMContentLoaded', function () {
         document.querySelectorAll('.modal').forEach(function (modalEl) {
             document.body.appendChild(modalEl);
-        });
-
-        ['createCashierModal', 'createStaffModal', 'addPayrollModal'].forEach(function (id) {
-            var modalEl = document.getElementById(id);
-            if (!modalEl) return;
-            modalEl.addEventListener('shown.bs.modal', function () {
-                var input = modalEl.querySelector('input[name="name"], input[name="username"], select[name="staff"]');
-                if (input) input.focus();
-            });
         });
 
         document.querySelectorAll('form[data-user-create-form]').forEach(function (form) {
