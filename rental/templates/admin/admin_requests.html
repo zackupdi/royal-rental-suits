@@ -335,7 +335,7 @@
                                 <div style="font-size:0.76rem; color:rgba(240,237,232,0.4); margin-top: 2px;">{{ req.phone }}</div>
                             </a>
                         </td>
-                        <td style="font-weight: 500;">{{ req.suit.suit_name }}</td>
+                        <td style="font-weight: 500;">{% if req.suit %}{{ req.suit.suit_name }}{% else %}Accessories only{% endif %}</td>
                         <td style="text-align: center;">
                             <span style="background:rgba(201,168,76,0.12); border:1px solid rgba(201,168,76,0.2); color:var(--gold); padding:3px 10px; border-radius:20px; font-size:0.74rem; font-weight:700;">
                                 {{ req.quantity_requested }}
@@ -453,14 +453,15 @@
                         {% for req in active_requests %}
                         <option value="{{ req.id }}"
                                 data-customer="{{ req.name }}"
-                                data-suit="{{ req.suit.suit_name }}"
+                                data-suit="{% if req.suit %}{{ req.suit.suit_name }}{% else %}Accessories only{% endif %}"
                             data-rental-total="{{ req.total_amount|floatformat:2 }}"
                             data-paid="{{ req.amount_paid|floatformat:2 }}"
-                                data-return-items="{{ req.returnable_items|join:'||' }}"
+                            data-guarantee-held="{{ req.guarantee_collected|floatformat:2 }}"
+                            data-return-items="{{ req.returnable_items|join:'||' }}"
                             data-expected-end="{{ req.end_time|date:'c' }}"
                             data-start-date="{{ req.start_time|date:'c' }}"
                                 data-pending-balance="{{ req.balance_due|floatformat:2 }}">
-                            ID #{{ req.id }} - {{ req.name }} ({{ req.suit.suit_name }})
+                            ID #{{ req.id }} - {{ req.name }} ({% if req.suit %}{{ req.suit.suit_name }}{% else %}Accessories only{% endif %})
                         </option>
                         {% endfor %}
                     </select>
@@ -528,6 +529,18 @@
                     <div class="finance-row">
                         <span class="finance-label">Damage Fee</span>
                         <span class="finance-value danger" id="laundryDamageDisplay">$0.00</span>
+                    </div>
+                    <div class="finance-row">
+                        <span class="finance-label">Guarantee Held</span>
+                        <span class="finance-value" id="guaranteeHeldDisplay">$0.00</span>
+                    </div>
+                    <div class="finance-row">
+                        <span class="finance-label">Guarantee Refund</span>
+                        <span class="finance-value success" id="guaranteeRefundDisplay">$0.00</span>
+                    </div>
+                    <div class="finance-row">
+                        <span class="finance-label">Damage Beyond Guarantee</span>
+                        <span class="finance-value danger" id="uncoveredDamageDisplay">$0.00</span>
                     </div>
                     <div class="finance-row" style="border-top: 1px dashed rgba(255,255,255,0.1); margin-top: 8px; padding-top: 12px;">
                         <span class="finance-label">Discount Applied</span>
@@ -669,6 +682,7 @@ function populateReturnDetails() {
     document.getElementById('rentalAmountDisplay').textContent = '$' + (parseFloat(opt.dataset.rentalTotal) || 0).toFixed(2);
     document.getElementById('amountPaidDisplay').textContent = '$' + (parseFloat(opt.dataset.paid) || 0).toFixed(2);
     document.getElementById('auditOrigBalance').textContent = '$' + (parseFloat(opt.dataset.pendingBalance) || 0).toFixed(2);
+    document.getElementById('guaranteeHeldDisplay').textContent = '$' + (parseFloat(opt.dataset.guaranteeHeld) || 0).toFixed(2);
     document.getElementById('requiresLaundryCheck').checked = false;
     document.getElementById('laundryFeeInput').value = 0;
     document.getElementById('laundryFeeInput').disabled = true;
@@ -736,10 +750,15 @@ function recalculateReturnFinance() {
     document.getElementById('laundryDamageDisplay').textContent = '$' + laundryFee.toFixed(2);
     const discount = parseFloat(document.getElementById('returnDiscount').value) || 0;
     const amountPaid = parseFloat(document.getElementById('returnAmountPaid').value) || 0;
+    const guaranteeHeldCents = Math.round((parseFloat(opt.dataset.guaranteeHeld) || 0) * 100);
     const laundryFeeCents = Math.round(laundryFee * 100);
+    const guaranteeRefundCents = Math.max(guaranteeHeldCents - laundryFeeCents, 0);
+    const uncoveredDamageCents = Math.max(laundryFeeCents - guaranteeHeldCents, 0);
+    document.getElementById('guaranteeRefundDisplay').textContent = '$' + (guaranteeRefundCents / 100).toFixed(2);
+    document.getElementById('uncoveredDamageDisplay').textContent = '$' + (uncoveredDamageCents / 100).toFixed(2);
     const discountCents = Math.round(discount * 100);
     const amountPaidCents = Math.round(amountPaid * 100);
-    const finalTotalDueCents = Math.max(originalBalanceCents + lateFeeCents + laundryFeeCents - discountCents, 0);
+    const finalTotalDueCents = Math.max(originalBalanceCents + lateFeeCents + uncoveredDamageCents - discountCents, 0);
     const netRemainingBalanceCents = Math.max(finalTotalDueCents - amountPaidCents, 0);
     document.getElementById('finalTotalDue').textContent = '$' + (finalTotalDueCents / 100).toFixed(2);
     const balanceDisplay = document.getElementById('finalNetBalance');
@@ -766,6 +785,9 @@ function resetReturnDetails() {
     document.getElementById('overdueMinutesDisplay').textContent = '0';
     document.getElementById('penaltyFineDisplay').textContent = '$0.00';
     document.getElementById('laundryDamageDisplay').textContent = '$0.00';
+    document.getElementById('guaranteeHeldDisplay').textContent = '$0.00';
+    document.getElementById('guaranteeRefundDisplay').textContent = '$0.00';
+    document.getElementById('uncoveredDamageDisplay').textContent = '$0.00';
     document.getElementById('finalTotalDue').textContent = '$0.00';
     document.getElementById('finalNetBalance').textContent = '$0.00';
     document.getElementById('finalNetBalance').style.color = '#4cd137';

@@ -18,14 +18,13 @@ class Command(BaseCommand):
 
         notified_count = 0
         for rental in expired_rentals:
+            item_name = rental.suit.suit_name if rental.suit_id else "accessories"
             # Prepare notification message
-            message = f"Way gaadhay wakhtiga kirada ee suit-ka '{rental.suit.suit_name}'. Fadlan soo celi ama la xiriiro si dib loogu heli karo. Number-ka: {rental.phone}"
+            message = f"Way gaadhay wakhtiga kirada ee '{item_name}'. Fadlan soo celi ama la xiriiro si dib loogu heli karo. Number-ka: {rental.phone}"
 
             # Create internal Notification record
-            Notification.objects.create(
-                user=rental.user,
-                message=message
-            )
+            if rental.user_id:
+                Notification.objects.create(user=rental.user, message=message)
 
 
             # Mark rental as expired so admin/cashier can see it
@@ -48,7 +47,7 @@ class Command(BaseCommand):
                 for staff in staff_users:
                     Notification.objects.create(
                         user=staff,
-                        message=f"Rental #{rental.id} for {rental.suit.suit_name} has expired. Late fee applied: ${fee}."
+                        message=f"Rental #{rental.id} for {item_name} has expired. Late fee applied: ${fee}."
                     )
 
             # Send SMS if not already notified and SMS configured
@@ -67,7 +66,7 @@ class Command(BaseCommand):
             notified_count += 1
             self.stdout.write(
                 self.style.SUCCESS(
-                    f'Sent notification for expired rental "{rental.suit.suit_name}" '
+                    f'Sent notification for expired rental "{item_name}" '
                     f'to customer "{rental.name}"'
                 )
             )

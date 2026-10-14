@@ -597,7 +597,14 @@
                 <span class="payment-badge">{{ payment.status|title }}</span>
               {% endif %}
             </td>
-            <td><span class="amount-cell">${{ payment.amount_paid|floatformat:2 }}</span></td>
+            <td>
+              <span class="amount-cell">${{ payment.total_collected|floatformat:2 }}</span>
+              {% if payment.guarantee_amount %}
+              <small style="display:block;color:var(--text-muted);">Rental ${{ payment.amount_paid|floatformat:2 }} · Guarantee ${{ payment.guarantee_amount|floatformat:2 }}</small>
+              {% elif payment.refund_amount %}
+              <small style="display:block;color:var(--danger);">Refund ${{ payment.refund_amount|floatformat:2 }}</small>
+              {% endif %}
+            </td>
             <td>
               {% if payment.payment_method|lower == 'cash' %}
                 <span class="method-badge method-cash"><i class="fa-solid fa-money-bill"></i> Cash</span>

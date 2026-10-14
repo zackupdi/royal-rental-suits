@@ -2006,6 +2006,7 @@ class RepeatRentalWorkflowTests(TestCase):
         self.assertContains(history_response, "Overdue")
         self.assertContains(history_response, "Outstanding payment")
         self.assertContains(history_response, "A new rental is still allowed")
+        self.assertContains(history_response, 'name="suit_price"')
         self.assertEqual(history_response.context["total_rentals"], 1)
         self.assertEqual(history_response.context["total_balance_due"], Decimal("50.00"))
 
@@ -2023,6 +2024,7 @@ class RepeatRentalWorkflowTests(TestCase):
             "phone": "252611223344",
             "present_address": "Hargeisa",
             "suit_id": str(self.new_suit.pk),
+            "suit_price": "13.00",
             "quantity": "1",
             "days": "2",
             "start_date": today.isoformat(),
@@ -2047,7 +2049,15 @@ class RepeatRentalWorkflowTests(TestCase):
         self.assertEqual(self.previous_rental.return_date, original_return_date)
         self.assertEqual(self.previous_rental.balance_due, Decimal("50.00"))
         self.assertEqual(new_rental.status, "Active")
-        self.assertEqual(new_rental.balance_due, Decimal("35.00"))
+        self.assertEqual(new_rental.suit_price_per_day, Decimal("13.00"))
+        self.assertEqual(new_rental.booked_suit_price, Decimal("13.00"))
+        self.assertEqual(new_rental.rental_subtotal, Decimal("26.00"))
+        self.assertEqual(new_rental.balance_due, Decimal("21.00"))
+        self.new_suit.price_per_day = Decimal("99.00")
+        self.new_suit.save(update_fields=["price_per_day"])
+        new_rental.refresh_from_db()
+        self.assertEqual(new_rental.booked_suit_price, Decimal("13.00"))
+        self.assertEqual(new_rental.rental_subtotal, Decimal("26.00"))
         self.assertEqual(Payment.objects.filter(rental=self.previous_rental).count(), 1)
         self.assertEqual(Payment.objects.filter(rental=new_rental).count(), 1)
         self.assertEqual(Payment.objects.get(rental=new_rental).amount_paid, Decimal("5.00"))
@@ -2084,6 +2094,62 @@ class RepeatRentalWorkflowTests(TestCase):
         self.assertEqual(
             self.client.get(reverse("admin_booking")).status_code,
             302,
+        )
+
+    def test_staff_account_with_rental_history_can_repeat_rent(self):
+        staff_customer = User.objects.create_user(
+            username="staff_with_rentals",
+            is_staff=True,
+        )
+        SuitRequest.objects.create(
+            user=staff_customer,
+            suit=self.previous_suit,
+            name="Staff Rental Customer",
+            phone="252611223344",
+            total_amount=Decimal("20.00"),
+            days_requested=1,
+            quantity_requested=1,
+            status="Returned",
+        )
+
+        form_response = self.client.get(
+            reverse("new_rent_for_customer", args=[staff_customer.pk])
+        )
+        self.assertEqual(form_response.status_code, 200)
+        self.assertEqual(form_response.context["customer_user"], staff_customer)
+
+        today = timezone.localdate()
+        response = self.client.post(
+            reverse("create_rental"),
+            {
+                "repeat_rental_submission": "1",
+                "customer_user_id": str(staff_customer.pk),
+                "rental_submission_token": form_response.context["rental_submission_token"],
+                "first_name": "Staff",
+                "father_name": "Customer",
+                "phone": "252611223344",
+                "present_address": "Hargeisa",
+                "suit_id": str(self.new_suit.pk),
+                "quantity": "1",
+                "days": "1",
+                "start_date": today.isoformat(),
+                "end_date": (today + timezone.timedelta(days=1)).isoformat(),
+                "amount_paid": "0",
+                "payment_method": "cash",
+            },
+        )
+
+        self.assertRedirects(
+            response,
+            reverse("customer_detail_by_user", args=[staff_customer.pk]),
+        )
+        new_rental = SuitRequest.objects.get(user=staff_customer, suit=self.new_suit)
+        self.assertEqual(new_rental.status, "Active")
+        self.assertEqual(
+            self.client.get(
+                reverse("customer_detail_by_user", args=[staff_customer.pk])
+            ).status_code,
+            200,
         )
 
     def test_repeat_rental_rejects_unavailable_suit_without_mutating_customer_history(self):
@@ -3072,10 +3138,16 @@ class InventoryManagementTests(TestCase):
             {
                 "action_mode": "rent_now",
                 "start_date": "2026-07-05",
-                "amount_paid": "0",
+                "amount_paid": "59",
+                "discount_type": "percent",
+                "discount_value": "10",
                 "payment_method": "cash",
                 "payment_reference": "",
                 "accessories": ["shoes", "tie", "belt", "watch"],
+                "addon_price_shoes": "5.00",
+                "guarantee_tie": "2.00",
+                "guarantee_belt": "1.00",
+                "guarantee_watch": "2.00",
                 "shoes_size": "42",
                 "shoes_color": "Black",
                 "tie_size": "Slim",
@@ -3090,22 +3162,29 @@ class InventoryManagementTests(TestCase):
         self.assertEqual(response.status_code, 302)
         req.refresh_from_db()
         self.assertEqual(req.status, "Active")
-        self.assertEqual(req.total_amount, Decimal("50.00") + Decimal("5.00") * 2 * 4)
+        self.assertEqual(req.total_amount, Decimal("54.00"))
+        self.assertEqual(req.discount_amount, Decimal("6.00"))
+        self.assertEqual(req.guarantee_total, Decimal("5.00"))
+        self.assertEqual(req.amount_paid, Decimal("54.00"))
+        self.assertEqual(req.guarantee_collected, Decimal("5.00"))
         self.assertIn("Accessories:", req.notes)
         self.assertIn("shoes", req.notes.lower())
         self.assertIn("watch", req.notes.lower())
 
-    def test_admin_booking_charges_all_accessories_at_fixed_daily_rate(self):
+    def test_admin_booking_prices_only_shoes_and_collects_accessory_guarantees(self):
         suit = Suit.objects.get(suit_name="Admin Suit")
         self.client.force_login(self.user)
         form_response = self.client.get(reverse("admin_booking"))
         self.assertContains(form_response, "Watch (Saacad)")
-        self.assertContains(form_response, "$5.00/day · separately charged")
+        self.assertContains(form_response, 'name="suit_price"')
+        self.assertContains(form_response, 'name="guarantee_tie"')
+        self.assertContains(form_response, 'name="addon_price_shoes"')
 
         response = self.client.post(
             reverse("create_rental"),
             {
                 "suit_id": str(suit.pk),
+                "suit_price": "21.25",
                 "quantity": "2",
                 "days": "2",
                 "start_date": timezone.localdate().isoformat(),
@@ -3113,10 +3192,18 @@ class InventoryManagementTests(TestCase):
                 "first_name": "Accessory",
                 "father_name": "Customer",
                 "phone": "252611223344",
-                "amount_paid": "0",
+                "amount_paid": "117.50",
+                "discount_type": "percent",
+                "discount_value": "10",
                 "addons[]": ["tie", "belt", "watch", "shoes"],
                 "addon_price_tie": "0.01",
-                "addon_price_shoes": "0.01",
+                "addon_price_belt": "0.01",
+                "addon_price_watch": "0.01",
+                "addon_price_shoes": "7.50",
+                "guarantee_tie": "2.00",
+                "guarantee_belt": "3.00",
+                "guarantee_watch": "4.00",
+                "guarantee_shoes": "5.00",
                 "watch_size": "Classic",
                 "watch_color": "Black",
             },
@@ -3124,7 +3211,15 @@ class InventoryManagementTests(TestCase):
 
         self.assertEqual(response.status_code, 302)
         rental = SuitRequest.objects.get(name="Accessory Customer")
-        self.assertEqual(rental.total_amount, Decimal("200.00"))
+        self.assertEqual(rental.suit_price_per_day, Decimal("21.25"))
+        self.assertEqual(rental.total_amount, Decimal("103.50"))
+        self.assertEqual(rental.discount_amount, Decimal("11.50"))
+        self.assertEqual(rental.guarantee_total, Decimal("14.00"))
+        self.assertEqual(rental.amount_paid, Decimal("103.50"))
+        self.assertEqual(rental.guarantee_collected, Decimal("14.00"))
+        payment = rental.payments.get()
+        self.assertEqual(payment.amount_paid, Decimal("103.50"))
+        self.assertEqual(payment.guarantee_amount, Decimal("14.00"))
         self.assertEqual(
             set(rental.accessory_items),
             {
@@ -3135,6 +3230,107 @@ class InventoryManagementTests(TestCase):
             },
         )
 
+    def test_accessory_only_booking_uses_custom_price_fixed_discount_and_365_days(self):
+        self.client.force_login(self.user)
+        start_date = timezone.localdate()
+        response = self.client.post(
+            reverse("create_rental"),
+            {
+                "suit_id": "",
+                "quantity": "1",
+                "days": "365",
+                "start_date": start_date.isoformat(),
+                "end_date": (start_date + timezone.timedelta(days=365)).isoformat(),
+                "first_name": "Accessory",
+                "father_name": "Only",
+                "phone": "252611223344",
+                "amount_paid": "1181.25",
+                "discount_type": "amount",
+                "discount_value": "10.00",
+                "addons[]": ["watch"],
+                "addon_price_watch": "3.25",
+                "guarantee_watch": "5.00",
+                "watch_size": "Classic",
+                "watch_color": "Black",
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        rental = SuitRequest.objects.get(name="Accessory Only")
+        self.assertIsNone(rental.suit)
+        self.assertEqual(rental.days_requested, 365)
+        self.assertEqual(rental.total_amount, Decimal("1176.25"))
+        self.assertEqual(rental.discount_amount, Decimal("10.00"))
+        self.assertEqual(rental.guarantee_total, Decimal("5.00"))
+        self.assertEqual(rental.amount_paid, Decimal("1176.25"))
+        self.assertEqual(rental.guarantee_collected, Decimal("5.00"))
+        self.assertEqual(
+            rental.accessory_details["watch"]["price_per_day"],
+            "3.25",
+        )
+        payment = rental.payments.get()
+        self.assertEqual(payment.amount_paid, Decimal("1176.25"))
+        self.assertEqual(payment.guarantee_amount, Decimal("5.00"))
+        self.assertEqual(Suit.objects.get(suit_name="Admin Suit").quantity, 2)
+
+        return_response = self.client.post(
+            reverse("process_return"),
+            {
+                "rental_id": rental.pk,
+                "return_condition": "good",
+                "return_amount_paid": "0.00",
+                "payment_method": "cash",
+            },
+        )
+        self.assertEqual(return_response.status_code, 302)
+        rental.refresh_from_db()
+        self.assertEqual(rental.guarantee_refunded, Decimal("5.00"))
+        self.assertEqual(rental.status, "Returned")
+
+    def test_return_applies_guarantee_to_damage_and_records_refund(self):
+        self.client.force_login(self.user)
+        suit = Suit.objects.get(suit_name="Admin Suit")
+        rental = SuitRequest.objects.create(
+            suit=suit,
+            name="Guarantee Customer",
+            phone="252611223344",
+            days_requested=1,
+            quantity_requested=1,
+            total_amount=Decimal("30.00"),
+            guarantee_total=Decimal("10.00"),
+            status="Active",
+            rental_start_time=timezone.now(),
+            due_date=timezone.now() + timezone.timedelta(days=1),
+            end_time=timezone.now() + timezone.timedelta(days=1),
+        )
+        Payment.objects.create(
+            rental=rental,
+            cashier=self.user,
+            amount_paid=Decimal("30.00"),
+            guarantee_amount=Decimal("10.00"),
+            payment_method="cash",
+            status="paid",
+        )
+
+        response = self.client.post(
+            reverse("process_return"),
+            {
+                "rental_id": rental.pk,
+                "return_condition": "damaged",
+                "requires_laundry": "on",
+                "laundry_fee": "4.00",
+                "return_amount_paid": "0.00",
+                "payment_method": "cash",
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        rental.refresh_from_db()
+        self.assertEqual(rental.status, "Returned")
+        self.assertEqual(rental.guarantee_refunded, Decimal("6.00"))
+        self.assertIsNotNone(rental.guarantee_settled_at)
+        refund = rental.payments.get(status="refunded")
+        self.assertEqual(refund.refund_amount, Decimal("6.00"))
     def test_admin_inventory_page_renders_professional_dashboard(self):
         self.client.login(username="admin", password="testpass123")
         response = self.client.get(reverse("inventory"))

@@ -545,8 +545,8 @@
                     <select id="repeat-suit" name="suit_id" required>
                         <option value="">Select a suit</option>
                         {% for suit in available_suits %}
-                        <option value="{{ suit.pk }}" data-price="{{ suit.price_per_day }}" {% if rental_form_values.suit_id == suit.pk|stringformat:"s" %}selected{% endif %}>
-                            {{ suit.suit_name }} · {{ suit.booking_available_quantity }} available · ${{ suit.price_per_day }}/day
+                        <option value="{{ suit.pk }}" {% if rental_form_values.suit_id == suit.pk|stringformat:"s" %}selected{% endif %}>
+                            {{ suit.suit_name }} · {{ suit.booking_available_quantity }} available
                         </option>
                         {% endfor %}
                     </select>
@@ -555,16 +555,19 @@
                     {% endif %}
                 </div>
                 <div>
+                    <label for="repeat-suit-price">Suit price per day ($)</label>
+                    <input id="repeat-suit-price" type="number" name="suit_price" min="0" step="0.01"
+                           value="{{ rental_form_values.suit_price|default:'0' }}" required>
+                    <small>Selecting a suit does not set or change its price.</small>
+                </div>
+                <div>
                     <label for="repeat-quantity">Quantity</label>
                     <input id="repeat-quantity" type="number" name="quantity" min="1" max="5" value="{{ rental_form_values.quantity|default:'1' }}" required>
                 </div>
                 <div>
                     <label for="repeat-days">Rental duration</label>
-                    <select id="repeat-days" name="days" required>
-                        {% for days, hours in rental_day_options %}
-                        <option value="{{ days }}" {% if rental_form_values.days == days|stringformat:"s" %}selected{% endif %}>{{ days }} day{{ days|pluralize }} ({{ hours }} hours)</option>
-                        {% endfor %}
-                    </select>
+                    <input id="repeat-days" type="number" name="days" min="1" max="365" step="1"
+                           value="{{ rental_form_values.days|default:'1' }}" required>
                 </div>
                 <div>
                     <label for="repeat-start-date">Start date</label>
@@ -618,6 +621,7 @@
         (() => {
             const form = document.getElementById("repeatRentalForm");
             const suit = document.getElementById("repeat-suit");
+            const suitPrice = document.getElementById("repeat-suit-price");
             const quantity = document.getElementById("repeat-quantity");
             const days = document.getElementById("repeat-days");
             const startDate = document.getElementById("repeat-start-date");
@@ -626,8 +630,7 @@
             const submit = document.getElementById("repeat-submit");
 
             const calculateTotal = () => {
-                const selected = suit.options[suit.selectedIndex];
-                const price = Number(selected?.dataset.price || 0);
+                const price = Number(suitPrice.value || 0);
                 total.textContent = `$${(price * Number(quantity.value || 1) * Number(days.value || 1)).toFixed(2)}`;
             };
             const updateEndDate = () => {
@@ -636,11 +639,21 @@
                 end.setDate(end.getDate() + Number(days.value || 1));
                 endDate.value = `${end.getFullYear()}-${String(end.getMonth() + 1).padStart(2, "0")}-${String(end.getDate()).padStart(2, "0")}`;
             };
+            const updateDays = () => {
+                if (!startDate.value || !endDate.value) return;
+                const start = new Date(`${startDate.value}T12:00:00`);
+                const end = new Date(`${endDate.value}T12:00:00`);
+                const duration = Math.round((end - start) / 86400000);
+                if (duration >= 1 && duration <= 365) days.value = duration;
+                calculateTotal();
+            };
 
             suit.addEventListener("change", calculateTotal);
+            suitPrice.addEventListener("input", calculateTotal);
             quantity.addEventListener("input", calculateTotal);
-            days.addEventListener("change", () => { calculateTotal(); updateEndDate(); });
+            days.addEventListener("input", () => { calculateTotal(); updateEndDate(); });
             startDate.addEventListener("change", updateEndDate);
+            endDate.addEventListener("change", updateDays);
             form.addEventListener("submit", (event) => {
                 if (!form.checkValidity()) return;
                 submit.disabled = true;

@@ -104,6 +104,7 @@
   .form-input option { background: var(--card-bg); color: #ffffff; }
   .form-input:focus { outline: none; border-color: var(--gold); }
   .form-input[readonly] { opacity: 0.6; cursor: not-allowed; }
+  .form-input:disabled { opacity: 0.35; cursor: not-allowed; }
 
   .btn {
     display: inline-flex; align-items: center; gap: 6px; padding: 0.5rem 1.05rem;
@@ -131,7 +132,7 @@
   .badge { padding: 3px 9px; border-radius: 4px; font-size: 0.7rem; font-weight: 600; display: inline-flex; align-items: center; gap: 4px; }
   .badge-success { background: rgba(46,204,113,0.12); color: var(--success); }
   .badge-warning { background: rgba(243,156,18,0.12); color: var(--warning); }
-  .badge-danger  { background: rgba(231,76,60,0.12);  color: var(--danger); }
+  .badge-danger  { background: rgba(135, 98, 94, 0.12);  color: var(--danger); }
   .badge-info    { background: rgba(52,152,219,0.12); color: var(--info); }
   .badge-gold    { background: var(--gold-bg); color: var(--gold); border: 1px solid var(--gold-border); }
 
@@ -143,6 +144,7 @@
   .pay-row:last-child { border-bottom: none; }
   .pay-total { font-weight: 700; font-size: 1rem; color: #2ecc71 !important; }
   .pay-total * { color: #2ecc71 !important; }
+  #pay-sam { font-weight: 700; font-size: 1rem; color: #972ecc !important; }
 
   .sec-label {
     font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.6px; color: var(--gold);
@@ -161,15 +163,41 @@
   }
   .suit-card-noimg i { font-size: 2.5rem; color: var(--gold); opacity: 0.3; }
 
+  /* ===== Accessories: price + guarantee + size + color ===== */
+  .acc-head, .accessory-row {
+    display: grid; grid-template-columns: 190px 105px 105px 1fr 1fr; gap: 0.6rem; align-items: center;
+  }
+  .acc-head {
+    padding: 0 0.8rem 0.3rem; font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.5px;
+    color: var(--muted); font-weight: 700;
+  }
   .accessory-row {
-    display: grid; grid-template-columns: 240px 120px 1fr 1fr; gap: 0.75rem; align-items: center;
     background: rgba(255,255,255,0.02); padding: 0.5rem 0.8rem; border-radius: var(--radius-sm);
     margin-bottom: 0.5rem; border: 1px solid transparent;
   }
-  .accessory-row.selected {
-    border-color: var(--gold-border); background: rgba(201,162,39,0.05);
+  .accessory-row.selected { border-color: var(--gold-border); background: rgba(201,162,39,0.05); }
+  .acc-label { display: flex; align-items: center; gap: 8px; font-size: 0.85rem; cursor: pointer; margin: 0; color: #ffffff; }
+  .free-tag {
+    display: none; background: rgba(46,204,113,0.15); color: var(--success) !important;
+    border: 1px solid rgba(46,204,113,0.35); padding: 1px 8px; border-radius: 20px;
+    font-size: 0.62rem; font-weight: 700; letter-spacing: 0.4px;
   }
-  .accessory-row label { color: #ffffff; }
+  .acc-hint { font-size: 0.74rem; color: var(--muted); margin: -0.2rem 0 0.8rem; line-height: 1.5; }
+  @media (max-width: 820px) {
+    .acc-head { display: none; }
+    .accessory-row { grid-template-columns: 1fr 1fr; }
+    .accessory-row .acc-label { grid-column: 1 / -1; }
+  }
+
+  /* ===== Discount mini form ===== */
+  .discount-box {
+    display: flex; gap: 0.9rem; align-items: flex-end; flex-wrap: wrap;
+    background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-sm);
+    padding: 0.9rem 1rem;
+  }
+  .discount-box .form-group { margin: 0; }
+  .discount-readout { margin-left: auto; text-align: right; }
+  .discount-readout strong { font-size: 1.1rem; color: var(--success); display: block; }
 
   @media print {
     body * { visibility: hidden; }
@@ -318,7 +346,7 @@
               {% endif %}
 
               <div style="display:flex; gap:8px;">
-                <button class="btn btn-gold" style="flex:1; justify-content:center; font-weight:700;" onclick="preselectSuit('{{ suit.id }}', '{{ suit.price_per_day }}')">
+                <button class="btn btn-gold" style="flex:1; justify-content:center; font-weight:700;" onclick="preselectSuit('{{ suit.id }}')">
                   <i class="fas fa-shopping-bag"></i> Book
                 </button>
                 <a href="{% url 'suit_profile' suit.id %}" class="btn" style="flex:1; justify-content:center;">Details</a>
@@ -388,7 +416,7 @@
   </div>
 
   <div id="book-suit" class="tab-panel">
-    <div class="card" style="max-width:850px;">
+    <div class="card" style="max-width:900px;">
       <div class="card-head">
         <h5><i class="fas fa-plus-circle"></i> Create New Rental Form</h5>
         {% if prefill_customer_id %}
@@ -418,6 +446,7 @@
         <form method="POST" action="{% url 'create_rental' %}" id="newRentalForm" onsubmit="return validateForm()">
           {% csrf_token %}
           <input type="hidden" name="selected_items" id="selectedItemsInput" value="">
+          <input type="hidden" name="guarantee_total" id="guaranteeTotalInput" value="0">
 
           <input type="hidden" name="customer_user_id" value="{{ prefill_customer_id|default:'' }}">
           <div class="sec-label"><i class="fas fa-user"></i> Customer Information</div>
@@ -484,21 +513,25 @@
               <select name="suit_id" id="suitSelect" class="form-input" onchange="updatePrice()">
                 <option value="">-- No Suit Selected (Accessories Only) --</option>
                 {% for suit in available_suits %}
-                <option value="{{ suit.id }}" data-price="{{ suit.price_per_day }}">{{ suit.suit_name }} — ${{ suit.price_per_day }}/day</option>
+                <option value="{{ suit.id }}">{{ suit.suit_name }}</option>
                 {% endfor %}
               </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="suitPrice">Suit price per day ($)</label>
+              <input type="number" name="suit_price" id="suitPrice" class="form-input"
+                     min="0" step="0.01" value="0" placeholder="Enter suit price manually"
+                     oninput="calculateTotal()" disabled>
+              <small class="acc-hint">Enter the price for this rental. Selecting a suit does not set or change the price.</small>
             </div>
             <div class="form-group">
               <label class="form-label">Suit Quantity</label>
               <input type="number" name="quantity" id="qtyInput" class="form-input" min="1" max="5" value="1" oninput="calculateTotal()">
             </div>
             <div class="form-group">
-              <label class="form-label">Rental days *</label>
-              <select name="days" class="form-input" id="rentalDays" onchange="calculateTotal(); calculateEndDate()" required>
-                {% for duration_days, duration_hours in rental_day_options %}
-                <option value="{{ duration_days }}">{{ duration_days }} Day{{ duration_days|pluralize }} ({{ duration_hours }} Hours)</option>
-                {% endfor %}
-              </select>
+              <label class="form-label">Rental days * (enter number)</label>
+              <input type="number" name="days" id="rentalDays" class="form-input" min="1" max="365" step="1" value="1"
+                     oninput="calculateTotal(); calculateEndDate()" required>
             </div>
           </div>
 
@@ -514,83 +547,129 @@
           </div>
 
           <div class="sec-label"><i class="fas fa-plus"></i> Optional Accessories (Agab Dheeri ah)</div>
-          <div style="display: flex; flex-direction: column; gap: 0.2rem; margin-bottom: 1.5rem;">
-            
+          <p class="acc-hint">
+            <strong style="color:#fff;">Suit la'aan:</strong> agab kasta qiimihiisa maalinlaha ah geli.
+            &nbsp;&middot;&nbsp;
+            <strong style="color:#fff;">Suit la socda:</strong> agabku waa FREE marka laga reebo kabaha.
+            Agab kasta oo la qaato geli <strong style="color:var(--gold);">Guarantee</strong> (damaanad la celin karo).
+          </p>
+
+          <div class="acc-head">
+            <span>Item</span><span>Price/day</span><span>Guarantee</span><span>Size</span><span>Color</span>
+          </div>
+          <div style="display:flex; flex-direction:column; gap:0.2rem; margin-bottom:1.5rem;">
+
             <div class="accessory-row" id="row_tie">
-              <label style="display:flex; align-items:center; gap:8px; font-size:0.85rem; cursor:pointer;">
+              <label class="acc-label">
                 <input type="checkbox" name="addons[]" value="tie" onchange="toggleAccessoryRow('tie')">
                 <span>Tie (Gravati)</span>
+                <span class="free-tag" id="free_tie">FREE</span>
               </label>
-              <span>${{ accessory_daily_price|floatformat:2 }}/day</span>
+              <input type="number" name="addon_price_tie" id="addon_price_tie" class="form-input btn-sm" placeholder="Price $" min="0" step="0.01" oninput="calculateTotal()" disabled>
+              <input type="number" name="guarantee_tie" id="guarantee_tie" class="form-input btn-sm" placeholder="Guarantee $" min="0" step="0.01" oninput="calculateTotal()" disabled>
               <input type="text" name="tie_size" id="tie_size" class="form-input btn-sm" placeholder="Size (e.g. Standard)" disabled>
               <input type="text" name="tie_color" id="tie_color" class="form-input btn-sm" placeholder="Color" disabled>
             </div>
 
             <div class="accessory-row" id="row_shirt">
-              <label style="display:flex; align-items:center; gap:8px; font-size:0.85rem; cursor:pointer;">
+              <label class="acc-label">
                 <input type="checkbox" name="addons[]" value="shirt" onchange="toggleAccessoryRow('shirt')">
                 <span>Shirt (Shaadh)</span>
+                <span class="free-tag" id="free_shirt">FREE</span>
               </label>
-              <span>${{ accessory_daily_price|floatformat:2 }}/day</span>
+              <input type="number" name="addon_price_shirt" id="addon_price_shirt" class="form-input btn-sm" placeholder="Price $" min="0" step="0.01" oninput="calculateTotal()" disabled>
+              <input type="number" name="guarantee_shirt" id="guarantee_shirt" class="form-input btn-sm" placeholder="Guarantee $" min="0" step="0.01" oninput="calculateTotal()" disabled>
               <input type="text" name="shirt_size" id="shirt_size" class="form-input btn-sm" placeholder="Size (e.g. M, L, XL)" disabled>
               <input type="text" name="shirt_color" id="shirt_color" class="form-input btn-sm" placeholder="Color" disabled>
             </div>
 
             <div class="accessory-row" id="row_belt">
-              <label style="display:flex; align-items:center; gap:8px; font-size:0.85rem; cursor:pointer;">
+              <label class="acc-label">
                 <input type="checkbox" name="addons[]" value="belt" onchange="toggleAccessoryRow('belt')">
                 <span>Belt (Suun)</span>
+                <span class="free-tag" id="free_belt">FREE</span>
               </label>
-              <span>${{ accessory_daily_price|floatformat:2 }}/day</span>
+              <input type="number" name="addon_price_belt" id="addon_price_belt" class="form-input btn-sm" placeholder="Price $" min="0" step="0.01" oninput="calculateTotal()" disabled>
+              <input type="number" name="guarantee_belt" id="guarantee_belt" class="form-input btn-sm" placeholder="Guarantee $" min="0" step="0.01" oninput="calculateTotal()" disabled>
               <input type="text" name="belt_size" id="belt_size" class="form-input btn-sm" placeholder="Size" disabled>
               <input type="text" name="belt_color" id="belt_color" class="form-input btn-sm" placeholder="Color" disabled>
             </div>
 
             <div class="accessory-row" id="row_watch">
-              <label style="display:flex; align-items:center; gap:8px; font-size:0.85rem; cursor:pointer;">
+              <label class="acc-label">
                 <input type="checkbox" name="addons[]" value="watch" onchange="toggleAccessoryRow('watch')">
                 <span>Watch (Saacad)</span>
+                <span class="free-tag" id="free_watch">FREE</span>
               </label>
-              <span>${{ accessory_daily_price|floatformat:2 }}/day</span>
+              <input type="number" name="addon_price_watch" id="addon_price_watch" class="form-input btn-sm" placeholder="Price $" min="0" step="0.01" oninput="calculateTotal()" disabled>
+              <input type="number" name="guarantee_watch" id="guarantee_watch" class="form-input btn-sm" placeholder="Guarantee $" min="0" step="0.01" oninput="calculateTotal()" disabled>
               <input type="text" name="watch_size" id="watch_size" class="form-input btn-sm" placeholder="Style / Type" disabled>
               <input type="text" name="watch_color" id="watch_color" class="form-input btn-sm" placeholder="Color" disabled>
             </div>
 
             <div class="accessory-row" id="row_shoes">
-              <label style="display:flex; align-items:center; gap:8px; font-size:0.85rem; cursor:pointer;">
+              <label class="acc-label">
                 <input type="checkbox" name="addons[]" value="shoes" onchange="toggleAccessoryRow('shoes')">
                 <span>Shoes (Kabaha)</span>
+                <span class="free-tag" id="free_shoes">FREE</span>
               </label>
-              <span>${{ accessory_daily_price|floatformat:2 }}/day · separately charged</span>
+              <input type="number" name="addon_price_shoes" id="addon_price_shoes" class="form-input btn-sm" placeholder="Price $" min="0" step="0.01" oninput="calculateTotal()" disabled>
+              <input type="number" name="guarantee_shoes" id="guarantee_shoes" class="form-input btn-sm" placeholder="Guarantee $" min="0" step="0.01" oninput="calculateTotal()" disabled>
               <input type="text" name="shoes_size" id="shoes_size" class="form-input btn-sm" placeholder="Size (e.g. 41, 42)" disabled>
               <input type="text" name="shoes_color" id="shoes_color" class="form-input btn-sm" placeholder="Color" disabled>
             </div>
 
           </div>
 
+          <div class="sec-label"><i class="fas fa-tags"></i> Discount</div>
+          <div class="discount-box">
+            <div class="form-group" style="min-width:150px;">
+              <label class="form-label">Type</label>
+              <select name="discount_type" id="discountType" class="form-input" onchange="onDiscountTypeChange()">
+                <option value="percent">Percent (%)</option>
+                <option value="amount">Fixed amount ($)</option>
+              </select>
+            </div>
+            <div class="form-group" style="width:130px;">
+              <label class="form-label">Value</label>
+              <input type="number" name="discount_value" id="discountValue" class="form-input" min="0" max="100" step="0.01" value="0" oninput="calculateTotal()">
+            </div>
+            <div class="discount-readout">
+              <span class="form-label" style="margin:0;">Discount given</span>
+              <strong id="discountReadout">- $0.00</strong>
+            </div>
+          </div>
+          <p class="acc-hint" style="margin:0.5rem 0 0;">Macmiilku looma baahna inuu bixiyo qiimaha qoran. Discount-ku wuxuu quseeyaa kirada keliya, ma quseeyo guarantee-ga.</p>
+
           <div class="sec-label"><i class="fas fa-receipt"></i> Payment</div>
           <div class="pay-box">
             <div class="pay-row"><span>Price per day (Suit)</span><span id="pricePerDay">$0.00</span></div>
-            <div class="pay-row"><span>Accessories per day</span><span id="accPricePerDay">$0.00</span></div>
-            <div class="pay-row"><span>Shoes per day (separate)</span><span id="shoePricePerDay">$0.00</span></div>
+            <div class="pay-row"><span>Charged items per day</span><span id="accPricePerDay">$0.00</span></div>
             <div class="pay-row"><span>Suit Quantity</span><span id="displayQuantity">1</span></div>
             <div class="pay-row"><span>Days</span><span id="displayDays">1 day</span></div>
             <div class="pay-row"><span>Subtotal</span><strong id="subtotal" style="color: #ffffff;">$0.00</strong></div>
+            <div class="pay-row" id="discountRow" style="display:none;">
+              <span>Discount</span><strong id="discountDisplay" style="color:var(--success);">-$0.00</strong>
+            </div>
+            <div class="pay-row"><span>Rental total</span><strong id="rentalTotal" style="color:#ffffff;">$0.00</strong></div>
+            <div class="pay-row" id="guaranteeRow" style="display:none;">
+              <span>Guarantee <small style="color:var(--muted);">(waa la celinayaa haddii agabku saxan yahay)</small></span>
+              <strong id="guaranteeDisplay" style="color:var(--gold);">$0.00</strong>
+            </div>
             <div class="pay-row">
-              <span>Payment method</span>
-              <select name="payment_method" class="form-input" style="width:150px; padding:0.35rem 0.6rem;">
+              <label for="payment_method">Payment method</label>
+              <select name="payment_method" id="payment_method" class="form-input" style="width:150px; padding:0.35rem 0.6rem;">
                 <option value="cash">Cash</option>
                 <option value="zaad">Zaad</option>
-                <option value="sahal">Somtel</option>
+                <option value="edahab">Edahab</option>
                 <option value="bank">Bank transfer</option>
               </select>
             </div>
-            <div class="pay-row" style="flex-direction:column; align-items:flex-start; gap:0.3rem;">
-              <span>Amount paid now</span>
-              <input type="number" name="amount_paid" class="form-input" min="0" step="0.01" value="0" placeholder="0.00" style="width:120px; text-align:right; padding:0.35rem 0.6rem;" id="paidInput" oninput="calculateBalance()">
-              <small style="color: rgba(255,255,255,0.6); font-size:0.78rem;">Enter 0 if the customer will pay later.</small>
+            <div class="pay-row " id="pay-sam" style="display: flex; justify-content: space-between; align-items:flex-start; gap:0.3rem;">
+              <label for="amount_paid">Amount paid now</label>
+              <input type="number" name="amount_paid" id="amount_paid" class="form-input" min="0" step="0.01" value="0" placeholder="Enter amount" style="width:160px; text-align:right; padding:0.35rem 0.6rem;" oninput="calculateBalance()">
             </div>
-            <div class="pay-row pay-total"><span>Total due</span><strong id="totalDue">$0.00</strong></div>
+            <div class="pay-row pay-total"><span>Total to collect</span><strong id="totalDue">$0.00</strong></div>
             <div class="pay-row" id="balanceRow" style="display:none;">
               <span style="font-size:0.78rem;">Remaining balance</span>
               <strong id="balanceDue" style="color:var(--danger)">$0.00</strong>
@@ -603,7 +682,7 @@
           </div>
 
           <div style="display:flex; gap:10px;">
-            <button type="button" class="btn" style="flex:1; justify-content:center;" onclick="document.getElementById('newRentalForm').reset(); resetAccessories(); initDates(); calculateTotal();">Cancel</button>
+            <button type="button" class="btn" style="flex:1; justify-content:center;" onclick="resetForm()">Cancel</button>
             <button type="submit" class="btn btn-gold" style="flex:2; justify-content:center; padding:0.65rem;">
               <i class="fas fa-check"></i> Confirm Rental
             </button>
@@ -616,242 +695,335 @@
 </div>
 
 <script>
+  const ACCESSORIES = ['tie', 'shirt', 'belt', 'watch', 'shoes'];
+  // Agabka mar kasta lacag ah (xitaa suit la socdo). Ka dhig [] haddii shoes FREE noqdaan.
+  const ALWAYS_CHARGED = ['shoes'];
+  // Qiimaha hore (waa la bedeli karaa) marka agab keligiis la kiraynayo
+  const DEFAULT_ITEM_PRICE = parseFloat("{{ accessory_daily_price|default:0|floatformat:'2u' }}") || 0;
+
+  const el = id => document.getElementById(id);
+  const fmt = n => '$' + n.toFixed(2);
+  const getNum = id => { const v = parseFloat(el(id).value); return (!isNaN(v) && v > 0) ? v : 0; };
+
   function getTodayString() {
     const d = new Date();
-    const year = d.getFullYear();
-    const month = String(d.getMonth() + 1).padStart(2, '0');
-    const day = String(d.getDate()).padStart(2, '0');
-    return `${year}-${month}-${day}`;
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
   }
 
   function initDates() {
     const todayStr = getTodayString();
-    const startDateInput = document.getElementById('startDate');
-    const endDateInput = document.getElementById('endDate');
-    
-    if(startDateInput) {
-      startDateInput.setAttribute('min', todayStr);
-      startDateInput.value = todayStr;
-    }
-    if(endDateInput) {
-      endDateInput.setAttribute('min', todayStr);
-    }
+    const startDateInput = el('startDate');
+    const endDateInput = el('endDate');
+    if (startDateInput) { startDateInput.setAttribute('min', todayStr); startDateInput.value = todayStr; }
+    if (endDateInput) { endDateInput.setAttribute('min', todayStr); }
     calculateEndDate();
   }
 
-  document.addEventListener("DOMContentLoaded", function() {
+  document.addEventListener("DOMContentLoaded", function () {
     initDates();
+    calculateTotal();
     setInterval(() => {
-      const timeSpan = document.getElementById('live-time');
-      if(timeSpan) {
-        timeSpan.textContent = new Date().toLocaleTimeString();
-      }
+      const timeSpan = el('live-time');
+      if (timeSpan) timeSpan.textContent = new Date().toLocaleTimeString();
     }, 1000);
   });
 
+  function getDays() {
+    return Math.max(parseInt(el('rentalDays').value) || 1, 1);
+  }
+
   function handleStartDateChange() {
-    const startDateInput = document.getElementById('startDate');
-    const endDateInput = document.getElementById('endDate');
-    if(startDateInput.value) {
-      endDateInput.setAttribute('min', startDateInput.value);
-    }
+    const s = el('startDate'), e = el('endDate');
+    if (s.value) e.setAttribute('min', s.value);
     calculateEndDate();
   }
 
   function handleEndDateChange() {
-    const startInput = document.getElementById('startDate').value;
-    const endInput = document.getElementById('endDate').value;
-    
+    const startInput = el('startDate').value;
+    const endInput = el('endDate').value;
     if (startInput && endInput) {
-      const start = new Date(startInput);
-      const end = new Date(endInput);
-      const diffTime = end - start;
-      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-      
+      const diffDays = Math.ceil((new Date(endInput) - new Date(startInput)) / 86400000);
       if (diffDays >= 1) {
-        document.getElementById('rentalDays').value = diffDays;
+        el('rentalDays').value = diffDays;
       } else {
-        document.getElementById('rentalDays').value = 1;
+        el('rentalDays').value = 1;
         calculateEndDate();
       }
       calculateTotal();
     }
   }
 
+  function calculateEndDate() {
+    const startInput = el('startDate').value;
+    if (!startInput) return;
+    const d = new Date(startInput);
+    d.setDate(d.getDate() + getDays());
+    el('endDate').value = d.toISOString().split('T')[0];
+  }
+
   function switchTab(evt, tabId) {
-    const panels = document.querySelectorAll('.tab-panel');
-    const buttons = document.querySelectorAll('.tab-btn');
-    panels.forEach(p => p.classList.remove('active'));
-    buttons.forEach(b => b.classList.remove('active'));
-    document.getElementById(tabId).classList.add('active');
-    if(evt) evt.currentTarget.classList.add('active');
+    document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    el(tabId).classList.add('active');
+    if (evt) evt.currentTarget.classList.add('active');
   }
 
   function switchTabByName(tabId) {
-    const panels = document.querySelectorAll('.tab-panel');
-    const buttons = document.querySelectorAll('.tab-btn');
-    panels.forEach(p => p.classList.remove('active'));
-    buttons.forEach(b => b.classList.remove('active'));
-    document.getElementById(tabId).classList.add('active');
+    document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    el(tabId).classList.add('active');
     const targetBtn = document.querySelector(`[data-tab="${tabId}"]`);
-    if(targetBtn) targetBtn.classList.add('active');
+    if (targetBtn) targetBtn.classList.add('active');
   }
 
-  function preselectSuit(id, price) {
-    const suitSelect = document.getElementById('suitSelect');
-    const selectedItemsInput = document.getElementById('selectedItemsInput');
-    if(suitSelect) {
+  function preselectSuit(id) {
+    const suitSelect = el('suitSelect');
+    const selectedItemsInput = el('selectedItemsInput');
+    if (suitSelect) {
       suitSelect.value = id;
-      if(selectedItemsInput) selectedItemsInput.value = id;
+      if (selectedItemsInput) selectedItemsInput.value = id;
       switchTabByName('book-suit');
       updatePrice();
     }
   }
 
   function toggleIdFields() {
-    const checkbox = document.getElementById('hasNationalId');
-    const fields = document.getElementById('idFields');
-    fields.style.display = checkbox.checked ? 'grid' : 'none';
+    el('idFields').style.display = el('hasNationalId').checked ? 'grid' : 'none';
+  }
+
+  /* ---------- Helpers ---------- */
+  function suitSelected() { const s = el('suitSelect'); return !!(s && s.value); }
+  function accessoryCheckbox(item) { return document.querySelector('#row_' + item + ' input[type="checkbox"]'); }
+  function isFreeItem(item) { return suitSelected() && !ALWAYS_CHARGED.includes(item); }
+
+  /* Xeerarka: suit la socdo -> agab FREE + guarantee box; suit la'aan -> price box */
+  function applyRules() {
+    const withSuit = suitSelected();
+    ACCESSORIES.forEach(item => {
+      const cb = accessoryCheckbox(item);
+      const price = el('addon_price_' + item);
+      const guar = el('guarantee_' + item);
+      const tag = el('free_' + item);
+
+      if (!cb.checked) {
+        [price, guar].forEach(i => { i.disabled = true; i.readOnly = false; i.required = false; i.value = ''; });
+        price.dataset.free = '';
+        tag.style.display = 'none';
+        return;
+      }
+
+      // ----- Price box -----
+      price.disabled = false;
+      if (isFreeItem(item)) {
+        price.value = '0';
+        price.readOnly = true;
+        price.required = false;
+        price.dataset.free = '1';
+        tag.style.display = 'inline-block';
+      } else {
+        if (price.dataset.free === '1' || price.value === '') {
+          price.value = DEFAULT_ITEM_PRICE > 0 ? DEFAULT_ITEM_PRICE.toFixed(2) : '';
+        }
+        price.readOnly = false;
+        price.required = true;
+        price.dataset.free = '';
+        tag.style.display = 'none';
+      }
+
+      // Guarantees apply to accessories whether or not a suit is rented.
+      guar.disabled = false;
+    });
   }
 
   function updatePrice() {
-    const select = document.getElementById('suitSelect');
-    const selectedItemsInput = document.getElementById('selectedItemsInput');
-    const priceDisplay = document.getElementById('pricePerDay');
-    
-    if(!select.value) {
-      if(selectedItemsInput) selectedItemsInput.value = '';
+    const select = el('suitSelect');
+    const selectedItemsInput = el('selectedItemsInput');
+    const priceDisplay = el('pricePerDay');
+    const suitPriceInput = el('suitPrice');
+
+    if (!select.value) {
+      if (selectedItemsInput) selectedItemsInput.value = '';
+      suitPriceInput.disabled = true;
+      suitPriceInput.required = false;
       priceDisplay.textContent = '$0.00';
       calculateTotal();
       return;
     }
-    const price = parseFloat(select.options[select.selectedIndex].dataset.price);
-    if(selectedItemsInput) selectedItemsInput.value = select.value;
-    priceDisplay.textContent = '$' + price.toFixed(2);
+    suitPriceInput.disabled = false;
+    suitPriceInput.required = true;
+    if (selectedItemsInput) selectedItemsInput.value = select.value;
+    priceDisplay.textContent = fmt(parseFloat(suitPriceInput.value) || 0);
     calculateTotal();
   }
 
   function toggleAccessoryRow(item) {
-    const row = document.getElementById('row_' + item);
-    const sizeInput = document.getElementById(item + '_size');
-    const colorInput = document.getElementById(item + '_color');
+    const row = el('row_' + item);
+    const sizeInput = el(item + '_size');
+    const colorInput = el(item + '_color');
     const checkbox = row.querySelector('input[type="checkbox"]');
 
-    if(checkbox.checked) {
+    if (checkbox.checked) {
       row.classList.add('selected');
-      sizeInput.removeAttribute('disabled');
-      colorInput.removeAttribute('disabled');
-      sizeInput.setAttribute('required', 'required');
-      colorInput.setAttribute('required', 'required');
+      sizeInput.disabled = false; colorInput.disabled = false;
+      sizeInput.required = true; colorInput.required = true;
     } else {
       row.classList.remove('selected');
-      sizeInput.setAttribute('disabled', 'disabled');
-      colorInput.setAttribute('disabled', 'disabled');
-      sizeInput.removeAttribute('required');
-      colorInput.removeAttribute('required');
-      sizeInput.value = '';
-      colorInput.value = '';
+      sizeInput.disabled = true; colorInput.disabled = true;
+      sizeInput.required = false; colorInput.required = false;
+      sizeInput.value = ''; colorInput.value = '';
     }
     calculateTotal();
   }
 
   function resetAccessories() {
-    ['tie', 'shirt', 'belt', 'watch', 'shoes'].forEach(item => {
-      const row = document.getElementById('row_' + item);
-      const sizeInput = document.getElementById(item + '_size');
-      const colorInput = document.getElementById(item + '_color');
-      const checkbox = row.querySelector('input[type="checkbox"]');
+    ACCESSORIES.forEach(item => {
+      const row = el('row_' + item);
+      const cb = accessoryCheckbox(item);
+      cb.checked = false;
       row.classList.remove('selected');
-      checkbox.checked = false;
-      sizeInput.setAttribute('disabled', 'disabled');
-      colorInput.setAttribute('disabled', 'disabled');
-      sizeInput.value = '';
-      colorInput.value = '';
+      [el(item + '_size'), el(item + '_color'), el('addon_price_' + item), el('guarantee_' + item)].forEach(i => {
+        i.disabled = true; i.required = false; i.readOnly = false; i.value = '';
+      });
+      el('addon_price_' + item).dataset.free = '';
+      el('free_' + item).style.display = 'none';
     });
   }
 
+  function resetForm() {
+    el('newRentalForm').reset();
+    resetAccessories();
+    el('selectedItemsInput').value = '';
+    onDiscountTypeChange(true);
+    initDates();
+    updatePrice();
+  }
+
+  /* ---------- Discount ---------- */
+  function onDiscountTypeChange(silent) {
+    const type = el('discountType').value;
+    const input = el('discountValue');
+    if (type === 'percent') { input.max = 100; input.placeholder = '0 - 100'; }
+    else { input.removeAttribute('max'); input.placeholder = '0.00'; }
+    if (!silent) calculateTotal();
+  }
+
+  function computeDiscount(subtotal) {
+    const type = el('discountType').value;
+    let v = parseFloat(el('discountValue').value) || 0;
+    if (v < 0) v = 0;
+    let d = (type === 'percent') ? subtotal * Math.min(v, 100) / 100 : Math.min(v, subtotal);
+    d = Math.round(d * 100) / 100;
+    el('discountReadout').textContent = '- ' + fmt(d);
+    return d;
+  }
+
+  /* ---------- Totals ---------- */
   function calculateTotal() {
-    const select = document.getElementById('suitSelect');
-    const suitPrice = (select && select.value) ? parseFloat(select.options[select.selectedIndex].dataset.price) : 0;
-    const qty = (select && select.value) ? (parseInt(document.getElementById('qtyInput').value) || 1) : 0;
-    
-    let accPricePerDay = 0;
-    let shoePricePerDay = 0;
-    const checkboxes = document.querySelectorAll('input[name="addons[]"]:checked');
-    checkboxes.forEach(cb => {
-      if (cb.value === 'shoes') {
-        shoePricePerDay += {{ accessory_daily_price|floatformat:2 }};
-      } else {
-        accPricePerDay += {{ accessory_daily_price|floatformat:2 }};
-      }
+    applyRules();
+
+    const withSuit = suitSelected();
+    const select = el('suitSelect');
+    const suitPrice = withSuit ? (parseFloat(el('suitPrice').value) || 0) : 0;
+    const qty = withSuit ? Math.max(parseInt(el('qtyInput').value) || 1, 1) : 0;
+    const days = getDays();
+    const mult = withSuit ? qty : 1;
+    el('pricePerDay').textContent = fmt(suitPrice);
+
+    let itemsPerDay = 0, guaranteeTotal = 0, checkedCount = 0, freeCount = 0;
+    ACCESSORIES.forEach(item => {
+      if (!accessoryCheckbox(item).checked) return;
+      checkedCount++;
+      if (isFreeItem(item)) freeCount++;
+      else itemsPerDay += getNum('addon_price_' + item);
+      guaranteeTotal += getNum('guarantee_' + item);
     });
 
-    const days = parseInt(document.getElementById('rentalDays').value) || 1;
-    
     const suitSubtotal = suitPrice * qty * days;
-    const accSubtotal = (accPricePerDay + shoePricePerDay) * qty * days;
-    const subtotal = suitSubtotal + accSubtotal;
-    
-    document.getElementById('accPricePerDay').textContent = '$' + accPricePerDay.toFixed(2);
-    document.getElementById('shoePricePerDay').textContent = '$' + shoePricePerDay.toFixed(2);
-    document.getElementById('displayQuantity').textContent = (qty > 0) ? qty : '0';
-    document.getElementById('displayDays').textContent = days + (days > 1 ? ' days' : ' day');
-    document.getElementById('subtotal').textContent = '$' + subtotal.toFixed(2);
-    document.getElementById('totalDue').textContent = '$' + subtotal.toFixed(2);
-    
+    const itemsSubtotal = itemsPerDay * mult * days;
+    const subtotal = suitSubtotal + itemsSubtotal;
+    const discount = computeDiscount(subtotal);
+    const rentalTotal = subtotal - discount;
+    const totalToCollect = rentalTotal + guaranteeTotal;
+
+    const accEl = el('accPricePerDay');
+    if (withSuit && freeCount > 0 && itemsPerDay === 0) {
+      accEl.textContent = 'FREE (with suit)'; accEl.style.color = 'var(--success)';
+    } else {
+      accEl.textContent = fmt(itemsPerDay); accEl.style.color = '';
+    }
+
+    el('displayQuantity').textContent = qty > 0 ? qty : '0';
+    el('displayDays').textContent = days + (days > 1 ? ' days' : ' day');
+    el('subtotal').textContent = fmt(subtotal);
+
+    el('discountRow').style.display = discount > 0 ? 'flex' : 'none';
+    el('discountDisplay').textContent = '-' + fmt(discount);
+    el('rentalTotal').textContent = fmt(rentalTotal);
+
+    el('guaranteeRow').style.display = guaranteeTotal > 0 ? 'flex' : 'none';
+    el('guaranteeDisplay').textContent = fmt(guaranteeTotal);
+    el('guaranteeTotalInput').value = guaranteeTotal.toFixed(2);
+
+    el('totalDue').textContent = fmt(totalToCollect);
     calculateBalance();
   }
 
-  function calculateEndDate() {
-    const startInput = document.getElementById('startDate').value;
-    const daysInput = parseInt(document.getElementById('rentalDays').value) || 1;
-    if(!startInput) return;
-    
-    const startDate = new Date(startInput);
-    startDate.setDate(startDate.getDate() + daysInput);
-    document.getElementById('endDate').value = startDate.toISOString().split('T')[0];
-  }
-
   function calculateBalance() {
-    const totalStr = document.getElementById('totalDue').textContent.replace('$', '');
-    const total = parseFloat(totalStr) || 0;
-    const paid = parseFloat(document.getElementById('paidInput').value) || 0;
-    const row = document.getElementById('balanceRow');
+    const total = parseFloat(el('totalDue').textContent.replace('$', '')) || 0;
+    const paid = parseFloat(el('amount_paid').value) || 0;
+    const row = el('balanceRow');
 
-    // If overpaid, show negative balance in red (indicates change due)
     if (paid > total) {
       row.style.display = 'flex';
-      document.getElementById('balanceDue').textContent = '-$' + (paid - total).toFixed(2);
-      document.getElementById('balanceDue').style.color = '#e05c5c';
+      el('balanceDue').textContent = '-$' + (paid - total).toFixed(2);
+      el('balanceDue').style.color = '#e05c5c';
       return;
     }
-
     const balance = total - paid;
     if (balance > 0) {
       row.style.display = 'flex';
-      document.getElementById('balanceDue').textContent = '$' + balance.toFixed(2);
-      document.getElementById('balanceDue').style.color = 'var(--danger)';
+      el('balanceDue').textContent = fmt(balance);
+      el('balanceDue').style.color = 'var(--danger)';
     } else {
       row.style.display = 'none';
     }
   }
 
   function validateForm() {
-    const suitSelect = document.getElementById('suitSelect');
-    const addonsChecked = document.querySelectorAll('input[name="addons[]"]:checked').length;
-    const totalDue = parseFloat(document.getElementById('totalDue').textContent.replace('$', '')) || 0;
-    const paidAmount = parseFloat(document.getElementById('paidInput').value) || 0;
+    const withSuit = suitSelected();
+    const checked = ACCESSORIES.filter(item => accessoryCheckbox(item).checked);
+    const totalDue = parseFloat(el('totalDue').textContent.replace('$', '')) || 0;
+    const paid = parseFloat(el('amount_paid').value) || 0;
 
-    if ((!suitSelect || !suitSelect.value) && addonsChecked === 0) {
+    if (!withSuit && checked.length === 0) {
       alert("Fadlan dooro ugu yaraan hal Suit ama hal Shay oo agab ah si aad u kireyso!");
       return false;
     }
 
-    if (paidAmount > totalDue) {
-      alert("Amount paid cannot exceed the total rental amount.");
+    if (!Number.isInteger(parseFloat(el('rentalDays').value)) || getDays() < 1) {
+      alert("Fadlan geli tirada maalmaha (ugu yaraan 1).");
       return false;
     }
 
+    // Agab lacag ah waa inuu leeyahay qiime
+    for (const item of checked) {
+      if (!isFreeItem(item) && getNum('addon_price_' + item) <= 0) {
+        alert("Fadlan geli qiimaha maalinlaha ah ee agabka: " + item.toUpperCase());
+        return false;
+      }
+    }
+
+    const dType = el('discountType').value;
+    const dVal = parseFloat(el('discountValue').value) || 0;
+    if (dVal < 0 || (dType === 'percent' && dVal > 100)) {
+      alert("Discount-ka % waa inuu u dhexeeyaa 0 ilaa 100.");
+      return false;
+    }
+
+    if (paid > totalDue) {
+      alert("Amount paid cannot exceed the total amount to collect.");
+      return false;
+    }
     return true;
   }
 </script>

@@ -11,6 +11,7 @@ from math import ceil
 import datetime
 from django.core.validators import MinValueValidator, MaxValueValidator
 from decimal import Decimal, ROUND_HALF_UP
+from .storage import private_media_storage
 
 
 class Suit(models.Model):
@@ -304,7 +305,7 @@ class SuitRequest(models.Model):
     ]
 
     user = models.ForeignKey(User, on_delete=models.CASCADE, null=True, blank=True)
-    suit = models.ForeignKey(Suit, on_delete=models.CASCADE)
+    suit = models.ForeignKey(Suit, on_delete=models.CASCADE, null=True, blank=True)
     name = models.CharField(max_length=100)
     phone = models.CharField(max_length=20)
     customer_email = models.EmailField(blank=True, null=True)  # Customer's email for notifications
@@ -315,7 +316,12 @@ class SuitRequest(models.Model):
     present_address = models.CharField(max_length=255, blank=True, null=True)
     parents_address = models.CharField(max_length=255, blank=True, null=True)
 
-    customer_image = models.ImageField(upload_to="customers/", blank=True, null=True)
+    customer_image = models.ImageField(
+        upload_to="customers/",
+        storage=private_media_storage,
+        blank=True,
+        null=True,
+    )
 
     request_date = models.DateTimeField(default=timezone.now)
 
@@ -354,14 +360,27 @@ class SuitRequest(models.Model):
         related_name="processed_rental_returns",
     )
     total_amount = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
+    suit_price_per_day = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        null=True,
+        blank=True,
+    )
 
-    days_requested = models.IntegerField(default=1, validators=[MinValueValidator(1), MaxValueValidator(7)])  # Allow up to 7 days
+    days_requested = models.IntegerField(default=1, validators=[MinValueValidator(1), MaxValueValidator(365)])
     rent_days = models.PositiveIntegerField(default=1)
     approved_at = models.DateTimeField(null=True, blank=True)
     due_date = models.DateTimeField(null=True, blank=True)
     quantity_requested = models.IntegerField(default=1, validators=[MinValueValidator(1), MaxValueValidator(5)])  # Allow up to 5 suits
     notes = models.TextField(blank=True, null=True)
     rejected_reason = models.CharField(max_length=255, blank=True)
+    accessory_details = models.JSONField(default=dict, blank=True)
+    discount_type = models.CharField(max_length=7, blank=True, default="")
+    discount_value = models.DecimalField(max_digits=8, decimal_places=2, default=0)
+    discount_amount = models.DecimalField(max_digits=8, decimal_places=2, default=0)
+    guarantee_total = models.DecimalField(max_digits=8, decimal_places=2, default=0)
+    guarantee_refunded = models.DecimalField(max_digits=8, decimal_places=2, default=0)
+    guarantee_settled_at = models.DateTimeField(null=True, blank=True)
 
     @property
     def start_time(self):
@@ -507,11 +526,33 @@ class SuitRequest(models.Model):
 
     @property
     def rental_subtotal(self):
-        return self.suit.price_per_day * self.days_requested * self.quantity_requested
+        if not self.suit_id:
+            return Decimal("0.00")
+        price_per_day = (
+            self.suit_price_per_day
+            if self.suit_price_per_day is not None
+            else self.suit.price_per_day
+        )
+        return price_per_day * self.days_requested * self.quantity_requested
+
+    @property
+    def booked_suit_price(self):
+        if not self.suit_id:
+            return Decimal("0.00")
+        return (
+            self.suit_price_per_day
+            if self.suit_price_per_day is not None
+            else self.suit.price_per_day
+        )
 
     @property
     def accessory_items(self):
         """Parse accessory details from notes so return audits can show returned accessories."""
+        if self.accessory_details:
+            return [
+                f"{item} ({(details or {}).get('size') or 'Standard'} / {(details or {}).get('color') or 'Standard'})"
+                for item, details in self.accessory_details.items()
+            ]
         if not self.notes:
             return []
 
@@ -526,7 +567,7 @@ class SuitRequest(models.Model):
     @property
     def returnable_items(self):
         items = []
-        if self.suit:
+        if self.suit_id:
             items.append(f"{self.suit.suit_name} (Qty: {self.quantity_requested or 1})")
         items.extend(self.accessory_items)
         return items
@@ -577,6 +618,10 @@ class SuitRequest(models.Model):
                 return False
             if rental.status not in {"Pending", "Approved", "Reserved"}:
                 raise ValidationError("Only pending or approved requests can reserve inventory.")
+
+            if not rental.suit_id:
+                self.refresh_from_db()
+                return True
 
             suit = Suit.objects.select_for_update().get(pk=rental.suit_id)
             quantity = rental.quantity_requested or 0
@@ -645,25 +690,27 @@ class SuitRequest(models.Model):
             if rental.status not in {"Pending", "Approved", "Reserved"}:
                 raise ValidationError("Only pending, approved, or reserved rentals can be issued.")
 
-            suit = Suit.objects.select_for_update().get(pk=rental.suit_id)
+            suit = Suit.objects.select_for_update().get(pk=rental.suit_id) if rental.suit_id else None
             quantity = rental.quantity_requested or 0
-            requested_start_date = rental.requested_start_date or timezone.localtime(start_time).date()
-            requested_end_date = rental.requested_end_date or (
-                requested_start_date + timedelta(days=(rental.days_requested or 1))
-            )
-            other_reservations = self._reserved_quantity(
-                suit.pk,
-                rental.pk,
-                requested_start_date,
-                requested_end_date,
-            )
-            if quantity < 1:
-                raise ValidationError("Rental quantity must be greater than zero.")
-            if suit.is_retired or suit.quantity - other_reservations < quantity:
-                available = max(suit.quantity - other_reservations, 0)
-                raise ValidationError(
-                    f"Only {available} unreserved units of {suit.suit_name} are currently available."
+            other_reservations = 0
+            if suit:
+                requested_start_date = rental.requested_start_date or timezone.localtime(start_time).date()
+                requested_end_date = rental.requested_end_date or (
+                    requested_start_date + timedelta(days=(rental.days_requested or 1))
                 )
+                other_reservations = self._reserved_quantity(
+                    suit.pk,
+                    rental.pk,
+                    requested_start_date,
+                    requested_end_date,
+                )
+                if quantity < 1:
+                    raise ValidationError("Rental quantity must be greater than zero.")
+                if suit.is_retired or suit.quantity - other_reservations < quantity:
+                    available = max(suit.quantity - other_reservations, 0)
+                    raise ValidationError(
+                        f"Only {available} unreserved units of {suit.suit_name} are currently available."
+                    )
 
             rental.rent_days = rental.days_requested or rental.rent_days or 1
             if not rental.approved_at:
@@ -673,31 +720,34 @@ class SuitRequest(models.Model):
             rental.end_time = rental.due_date
             rental.return_date = None
             rental.status = "Active"
-            if not rental.total_amount:
-                rental.total_amount = suit.price_per_day * rental.days_requested * quantity
+            if not suit and not rental.accessory_details:
+                raise ValidationError("An accessory-only rental must include at least one accessory.")
+            if not rental.total_amount and suit and not rental.discount_amount:
+                rental.total_amount = rental.booked_suit_price * rental.days_requested * quantity
             rental.save(update_fields=[
                 "rent_days", "approved_at", "rental_start_time", "due_date",
                 "end_time", "return_date", "status", "total_amount",
             ])
 
-            suit.quantity -= quantity
-            remaining_unreserved = suit.quantity - other_reservations
-            suit.status = (
-                "Available" if remaining_unreserved > 0
-                else "Reserved" if other_reservations > 0
-                else "Rented"
-            )
-            suit.save(update_fields=["quantity", "status"])
-            record_inventory_movement(
-                suit,
-                "issued",
-                quantity_delta=-quantity,
-                performed_by=performed_by,
-                rental_request=rental,
-                notes="Rental issued to customer.",
-            )
-            suit.refresh_rental_stats()
-            suit.refresh_rental_end_time()
+            if suit:
+                suit.quantity -= quantity
+                remaining_unreserved = suit.quantity - other_reservations
+                suit.status = (
+                    "Available" if remaining_unreserved > 0
+                    else "Reserved" if other_reservations > 0
+                    else "Rented"
+                )
+                suit.save(update_fields=["quantity", "status"])
+                record_inventory_movement(
+                    suit,
+                    "issued",
+                    quantity_delta=-quantity,
+                    performed_by=performed_by,
+                    rental_request=rental,
+                    notes="Rental issued to customer.",
+                )
+                suit.refresh_rental_stats()
+                suit.refresh_rental_end_time()
 
             self.refresh_from_db()
             return True
@@ -730,7 +780,11 @@ class SuitRequest(models.Model):
                 performed_by=performed_by,
             )
 
-            suit = Suit.objects.select_for_update().get(pk=rental.suit_id)
+            suit = Suit.objects.select_for_update().get(pk=rental.suit_id) if rental.suit_id else None
+            if not suit:
+                self.refresh_from_db()
+                return True
+
             if suit.should_queue_for_dry_cleaning or rental.return_condition == "damaged":
                 suit.status = "Dry Cleaning"
                 movement_type = "returned_for_cleaning"
@@ -763,6 +817,15 @@ class SuitRequest(models.Model):
     def amount_paid(self):
         total = self.payments.aggregate(total=Sum('amount_paid'))['total']
         return total if total is not None else Decimal('0.00')
+
+    @property
+    def guarantee_collected(self):
+        total = self.payments.aggregate(total=Sum("guarantee_amount"))["total"]
+        return total if total is not None else Decimal("0.00")
+
+    @property
+    def guarantee_held(self):
+        return max(self.guarantee_collected - self.guarantee_refunded, Decimal("0.00"))
 
     @property
     def balance_due(self):
@@ -1015,6 +1078,7 @@ class Payment(models.Model):
     rental = models.ForeignKey(SuitRequest, on_delete=models.CASCADE, related_name='payments')
     cashier = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True)
     amount_paid = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
+    guarantee_amount = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
     idempotency_key = models.CharField(max_length=36, unique=True, null=True, blank=True)
     payment_method = models.CharField(max_length=50, blank=True, null=True)
     payment_reference = models.CharField(max_length=255, blank=True, null=True)
@@ -1040,7 +1104,7 @@ class Payment(models.Model):
 
     @property
     def suit_name(self):
-        return self.rental.suit.suit_name
+        return self.rental.suit.suit_name if self.rental.suit_id else "Accessories only"
 
     @property
     def method(self):
@@ -1049,6 +1113,10 @@ class Payment(models.Model):
     @property
     def balance_due(self):
         return self.rental.balance_due
+
+    @property
+    def total_collected(self):
+        return self.amount_paid + self.guarantee_amount
 
 
 class Expense(models.Model):
@@ -1120,8 +1188,18 @@ class Notification(models.Model):
 # Extend user with a lightweight profile for uploads
 class Profile(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='profile')
-    profile_photo = models.ImageField(upload_to='profiles/', null=True, blank=True)
-    id_document = models.FileField(upload_to='ids/', null=True, blank=True)
+    profile_photo = models.ImageField(
+        upload_to='profiles/',
+        storage=private_media_storage,
+        null=True,
+        blank=True,
+    )
+    id_document = models.FileField(
+        upload_to='ids/',
+        storage=private_media_storage,
+        null=True,
+        blank=True,
+    )
     customer_phone = models.CharField(max_length=20, blank=True)
     national_id = models.CharField(max_length=50, blank=True)
     present_address = models.CharField(max_length=255, blank=True)

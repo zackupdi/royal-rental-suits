@@ -1,0 +1,20 @@
+services:
+  - type: web
+    name: royal-rental-suits
+    runtime: python
+    plan: free
+    buildCommand: bash build.sh
+    startCommand: gunicorn suit_rental.wsgi:application
+    envVars:
+      - key: DEBUG
+        value: "false"
+      - key: DJANGO_SECRET_KEY
+        generateValue: true
+      - key: DATABASE_URL
+        sync: false
+      - key: CLOUDINARY_CLOUD_NAME
+        sync: false
+      - key: CLOUDINARY_API_KEY
+        sync: false
+      - key: CLOUDINARY_API_SECRET
+        sync: false

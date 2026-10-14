@@ -290,10 +290,22 @@
         
 
         <div class="receipt-block">
-            <h5 class="section-title">Suit Details</h5>
+            <h5 class="section-title">Rental Details</h5>
+            {% if req.suit %}
             <div class="receipt-detail-item"><span class="receipt-detail-label">Suit Name:</span> {{ req.suit.suit_name }}</div>
             <div class="receipt-detail-item"><span class="receipt-detail-label">Size:</span> {{ req.suit.size }}</div>
+            {% else %}
+            <div class="receipt-detail-item"><span class="receipt-detail-label">Items:</span> Accessories only</div>
+            {% endif %}
             <div class="receipt-detail-item"><span class="receipt-detail-label">Days:</span> {{ req.days_requested }}</div>
+            {% for item, details in req.accessory_details.items %}
+            <div class="receipt-detail-item">
+                <span class="receipt-detail-label">{{ item|title }}:</span>
+                {{ details.size|default:"Standard" }} / {{ details.color|default:"Standard" }}
+                · ${{ details.price_per_day|floatformat:2 }}/day
+                {% if details.guarantee %}· Guarantee ${{ details.guarantee|floatformat:2 }}{% endif %}
+            </div>
+            {% endfor %}
             {% if req.rental_start_time %}
             <div class="receipt-detail-item"><span class="receipt-detail-label">Rental Date:</span> {{ req.rental_start_time|date:'d/m/Y H:i' }}</div>
             {% endif %}
@@ -304,14 +316,18 @@
 
         <div class="receipt-block">
             <h5 class="section-title">Price</h5>
-            <div class="receipt-detail-item"><span class="receipt-detail-label">Rental Price:</span> {{ req.suit.price_per_day|floatformat:2 }} USD / day</div>
+            {% if req.suit %}<div class="receipt-detail-item"><span class="receipt-detail-label">Suit Price:</span> {{ req.booked_suit_price|floatformat:2 }} USD / day</div>{% endif %}
+            <div class="receipt-detail-item"><span class="receipt-detail-label">Rental Total:</span> {{ req.total_amount|floatformat:2 }} USD</div>
             <div class="receipt-detail-item"><span class="receipt-detail-label">Late Penalty:</span> {{ req.late_fee|floatformat:2 }} USD</div>
             <div class="receipt-detail-item"><span class="receipt-detail-label">Discount:</span> {{ discount_amount|floatformat:2 }} USD</div>
         </div>
 
         <div class="amount-grid">
             <div class="amount-row"><span>Paid Now</span><strong>{{ req.amount_paid|floatformat:2 }} USD</strong></div>
+            <div class="amount-row"><span>Guarantee Held</span><strong>{{ req.guarantee_held|floatformat:2 }} USD</strong></div>
+            <div class="amount-row"><span>Guarantee Refunded</span><strong>{{ req.guarantee_refunded|floatformat:2 }} USD</strong></div>
             <div class="amount-row"><span>Remaining Balance</span><strong>{{ req.balance_due|floatformat:2 }} USD</strong></div>
+            <div class="amount-row"><span>Total Collected</span><strong>{{ total_collected|floatformat:2 }} USD</strong></div>
             <div class="amount-total"><span>Total Amount</span><span>{{ total_amount|floatformat:2 }} USD</span></div>
         </div>
 
@@ -363,18 +379,22 @@ function copyReceipt() {
     {% if req.customer_email %}lines.push('Email      : {{ req.customer_email }}');{% endif %}
     {% if req.national_id %}lines.push('National ID: {{ req.national_id }}');{% endif %}
     lines.push('----------------------------------------');
-    lines.push('Suit Details');
-    lines.push('Suit Name  : {{ req.suit.suit_name }}');
-    lines.push('Size       : {{ req.suit.size }}');
+    lines.push('Rental Details');
+    {% if req.suit %}lines.push('Suit Name  : {{ req.suit.suit_name }}');{% else %}lines.push('Items      : Accessories only');{% endif %}
+    {% if req.suit %}lines.push('Size       : {{ req.suit.size }}');{% endif %}
     lines.push('Days       : {{ req.days_requested }}');
     {% if req.rental_start_time %}lines.push('Rental Date: {{ req.rental_start_time|date:"d/m/Y H:i" }}');{% endif %}
     {% if req.end_time %}lines.push('Return Date: {{ req.end_time|date:"d/m/Y H:i" }}');{% endif %}
     lines.push('----------------------------------------');
     lines.push('Pricing');
-    lines.push('Rental Price : {{ req.suit.price_per_day|floatformat:2 }} USD');
+    {% if req.suit %}lines.push('Suit Price   : {{ req.booked_suit_price|floatformat:2 }} USD / day');{% endif %}
+    lines.push('Rental Total : {{ req.total_amount|floatformat:2 }} USD');
     lines.push('Late Penalty : {{ req.late_fee|floatformat:2 }} USD');
     lines.push('Discount     : {{ discount_amount|floatformat:2 }} USD');
     lines.push('Total        : {{ total_amount|floatformat:2 }} USD');
+    lines.push('Guarantee held: {{ req.guarantee_held|floatformat:2 }} USD');
+    lines.push('Guarantee refunded: {{ req.guarantee_refunded|floatformat:2 }} USD');
+    lines.push('Total collected: {{ total_collected|floatformat:2 }} USD');
     lines.push('----------------------------------------');
     lines.push('Payment Method : {{ req.payment_method|default:"Cash" }}');
     lines.push('Status         : {{ req.status }}');
