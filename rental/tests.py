@@ -2,15 +2,40 @@ import base64
 from datetime import datetime, time
 from decimal import Decimal
 from unittest import skip
+from unittest.mock import patch
 
 from django.contrib.auth.models import Group, User
 from django.core.exceptions import ValidationError
 from django.core.files.uploadedfile import SimpleUploadedFile
+from django.core.management import call_command
+from django.core.management.base import CommandError
 from django.test import TestCase
 from django.urls import reverse
 from django.utils import timezone
 
 from .models import ContactMessage, DryCleaning, Expense, InventoryMovement, LateFeeTransaction, Payment, Profile, RentalPolicy, Suit, SuitRequest
+
+
+class BootstrapSuperuserCommandTests(TestCase):
+    def test_creates_superuser_from_environment_and_is_idempotent(self):
+        environment = {
+            "BOOTSTRAP_SUPERUSER_USERNAME": "deploy-admin",
+            "BOOTSTRAP_SUPERUSER_PASSWORD": "a-strong-temporary-password",
+            "BOOTSTRAP_SUPERUSER_EMAIL": "admin@example.com",
+        }
+        with patch.dict("os.environ", environment):
+            call_command("bootstrap_superuser", verbosity=0)
+            call_command("bootstrap_superuser", verbosity=0)
+
+        user = User.objects.get(username="deploy-admin")
+        self.assertTrue(user.is_superuser)
+        self.assertTrue(user.check_password("a-strong-temporary-password"))
+        self.assertEqual(user.email, "admin@example.com")
+
+    def test_requires_username_and_password(self):
+        with patch.dict("os.environ", {}, clear=True):
+            with self.assertRaises(CommandError):
+                call_command("bootstrap_superuser", verbosity=0)
 
 
 class PublicViewsModuleTests(TestCase):

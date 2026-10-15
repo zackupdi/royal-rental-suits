@@ -88,6 +88,12 @@ python manage.py loaddata render-data.json
 
 This transfers Django users and their password hashes as well as the rental data, so existing usernames and passwords remain valid. Keep the fixture private, never commit it or share it, and delete it after confirming the import. File uploads are not included in Django fixtures; sync suit catalog images separately as described above.
 
-After deployment, use the Render service URL to sign in with an existing staff account. If no staff account exists in the imported data, create one with `python manage.py createsuperuser` against the Render database.
+After deployment, use the Render service URL to sign in with an existing staff account. If Render Shell is unavailable, create the initial admin through one deployment:
+
+1. In the Render web service's **Environment** settings, add `BOOTSTRAP_SUPERUSER_USERNAME` and `BOOTSTRAP_SUPERUSER_PASSWORD`. Optionally add `BOOTSTRAP_SUPERUSER_EMAIL`. Use a new username and a strong, unique password; do not put these values in Git or share them.
+2. Deploy the service. The build applies migrations first, then creates the superuser without printing the password in the build log.
+3. After the deploy succeeds, remove all `BOOTSTRAP_SUPERUSER_*` variables from the service environment and save the changes. This prevents the temporary credentials from remaining in Render settings; the created account stays in the database.
+
+The bootstrap command does not change an existing account's password. If the username already belongs to a regular user, choose a different one.
 
 Rotate any credentials that were previously stored in source code, and enter replacement credentials only in Render's environment settings. Never commit `.env` files, database exports, or Cloudinary credentials.
