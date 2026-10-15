@@ -23,7 +23,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # See https://docs.djangoproject.com/en/5.1/howto/deployment/checklist/
 
 RENDER_EXTERNAL_HOSTNAME = os.environ.get("RENDER_EXTERNAL_HOSTNAME", "").strip()
-DEBUG = os.environ.get("DEBUG", "true" if not RENDER_EXTERNAL_HOSTNAME else "false").lower() in {
+DEBUG = os.environ.get("DEBUG", "true").lower() in {
     "1", "true", "yes",
 }
 SECRET_KEY = os.environ.get(
