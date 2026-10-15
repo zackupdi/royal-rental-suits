@@ -34,7 +34,7 @@ SECRET_KEY = os.environ.get(
 ALLOWED_HOSTS = [
     host.strip()
     for host in os.environ.get(
-        "ALLOWED_HOSTS", "localhost,127.0.0.1"
+        "ALLOWED_HOSTS", "localhost,127.0.0.1,.onrender.com"
     ).split(",")
     if host.strip()
 ]
@@ -44,7 +44,7 @@ if RENDER_EXTERNAL_HOSTNAME:
 CSRF_TRUSTED_ORIGINS = [
     origin.strip()
     for origin in os.environ.get(
-        "CSRF_TRUSTED_ORIGINS", "http://127.0.0.1:8000,http://localhost:8000"
+        "CSRF_TRUSTED_ORIGINS", "http://127.0.0.1:8000,http://localhost:8000,https://*.onrender.com"
     ).split(",")
     if origin.strip()
 ]
@@ -236,7 +236,7 @@ STRIPE_CURRENCY = os.environ.get("STRIPE_CURRENCY", "usd")
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 SESSION_COOKIE_SECURE = not DEBUG
 CSRF_COOKIE_SECURE = not DEBUG
-SECURE_SSL_REDIRECT = not DEBUG
+SECURE_SSL_REDIRECT = os.environ.get("SECURE_SSL_REDIRECT", "false").lower() in {"1", "true", "yes"}
 SECURE_HSTS_SECONDS = int(
     os.environ.get("SECURE_HSTS_SECONDS", "31536000" if not DEBUG else "0")
 )
