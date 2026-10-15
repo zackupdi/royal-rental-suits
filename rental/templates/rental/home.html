@@ -523,12 +523,18 @@
 
         /* 🌟 CUSBOONAYSIINTA SAWIRADA: Si buuxda u muuqda oo aan la jarjarin */
         .collection-img {
-            width: 100%;
-            height: auto;
-            aspect-ratio: 3 / 4; /* Cabirka ugu fiican sawirada suudhka (Portrait) */
-            object-fit: cover;
-            object-position: top center; /* Hubi in qaybta sare ee suudhku muuqato */
             display: block;
+            width: 100%;
+            height: 450px;
+            object-fit: cover;
+            object-position: center;
+            border-radius: 12px;
+            opacity: 1;
+            visibility: visible;
+        }
+
+        .carousel-item {
+            width: 100%;
         }
 
         .collection-body { padding: 32px; }
@@ -741,7 +747,7 @@
 
         @media(max-width:768px) {
             .hero-stats { gap: 20px; }
-            .collection-img { aspect-ratio: 4/5; } /* Mobile-ka oo yar ka dhig si fiican loo arko */
+            .collection-img { height: 300px; }
             .cta-card { padding: 38px 22px; }
         }
     </style>
@@ -967,6 +973,15 @@
                         </div>
                         <div class="carousel-item">
                             <img src="{% static 'luxury3.jpg' %}" class="collection-img" alt="Luxury Suit">
+                        </div>
+                        <div class="carousel-item">
+                            <img src="{% static 'luxury4.jpg' %}" class="collection-img" alt="Luxury Suit">
+                        </div>
+                        <div class="carousel-item">
+                            <img src="{% static 'luxury5.jpg' %}" class="collection-img" alt="Luxury Suit">
+                        </div>
+                        <div class="carousel-item">
+                            <img src="{% static 'luxury6.jpg' %}" class="collection-img" alt="Luxury Suit">
                         </div>
                     </div>
                     <button class="carousel-control-prev" type="button" data-bs-target="#luxuryCarousel" data-bs-slide="prev">
