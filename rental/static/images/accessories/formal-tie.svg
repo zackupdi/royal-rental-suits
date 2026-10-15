@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 600" role="img" aria-labelledby="title">
+  <title id="title">Formal silk tie</title>
+  <defs>
+    <linearGradient id="background" x2="1" y2="1">
+      <stop stop-color="#222129"/>
+      <stop offset="1" stop-color="#101115"/>
+    </linearGradient>
+    <linearGradient id="silk" x2="1" y2="1">
+      <stop stop-color="#8b2934"/>
+      <stop offset=".5" stop-color="#4c1724"/>
+      <stop offset="1" stop-color="#9a3942"/>
+    </linearGradient>
+    <linearGradient id="gold" x2="0" y2="1">
+      <stop stop-color="#f5df9b"/>
+      <stop offset="1" stop-color="#bd9141"/>
+    </linearGradient>
+  </defs>
+  <rect width="800" height="600" fill="url(#background)"/>
+  <path d="M272 132l128-49 128 49-81 76 57 250-104 90-104-90 57-250z" fill="url(#silk)" stroke="url(#gold)" stroke-width="8" stroke-linejoin="round"/>
+  <path d="M400 83v465m-128-416 81 76-57 250m232-326-81 76 57 250" fill="none" stroke="#e6b9a9" stroke-width="4" opacity=".42"/>
+  <path d="M283 146l117-45 117 45" fill="none" stroke="#f4e0b0" stroke-width="4" opacity=".7"/>
+  <text x="400" y="570" fill="#c9a84c" font-family="sans-serif" font-size="22" letter-spacing="7" text-anchor="middle">FORMAL ACCESSORIES</text>
+</svg>

@@ -38,6 +38,22 @@ class BootstrapSuperuserCommandTests(TestCase):
                 call_command("bootstrap_superuser", verbosity=0)
 
 
+class SuitImageFallbackTests(TestCase):
+    def test_items_without_uploaded_images_use_local_category_fallbacks(self):
+        cases = (
+            ("Brown Leather Belt", "belts", "/static/images/accessories/leather-belt.svg"),
+            ("Black Leather Shoes", "shoes", "/static/images/accessories/dress-shoes.svg"),
+            ("Black Silk Tie", "ties", "/static/images/accessories/formal-tie.svg"),
+            ("White Formal Shirt", "shirts", "/static/images/accessories/formal-shirt.svg"),
+            ("Black Classic Suit", "suits", "/static/luxury1.jpg"),
+        )
+
+        for name, item_type, expected_url in cases:
+            with self.subTest(name=name):
+                suit = Suit(suit_name=name, item_type=item_type)
+                self.assertEqual(suit.image_url, expected_url)
+
+
 class PublicViewsModuleTests(TestCase):
     def test_public_views_module_exports_core_views(self):
         from . import views_public

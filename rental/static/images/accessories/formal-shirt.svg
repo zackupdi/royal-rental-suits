@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 600" role="img" aria-labelledby="title">
+  <title id="title">Formal shirt</title>
+  <defs>
+    <linearGradient id="background" x2="1" y2="1">
+      <stop stop-color="#252626"/>
+      <stop offset="1" stop-color="#101115"/>
+    </linearGradient>
+    <linearGradient id="fabric" x2="0" y2="1">
+      <stop stop-color="#faf7ef"/>
+      <stop offset="1" stop-color="#c9c5bd"/>
+    </linearGradient>
+    <linearGradient id="gold" x2="0" y2="1">
+      <stop stop-color="#f5df9b"/>
+      <stop offset="1" stop-color="#bd9141"/>
+    </linearGradient>
+  </defs>
+  <rect width="800" height="600" fill="url(#background)"/>
+  <path d="M286 126l80-38 34 39 34-39 80 38 91 80-57 77-48-37v194H300V246l-48 37-57-77z" fill="url(#fabric)" stroke="url(#gold)" stroke-width="8" stroke-linejoin="round"/>
+  <path d="M366 88l34 39 34-39-17 78h-34z" fill="#f4f0e8" stroke="#b7aa92" stroke-width="4"/>
+  <path d="M400 166v267" stroke="#908879" stroke-width="4"/>
+  <circle cx="414" cy="210" r="5" fill="#8a806f"/>
+  <circle cx="414" cy="258" r="5" fill="#8a806f"/>
+  <circle cx="414" cy="306" r="5" fill="#8a806f"/>
+  <path d="M300 298h54v73h-54m146-73h54v73h-54" fill="none" stroke="#b8ad9b" stroke-width="4"/>
+  <text x="400" y="530" fill="#c9a84c" font-family="sans-serif" font-size="22" letter-spacing="7" text-anchor="middle">FORMAL WEAR</text>
+</svg>

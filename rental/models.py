@@ -6,6 +6,7 @@ from django.dispatch import receiver
 from django.utils import timezone
 from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
+from django.templatetags.static import static
 from datetime import timedelta
 from math import ceil
 import datetime
@@ -79,7 +80,20 @@ class Suit(models.Model):
     def image_url(self):
         if self.image:
             return self.image.url
-        return "https://images.unsplash.com/photo-1594932224011-04504106503c?q=80&w=800"
+
+        item_details = " ".join(
+            filter(None, [self.item_type, self.suit_name, self.description])
+        ).lower()
+        fallback_images = (
+            ("belt", "images/accessories/leather-belt.svg"),
+            ("shoe", "images/accessories/dress-shoes.svg"),
+            ("tie", "images/accessories/formal-tie.svg"),
+            ("shirt", "images/accessories/formal-shirt.svg"),
+        )
+        for keyword, image_path in fallback_images:
+            if keyword in item_details:
+                return static(image_path)
+        return static("luxury1.jpg")
 
     @property
     def is_retired(self):
