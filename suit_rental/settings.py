@@ -23,13 +23,23 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # See https://docs.djangoproject.com/en/5.1/howto/deployment/checklist/
 
 RENDER_EXTERNAL_HOSTNAME = os.environ.get("RENDER_EXTERNAL_HOSTNAME", "").strip()
-DEBUG = os.environ.get("DEBUG", "true").lower() in {
+IS_RENDER = any(
+    os.environ.get(variable, "").strip()
+    for variable in ("RENDER", "RENDER_SERVICE_ID", "RENDER_EXTERNAL_HOSTNAME")
+)
+DEBUG = os.environ.get("DEBUG", "false" if IS_RENDER else "true").lower() in {
     "1", "true", "yes",
 }
-SECRET_KEY = os.environ.get(
-    "DJANGO_SECRET_KEY",
-    "django-insecure-7x+&p5)(bpr9wl4nkdruz5+vir^@bgbyqe#_swcgln-%ylw^^u"
-)
+if IS_RENDER:
+    DEBUG = False
+
+SECRET_KEY = os.environ.get("DJANGO_SECRET_KEY", "")
+if not SECRET_KEY:
+    if IS_RENDER:
+        raise ImproperlyConfigured(
+            "Set DJANGO_SECRET_KEY in the Render environment before starting Django."
+        )
+    SECRET_KEY = "local-development-only-do-not-use-in-production"
 
 ALLOWED_HOSTS = [
     host.strip()
@@ -122,6 +132,10 @@ if DATABASE_URL:
             ssl_require=not DEBUG,
         )
     }
+elif IS_RENDER:
+    raise ImproperlyConfigured(
+        "Set DATABASE_URL to the Render PostgreSQL internal connection URL."
+    )
 else:
     DATABASES = {
         "default": {
