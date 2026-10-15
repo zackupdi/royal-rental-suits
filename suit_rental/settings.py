@@ -180,13 +180,8 @@ CLOUDINARY_STORAGE = {
     "API_SECRET": os.environ.get("CLOUDINARY_API_SECRET"),
 }
 
-# Uploaded media must use durable object storage in production because Render's
-# local filesystem is temporary. Local development continues using MEDIA_ROOT.
+# Uploaded media uses Cloudinary if credentials are provided, otherwise FileSystemStorage
 USE_CLOUDINARY = all(CLOUDINARY_STORAGE.values())
-if not DEBUG and not USE_CLOUDINARY:
-    raise ImproperlyConfigured(
-        "Set CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, and CLOUDINARY_API_SECRET in production."
-    )
 
 STORAGES = {
     "default": {
