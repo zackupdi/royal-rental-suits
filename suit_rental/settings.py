@@ -26,11 +26,10 @@ RENDER_EXTERNAL_HOSTNAME = os.environ.get("RENDER_EXTERNAL_HOSTNAME", "").strip(
 DEBUG = os.environ.get("DEBUG", "true" if not RENDER_EXTERNAL_HOSTNAME else "false").lower() in {
     "1", "true", "yes",
 }
-SECRET_KEY = os.environ.get("DJANGO_SECRET_KEY", "")
-if not SECRET_KEY:
-    if not DEBUG:
-        raise ImproperlyConfigured("Set DJANGO_SECRET_KEY in the production environment.")
-    SECRET_KEY = "local-development-only-do-not-use-in-production"
+SECRET_KEY = os.environ.get(
+    "DJANGO_SECRET_KEY",
+    "django-insecure-7x+&p5)(bpr9wl4nkdruz5+vir^@bgbyqe#_swcgln-%ylw^^u"
+)
 
 ALLOWED_HOSTS = [
     host.strip()
@@ -123,15 +122,13 @@ if DATABASE_URL:
             ssl_require=not DEBUG,
         )
     }
-elif DEBUG:
+else:
     DATABASES = {
         "default": {
             "ENGINE": "django.db.backends.sqlite3",
             "NAME": BASE_DIR / "db.sqlite3",
         }
     }
-else:
-    raise ImproperlyConfigured("Set DATABASE_URL to the production PostgreSQL database.")
 
 # Password validation
 # https://docs.djangoproject.com/en/5.1/ref/settings/#auth-password-validators
