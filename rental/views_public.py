@@ -75,14 +75,27 @@ def home(request):
         just_logged_out = True
         del request.session["just_logged_out"]
 
-    suits = Suit.objects.exclude(condition_grade='retired')
+    try:
+        suits = Suit.objects.exclude(condition_grade='retired')
+        total_suits = suits.count()
+        available_suits = suits.filter(status="Available").count()
+        luxury_count = suits.filter(collection="Luxury").count()
+        standard_count = suits.filter(collection="Standard").count()
+        budget_count = suits.filter(collection="Budget").count()
+    except Exception:
+        total_suits = 0
+        available_suits = 0
+        luxury_count = 0
+        standard_count = 0
+        budget_count = 0
+
     context = {
         "just_logged_out": just_logged_out,
-        "total_suits": suits.count(),
-        "available_suits": suits.filter(status="Available").count(),
-        "luxury_count": suits.filter(collection="Luxury").count(),
-        "standard_count": suits.filter(collection="Standard").count(),
-        "budget_count": suits.filter(collection="Budget").count(),
+        "total_suits": total_suits,
+        "available_suits": available_suits,
+        "luxury_count": luxury_count,
+        "standard_count": standard_count,
+        "budget_count": budget_count,
     }
     return render(request, "rental/home.html", context)
 

@@ -252,8 +252,7 @@ LOGGING = {
     'disable_existing_loggers': False,
     'formatters': {
         'verbose': {
-            'format': '[{asctime}] {levelname} {name}: {message}',
-            'style': '{',
+            'format': '[%(asctime)s] %(levelname)s %(name)s: %(message)s',
         },
     },
     'handlers': {
@@ -267,10 +266,20 @@ LOGGING = {
         'level': 'INFO',
     },
     'loggers': {
+        'django': {
+            'handlers': ['console'],
+            'level': 'INFO',
+            'propagate': True,
+        },
         'django.request': {
             'handlers': ['console'],
-            'level': 'ERROR',
-            'propagate': False,
+            'level': 'DEBUG',
+            'propagate': True,
+        },
+        'django.server': {
+            'handlers': ['console'],
+            'level': 'DEBUG',
+            'propagate': True,
         },
     },
 }
