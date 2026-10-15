@@ -1,150 +1,146 @@
-{% load static %}
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>My Bookings | Suit Rental</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
-    <style>
-        body {
-            background: #0f0f1a;
-            color: #f0ede8;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-        }
-        .card {
-            background: rgba(255,255,255,0.05);
-            border: 1px solid rgba(255,255,255,0.08);
-        }
-        .badge-soft {
-            background: rgba(201,168,76,0.14);
-            color: #c9a84c;
-        }
-        .table thead th {
-            border-bottom: 1px solid rgba(255,255,255,0.1);
-        }
-        .profile-summary {
-            border-color: rgba(201,168,76,0.2);
-            background: linear-gradient(135deg, rgba(201,168,76,0.1), rgba(255,255,255,0.025));
-        }
-        .profile-summary .profile-label {
-            color: rgba(240,237,232,0.55);
-            font-size: .72rem;
-            text-transform: uppercase;
-            letter-spacing: .08em;
-        }
-    </style>
-</head>
-<body>
-<nav class="navbar navbar-expand-lg navbar-dark bg-dark py-3">
-    <div class="container">
-        <a class="navbar-brand" href="{% url 'all_suits' %}"><i class="fa-solid fa-crown me-2"></i>SUIT RENTAL</a>
-        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navMenu">
-            <span class="navbar-toggler-icon"></span>
-        </button>
-        <div class="collapse navbar-collapse" id="navMenu">
-            <ul class="navbar-nav ms-auto">
-                <li class="nav-item"><a class="nav-link" href="{% url 'all_suits' %}">Collections</a></li>
-                <li class="nav-item"><a class="nav-link active" href="{% url 'customer_history' %}">My Bookings</a></li>
-                <li class="nav-item"><a class="nav-link" href="{% url 'notifications' %}">Notifications</a></li>
-                <li class="nav-item"><a class="nav-link text-danger" href="{% url 'customer_logout' %}">Logout</a></li>
-            </ul>
-        </div>
-    </div>
-</nav>
+MAX_QTY = 5
+MAX_DAYS = 365
+REQUEST_FIELDS = {f.name for f in RentalRequest._meta.get_fields()}
 
-<div class="container py-5">
-    <div class="mb-4 text-center">
-        <h1 class="fw-bold">My Bookings</h1>
-        <p class="text-muted">Review all your suit requests and track their current status.</p>
-        <a href="{% url 'all_suits' %}" class="btn btn-warning rounded-pill px-4 mt-3">New Rent</a>
-    </div>
 
-    <div class="card profile-summary p-4 mb-4">
-        <h2 class="h5 mb-3"><i class="fa-solid fa-address-card text-warning me-2"></i>Your saved profile</h2>
-        <div class="row g-3">
-            <div class="col-md-4">
-                <div class="profile-label">Name</div>
-                <div>{{ request.user.get_full_name|default:request.user.username }}</div>
-            </div>
-            <div class="col-md-4">
-                <div class="profile-label">Email</div>
-                <div>{{ request.user.email|default:"Not provided" }}</div>
-            </div>
-            <div class="col-md-4">
-                <div class="profile-label">Phone</div>
-                <div>{{ customer_profile.customer_phone|default:"Not provided" }}</div>
-            </div>
-            <div class="col-md-6">
-                <div class="profile-label">Address</div>
-                <div>{{ customer_profile.present_address|default:"Not provided" }}</div>
-            </div>
-            <div class="col-md-6">
-                <div class="profile-label">Parent / alternate address</div>
-                <div>{{ customer_profile.parents_address|default:"Not provided" }}</div>
-            </div>
-        </div>
-    </div>
+def _int(value, default=0):
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return default
 
-    <div class="card p-4">
-        {% if bookings %}
-            <div class="table-responsive">
-                <table class="table table-borderless text-white align-middle mb-0">
-                    <thead>
-                        <tr class="text-muted small text-uppercase">
-                            <th>Suit</th>
-                            <th>Qty</th>
-                            <th>Days</th>
-                            <th>Status</th>
-                            <th>Details</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for booking in bookings %}
-                            <tr>
-                                <td>
-                                    <div class="fw-bold">{{ booking.name|default:booking.suit.suit_name }}</div>
-                                    <div class="text-muted small">{{ booking.suit.suit_name }} • {{ booking.suit.collection }} • {{ booking.suit.color }}</div>
-                                </td>
-                                <td>{{ booking.quantity_requested }}</td>
-                                <td>{{ booking.days_requested }}</td>
-                                <td>
-                                    {% if booking.status == 'Pending' %}
-                                        <span class="badge bg-warning text-dark">Pending</span>
-                                    {% elif booking.status == 'Active' %}
-                                        <span class="badge bg-success">Active</span>
-                                    {% elif booking.status == 'Returned' or booking.status == 'Completed' %}
-                                        <span class="badge bg-secondary">Completed</span>
-                                    {% elif booking.status == 'Rejected' %}
-                                        <span class="badge bg-danger">Rejected</span>
-                                    {% else %}
-                                        <span class="badge bg-light text-dark">{{ booking.status }}</span>
-                                    {% endif %}
-                                </td>
-                                <td>
-                                    <div class="small text-muted">Phone: {{ booking.phone|default:'—' }}</div>
-                                    <div class="small text-muted">Address: {{ booking.present_address|default:'—' }}</div>
-                                    {% if booking.customer_image %}
-                                        <div class="small text-muted">Image: uploaded</div>
-                                    {% endif %}
-                                </td>
-                            </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
-        {% else %}
-            <div class="text-center py-5">
-                <i class="fa-solid fa-clock fa-3x text-muted mb-3"></i>
-                <p class="mb-2">You have no booking history yet.</p>
-                <p class="text-muted">Request a suit from the collection page and your history will appear here.</p>
-                <a href="{% url 'all_suits' %}" class="btn btn-warning rounded-pill px-4">Browse Suits</a>
-            </div>
-        {% endif %}
-    </div>
-</div>
 
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
-</body>
-</html>
+def _owner_field():
+    """Field-ka RentalRequest ku xira User-ka (user / customer / ...)."""
+    User = get_user_model()
+    for name in ('user', 'customer', 'customer_user', 'requested_by'):
+        try:
+            field = RentalRequest._meta.get_field(name)
+        except FieldDoesNotExist:
+            continue
+        if field.is_relation and field.related_model is User:
+            return name
+    raise ImproperlyConfigured(
+        "RentalRequest wuxuu u baahan yahay ForeignKey u dhexeeya User-ka "
+        "(user / customer / customer_user / requested_by)."
+    )
+
+
+@login_required        # ku hay decorator-kii customer-ka ee aad hore u isticmaashay
+def customer_history(request):
+    release_expired_reservations()
+    user = request.user
+    owner = _owner_field()
+
+    # ⬇⬇ XIGAN: haddii view-gaagii hore profile-ka si kale u helay, ku celi line-kaas ⬇⬇
+    customer_profile = getattr(user, 'customer_profile', None)
+    # ⬆⬆ ------------------------------------------------------------------------ ⬆⬆
+
+    profile_phone = getattr(customer_profile, 'customer_phone', '') or ''
+    profile_addr = getattr(customer_profile, 'present_address', '') or ''
+    profile_parents = getattr(customer_profile, 'parents_address', '') or ''
+
+    form = None            # None = GET (ama ma jiro cilad)
+    show_form = False
+
+    # ---------------- POST: codsi cusub ----------------
+    if request.method == 'POST':
+        form = {k: request.POST.get(k, '').strip() for k in (
+            'suit_id', 'quantity', 'days', 'start_date',
+            'phone', 'present_address', 'parents_address', 'notes')}
+        errors = []
+
+        suit = Suit.objects.filter(pk=_int(form['suit_id']), quantity__gt=0).first()
+        qty = _int(form['quantity'], 1)
+        days = _int(form['days'], 1)
+
+        if not suit:
+            errors.append('Please choose an available suit.')
+        elif not 1 <= qty <= min(suit.quantity, MAX_QTY):
+            errors.append(f'Quantity must be between 1 and {min(suit.quantity, MAX_QTY)}.')
+        if not 1 <= days <= MAX_DAYS:
+            errors.append(f'Days must be between 1 and {MAX_DAYS}.')
+        if not form['phone']:
+            errors.append('Phone number is required.')
+        if not form['present_address']:
+            errors.append('District / City is required.')
+
+        start_note = ''
+        if form['start_date']:
+            try:
+                start = datetime.strptime(form['start_date'], '%Y-%m-%d').date()
+                if start < timezone.localdate():
+                    errors.append('Preferred start date cannot be in the past.')
+                else:
+                    start_note = f"Preferred start date: {start.isoformat()}. "
+            except ValueError:
+                errors.append('Invalid start date.')
+
+        if not errors:
+            # Ka hortag duplicate: codsi Pending ah oo isku mid ah horay u jiro
+            if RentalRequest.objects.filter(
+                    **{owner: user}, suit=suit, status='Pending',
+                    quantity_requested=qty, days_requested=days).exists():
+                messages.info(request, 'You already have a pending request for this suit.')
+                return redirect('customer_history')
+
+            data = {
+                owner: user,
+                'suit': suit,
+                'name': user.get_full_name() or user.username,
+                'phone': form['phone'],
+                'present_address': form['present_address'],
+                'parents_address': form['parents_address'],
+                'quantity_requested': qty,
+                'days_requested': days,
+                'status': 'Pending',
+                'total_amount': suit.price_per_day * qty * days,
+                'notes': (start_note + form['notes']).strip(),
+            }
+            data = {k: v for k, v in data.items() if k in REQUEST_FIELDS}   # kaliya fields-ka jira
+            image = request.FILES.get('customer_image')
+            if image and 'customer_image' in REQUEST_FIELDS:
+                data['customer_image'] = image
+
+            with transaction.atomic():
+                RentalRequest.objects.create(**data)
+
+            messages.success(request, 'Your request was sent. Reception will review it shortly.')
+            return redirect('customer_history')
+
+        for e in errors:
+            messages.error(request, e)
+        show_form = True            # dib u muuji form-ka oo qiimayaasha ku haynaya
+
+    # ---------------- GET (iyo POST khaldan) ----------------
+    bookings = list(
+        RentalRequest.objects.filter(**{owner: user}).select_related('suit').order_by('-id')
+    )
+    counts = Counter(b.status for b in bookings)
+    stats = {
+        'total': len(bookings),
+        'active': counts['Active'],
+        'pending': counts['Pending'] + counts['Reserved'],
+        'completed': counts['Returned'] + counts['Completed'],
+    }
+
+    if form is None:
+        form = {
+            'phone': profile_phone, 'present_address': profile_addr,
+            'parents_address': profile_parents,
+            'suit_id': request.GET.get('suit', ''),     # ?suit=ID -> hore u dooro
+            'quantity': '1', 'days': '1', 'start_date': '', 'notes': '',
+        }
+
+    start_in_form = show_form or bool(request.GET.get('new')) or bool(request.GET.get('suit')) or not bookings
+
+    return render(request, 'rental/customer_history.html', {
+        'bookings': bookings,
+        'stats': stats,
+        'customer_profile': customer_profile,
+        'available_suits': Suit.objects.filter(quantity__gt=0).order_by('suit_name'),
+        'form': form,
+        'start_in_form': start_in_form,
+        'has_notes': 'notes' in REQUEST_FIELDS,
+        'can_upload_image': 'customer_image' in REQUEST_FIELDS,
+    })

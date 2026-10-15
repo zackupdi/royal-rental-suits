@@ -7,24 +7,24 @@
 <style>
 /* ==========================================
    ROYAL RENTAL - CUSTOMER MANAGEMENT
-   Theme: Navy Blue + Royal Gold
+   Theme: Professional Black + Royal Gold
 ========================================== */
 
 .customers-page {
-    --rr-navy: #0d1b2a;
-    --rr-panel: #122438;
-    --rr-panel-light: #172c42;
+    --rr-bg: #08090c;
+    --rr-panel: #111318;
+    --rr-panel-light: #191c23;
     --rr-gold: #c9a84c;
     --rr-gold-hover: #e0c068;
     --rr-text: #f1f5f9;
-    --rr-muted: #94a3b8;
-    --rr-border: rgba(201, 168, 76, .22);
+    --rr-muted: #9ca3af;
+    --rr-border: rgba(255, 255, 255, .10);
 
+    width: 100%;
+    min-width: 0;
     color: var(--rr-text);
     font-family: Inter, "Segoe UI", Arial, sans-serif;
     font-size: 14px;
-    width: 100%;
-    min-width: 0;
 }
 
 .customers-page *,
@@ -39,7 +39,7 @@
     font-weight: 700;
     line-height: 1.2;
     color: var(--rr-gold);
-    margin-bottom: 8px;
+    margin: 0 0 8px;
 }
 
 .customers-page .page-description {
@@ -54,14 +54,9 @@
 .customers-page .cust-hero {
     position: relative;
     overflow: hidden;
-    background: linear-gradient(
-        125deg,
-        rgba(201,168,76,.10),
-        rgba(13,27,42,.97) 55%,
-        rgba(23,44,66,.95)
-    );
-    border: 1px solid var(--rr-border);
-    border-radius: 18px;
+    background: linear-gradient(125deg, #191919, #08090c 65%, #141414);
+    border: 1px solid #292929;
+    border-radius: 16px;
     padding: 26px;
     margin-bottom: 24px;
 }
@@ -92,60 +87,6 @@
     margin-bottom: 8px;
 }
 
-/* Buttons */
-
-.customers-page .btn-gold {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    gap: 8px;
-    background: var(--rr-gold);
-    border: 1px solid var(--rr-gold);
-    color: var(--rr-navy);
-    font-weight: 700;
-    font-size: .84rem;
-    padding: 10px 17px;
-    border-radius: 9px;
-    text-decoration: none;
-    transition: all .2s ease;
-    white-space: nowrap;
-}
-
-.customers-page .btn-gold:hover {
-    background: var(--rr-gold-hover);
-    border-color: var(--rr-gold-hover);
-    color: var(--rr-navy);
-    transform: translateY(-1px);
-}
-
-.customers-page .btn-outline-light {
-    border-radius: 9px;
-    font-size: .82rem;
-}
-
-.customers-page .btn-view {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    gap: 6px;
-    background: rgba(255,255,255,.04);
-    border: 1px solid rgba(255,255,255,.17);
-    color: #e2e8f0;
-    border-radius: 8px;
-    padding: 7px 11px;
-    font-size: .78rem;
-    font-weight: 600;
-    text-decoration: none;
-    transition: all .2s ease;
-    white-space: nowrap;
-}
-
-.customers-page .btn-view:hover {
-    border-color: var(--rr-gold);
-    color: var(--rr-gold);
-    background: rgba(201,168,76,.08);
-}
-
 /* Statistics */
 
 .customers-page .stats-grid {
@@ -162,12 +103,8 @@
     display: flex;
     align-items: center;
     gap: 14px;
-    background: linear-gradient(
-        145deg,
-        rgba(23,44,66,.96),
-        rgba(13,27,42,.98)
-    );
-    border: 1px solid var(--rr-border);
+    background: linear-gradient(145deg, #191919, #0d0d0d);
+    border: 1px solid #292929;
     border-radius: 14px;
     transition: border-color .2s, transform .2s;
 }
@@ -184,8 +121,8 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    background: rgba(201,168,76,.12);
-    border: 1px solid rgba(201,168,76,.17);
+    background: rgba(201,168,76,.10);
+    border: 1px solid rgba(201,168,76,.20);
     border-radius: 12px;
     color: var(--rr-gold);
     font-size: 1.1rem;
@@ -206,7 +143,7 @@
     line-height: 1.4;
 }
 
-/* Search and table heading */
+/* Directory toolbar */
 
 .customers-page .section-toolbar {
     display: flex;
@@ -249,8 +186,8 @@
     min-height: 43px;
     padding: 10px 14px 10px 41px;
     color: #f8fafc;
-    background: rgba(18,36,56,.9);
-    border: 1px solid var(--rr-border);
+    background: #111111;
+    border: 1px solid #303030;
     border-radius: 10px;
     font-size: .83rem;
     outline: none;
@@ -258,13 +195,13 @@
 }
 
 .customers-page .search-box::placeholder {
-    color: #8797aa;
+    color: #87909d;
 }
 
 .customers-page .search-box:focus {
     border-color: var(--rr-gold);
     box-shadow: 0 0 0 3px rgba(201,168,76,.10);
-    background: #122438;
+    background: #171717;
     color: white;
 }
 
@@ -273,8 +210,8 @@
 .customers-page .cust-table-wrap {
     width: 100%;
     overflow: hidden;
-    background: rgba(13,27,42,.94);
-    border: 1px solid var(--rr-border);
+    background: #0b0b0b;
+    border: 1px solid #292929;
     border-radius: 15px;
 }
 
@@ -286,7 +223,7 @@
 
 .customers-page .cust-table {
     width: 100%;
-    min-width: 850px;
+    min-width: 760px;
     margin: 0;
     color: var(--rr-text);
     vertical-align: middle;
@@ -295,15 +232,15 @@
 }
 
 .customers-page .cust-table thead th {
-    background: #102136;
-    color: var(--rr-muted);
+    background: #171717;
+    color: #aeb5c0;
     font-size: .69rem;
     font-weight: 700;
     letter-spacing: .7px;
     text-transform: uppercase;
     white-space: nowrap;
     padding: 16px 15px;
-    border-bottom: 1px solid var(--rr-border);
+    border-bottom: 1px solid #303030;
 }
 
 .customers-page .cust-table tbody td {
@@ -321,7 +258,7 @@
 }
 
 .customers-page .cust-table tbody tr:hover {
-    background: rgba(201,168,76,.045);
+    background: rgba(255,255,255,.035);
 }
 
 .customers-page .customer-info {
@@ -340,7 +277,7 @@
     justify-content: center;
     border-radius: 12px;
     background: linear-gradient(135deg, #e0c068, #a7832d);
-    color: #0d1b2a;
+    color: #08090c;
     font-size: .95rem;
     font-weight: 800;
     text-transform: uppercase;
@@ -358,7 +295,7 @@
     margin-top: 3px;
 }
 
-/* Status pills */
+/* Status labels */
 
 .customers-page .pill {
     display: inline-flex;
@@ -395,6 +332,36 @@
     background: rgba(255,255,255,.05);
 }
 
+/* View button */
+
+.customers-page .btn-view {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    background: #181818;
+    border: 1px solid #3a3a3a;
+    color: #f1f5f9;
+    border-radius: 8px;
+    padding: 8px 13px;
+    font-size: .78rem;
+    font-weight: 600;
+    text-decoration: none;
+    transition: all .2s ease;
+    white-space: nowrap;
+}
+
+.customers-page .btn-view:hover {
+    border-color: var(--rr-gold);
+    color: var(--rr-gold);
+    background: rgba(201,168,76,.07);
+}
+
+.customers-page .btn-view:focus-visible {
+    outline: 2px solid var(--rr-gold);
+    outline-offset: 3px;
+}
+
 /* Empty state */
 
 .customers-page .empty-state {
@@ -415,91 +382,6 @@
     color: #f1f5f9;
     margin-bottom: 6px;
     font-size: .95rem;
-}
-
-/* Modal */
-
-#newRentModal .modal-content.lux {
-    background: #0f2133;
-    color: #f1f5f9;
-    border: 1px solid rgba(201,168,76,.3);
-    border-radius: 17px;
-    box-shadow: 0 20px 65px rgba(0,0,0,.4);
-    overflow: hidden;
-}
-
-#newRentModal .modal-header,
-#newRentModal .modal-footer {
-    padding: 19px 22px;
-}
-
-#newRentModal .modal-body {
-    padding: 8px 22px 22px;
-}
-
-#newRentModal .modal-title {
-    font-size: 1.08rem;
-    font-weight: 750;
-}
-
-#newRentModal .modal-title i {
-    color: var(--rr-gold);
-}
-
-#newRentModal .history-box {
-    height: 100%;
-    min-height: 76px;
-    background: rgba(255,255,255,.035);
-    border: 1px solid rgba(201,168,76,.16);
-    border-radius: 10px;
-    padding: 12px 4px;
-    text-align: center;
-}
-
-#newRentModal .history-box .n {
-    color: var(--rr-gold);
-    font-size: 1.35rem;
-    font-weight: 750;
-    line-height: 1.3;
-}
-
-#newRentModal .history-label {
-    color: var(--rr-muted);
-    font-size: .68rem;
-    margin-top: 5px;
-}
-
-#newRentModal .history-heading {
-    color: var(--rr-gold);
-    font-size: .7rem;
-    font-weight: 700;
-    letter-spacing: 1px;
-    text-transform: uppercase;
-    margin-bottom: 12px;
-}
-
-#newRentModal .customer-phone {
-    color: var(--rr-muted);
-    font-size: .82rem;
-    overflow-wrap: anywhere;
-}
-
-#newRentModal #mLast {
-    color: var(--rr-muted);
-    font-size: .78rem;
-    line-height: 1.7;
-    overflow-wrap: anywhere;
-}
-
-#newRentModal .alert-warning {
-    background: rgba(201,168,76,.1);
-    color: #fcd76a;
-    border: 1px solid rgba(201,168,76,.25);
-    border-radius: 9px;
-}
-
-#newRentModal .modal-footer {
-    border-top: 1px solid rgba(255,255,255,.06) !important;
 }
 
 /* Tablet */
@@ -534,14 +416,6 @@
 
     .customers-page .page-description {
         font-size: .8rem;
-    }
-
-    .customers-page .hero-actions {
-        width: 100%;
-    }
-
-    .customers-page .hero-actions .btn-gold {
-        width: 100%;
     }
 
     .customers-page .stats-grid {
@@ -584,38 +458,8 @@
         border-radius: 11px;
     }
 
-    #newRentModal .modal-dialog {
-        margin: 10px;
-    }
-
-    #newRentModal .modal-header,
-    #newRentModal .modal-footer {
-        padding: 15px;
-    }
-
-    #newRentModal .modal-body {
-        padding: 7px 15px 17px;
-    }
-
-    #newRentModal .history-box {
-        min-height: 69px;
-        padding: 10px 2px;
-    }
-
-    #newRentModal .history-box .n {
-        font-size: 1.15rem;
-    }
-
-    #newRentModal .history-label {
-        font-size: .63rem;
-    }
-
-    #newRentModal .modal-footer {
-        gap: 8px;
-    }
-
-    #newRentModal .modal-footer .btn {
-        flex: 1;
+    .customers-page .cust-table {
+        min-width: 700px;
     }
 }
 
@@ -627,38 +471,113 @@
         transform: none !important;
     }
 }
+
+/* ===== BLACK BODY THEME ===== */
+.customers-page {
+    background: #000000 !important;
+    color: #ffffff !important;
+    min-height: 100vh;
+}
+
+.customers-page .container-fluid,
+.customers-page section {
+    background-color: #000000;
+}
+
+.customers-page h1,
+.customers-page h2,
+.customers-page h3,
+.customers-page h4,
+.customers-page h5,
+.customers-page p,
+.customers-page label,
+.customers-page td,
+.customers-page strong {
+    color: #ffffff;
+}
+
+.customers-page .page-heading,
+.customers-page .hero-label,
+.customers-page .stat-icon,
+.customers-page .search-icon {
+    color: #c9a84c;
+}
+
+.customers-page .stat-card,
+.customers-page .cust-hero,
+.customers-page .cust-table-wrap {
+    background: #000000 !important;
+    border: 1px solid #292929;
+}
+
+.customers-page .cust-table,
+.customers-page .cust-table tbody,
+.customers-page .cust-table tbody tr,
+.customers-page .cust-table tbody td {
+    background-color: #000000 !important;
+    color: #ffffff !important;
+}
+
+.customers-page .cust-table thead th {
+    background-color: #111111 !important;
+    color: #c9a84c !important;
+}
+
+.customers-page .customer-caption,
+.customers-page .section-subtitle,
+.customers-page .page-description,
+.customers-page .stat-label {
+    color: #b0b0b0 !important;
+}
+
+.customers-page .search-box {
+    background: #080808 !important;
+    color: #ffffff !important;
+    border-color: #333333;
+}
+
+.customers-page .search-box::placeholder {
+    color: #999999;
+}
+
+.customers-page .btn-view {
+    background: #111111;
+    color: #ffffff;
+    border-color: #444444;
+}
+
+.customers-page .btn-view:hover {
+    color: #c9a84c;
+    border-color: #c9a84c;
+}
+
+.customers-page .table-responsive {
+    background: #000000;
+}
+
+.customers-page .cust-table tbody tr:hover td {
+    background-color: #151515 !important;
+}
 </style>
 
 <div class="customers-page">
-
     <div class="container-fluid px-0">
 
         <!-- PAGE HEADER -->
         <section class="cust-hero">
-            <div class="hero-content d-flex flex-wrap
-                        justify-content-between align-items-center gap-3">
+            <div class="hero-content">
 
-                <div>
-                    <div class="hero-label">
-                        <i class="fas fa-crown me-1"></i>
-                        Royal Rental Management
-                    </div>
-
-                    <h2 class="page-heading">Customer Directory</h2>
-
-                    <p class="page-description">
-                        Manage your customers, review rental history,
-                        and create new rentals with ease.
-                    </p>
+                <div class="hero-label">
+                    <i class="fas fa-crown me-1"></i>
+                    Royal Rental Management
                 </div>
 
-                <div class="hero-actions">
-                    <a href="{% url 'create_rental' %}"
-                       class="btn-gold">
-                        <i class="fas fa-plus"></i>
-                        New Rental
-                    </a>
-                </div>
+                <h2 class="page-heading">Customer Directory</h2>
+
+                <p class="page-description">
+                    Manage your customers, review rental history,
+                    and access customer records with ease.
+                </p>
 
             </div>
         </section>
@@ -671,7 +590,9 @@
                     <i class="fas fa-users"></i>
                 </div>
                 <div>
-                    <div class="stat-number">{{ customer_count|default:0 }}</div>
+                    <div class="stat-number">
+                        {{ customer_count|default:0 }}
+                    </div>
                     <div class="stat-label">Total Customers</div>
                 </div>
             </div>
@@ -681,7 +602,9 @@
                     <i class="fas fa-person-circle-check"></i>
                 </div>
                 <div>
-                    <div class="stat-number">{{ total_active|default:0 }}</div>
+                    <div class="stat-number">
+                        {{ total_active|default:0 }}
+                    </div>
                     <div class="stat-label">Active Rentals</div>
                 </div>
             </div>
@@ -691,7 +614,9 @@
                     <i class="fas fa-clock"></i>
                 </div>
                 <div>
-                    <div class="stat-number">{{ total_pending|default:0 }}</div>
+                    <div class="stat-number">
+                        {{ total_pending|default:0 }}
+                    </div>
                     <div class="stat-label">Pending Rentals</div>
                 </div>
             </div>
@@ -701,7 +626,9 @@
                     <i class="fas fa-rotate-left"></i>
                 </div>
                 <div>
-                    <div class="stat-number">{{ total_returned|default:0 }}</div>
+                    <div class="stat-number">
+                        {{ total_returned|default:0 }}
+                    </div>
                     <div class="stat-label">Returned Rentals</div>
                 </div>
             </div>
@@ -721,7 +648,7 @@
                     </h3>
 
                     <div class="section-subtitle">
-                        Search and manage your customer records.
+                        Search and view your customer records.
                     </div>
                 </div>
 
@@ -738,12 +665,11 @@
 
             </div>
 
-            <!-- TABLE -->
+            <!-- CUSTOMER TABLE -->
             <div class="cust-table-wrap shadow-sm">
                 <div class="table-responsive">
 
-                    <table class="table table-borderless
-                                  cust-table align-middle"
+                    <table class="table table-borderless cust-table align-middle"
                            id="customerTable">
 
                         <thead>
@@ -816,31 +742,18 @@
                                     </span>
                                 </td>
 
+                                <!-- VIEW ONLY: RENT BUTTON REMOVED -->
                                 <td>
-                                    <div class="d-flex justify-content-end
-                                                align-items-center gap-2">
+                                    <div class="d-flex justify-content-end align-items-center">
 
                                         <a href="{% url 'customer_detail' customer.name %}"
-                                           class="btn-view">
+                                           class="btn-view"
+                                           aria-label="View {{ customer.name|default:'customer' }} details">
+
                                             <i class="fas fa-eye"></i>
                                             View
+
                                         </a>
-
-                                        <button type="button"
-                                                class="btn-gold btn-new-rent"
-                                                style="padding:7px 10px;font-size:.76rem"
-                                                data-name="{{ customer.name|default:'' }}"
-                                                data-phone="{{ customer.phone|default:'' }}"
-                                                data-total="{{ customer.total_rentals|default:0 }}"
-                                                data-active="{{ customer.active_rentals|default:0 }}"
-                                                data-returned="{{ customer.returned_rentals|default:0 }}"
-                                                data-pending="{{ customer.pending_rentals|default:0 }}"
-                                                data-last-date="{{ customer.last_rental_date|date:'d M Y'|default:'' }}"
-                                                data-last-suit="{{ customer.last_suit|default:'' }}">
-
-                                            <i class="fas fa-plus"></i>
-                                            Rent
-                                        </button>
 
                                     </div>
                                 </td>
@@ -885,135 +798,9 @@
     </div>
 </div>
 
-<!-- NEW RENTAL MODAL -->
-<div class="modal fade"
-     id="newRentModal"
-     tabindex="-1"
-     aria-labelledby="newRentModalTitle"
-     aria-hidden="true">
-
-    <div class="modal-dialog modal-dialog-centered">
-
-        <div class="modal-content lux">
-
-            <div class="modal-header border-0">
-
-                <h5 class="modal-title" id="newRentModalTitle">
-                    <i class="fas fa-handshake me-2"></i>
-                    New Rental
-                </h5>
-
-                <button type="button"
-                        class="btn-close btn-close-white"
-                        data-bs-dismiss="modal"
-                        aria-label="Close"></button>
-
-            </div>
-
-            <div class="modal-body">
-
-                <!-- Customer information -->
-                <div class="d-flex align-items-center gap-3 mb-4">
-
-                    <span class="avatar"
-                          id="mAvatar"
-                          style="width:52px;height:52px;font-size:1.2rem">
-                    </span>
-
-                    <div style="min-width:0">
-                        <div class="fw-bold fs-5"
-                             id="mName"
-                             style="overflow-wrap:anywhere">
-                        </div>
-
-                        <div class="customer-phone mt-1">
-                            <i class="fas fa-phone me-1"></i>
-                            <span id="mPhone"></span>
-                        </div>
-                    </div>
-
-                </div>
-
-                <!-- Rental history -->
-                <div class="history-heading">
-                    <i class="fas fa-clock-rotate-left me-1"></i>
-                    Rental History
-                </div>
-
-                <div class="row g-2 mb-3">
-
-                    <div class="col-3">
-                        <div class="history-box">
-                            <div class="n" id="mTotal">0</div>
-                            <div class="history-label">Total</div>
-                        </div>
-                    </div>
-
-                    <div class="col-3">
-                        <div class="history-box">
-                            <div class="n" id="mActive">0</div>
-                            <div class="history-label">Active</div>
-                        </div>
-                    </div>
-
-                    <div class="col-3">
-                        <div class="history-box">
-                            <div class="n" id="mReturned">0</div>
-                            <div class="history-label">Returned</div>
-                        </div>
-                    </div>
-
-                    <div class="col-3">
-                        <div class="history-box">
-                            <div class="n" id="mPending">0</div>
-                            <div class="history-label">Pending</div>
-                        </div>
-                    </div>
-
-                </div>
-
-                <div id="mLast"></div>
-
-                <div class="alert alert-warning py-3 mt-3 mb-0 small d-none"
-                     id="mWarn"
-                     role="alert">
-
-                    <i class="fas fa-triangle-exclamation me-2"></i>
-                    This customer currently has an active rental.
-                    Please review the rental details before proceeding.
-
-                </div>
-
-            </div>
-
-            <div class="modal-footer border-0">
-
-                <button type="button"
-                        class="btn btn-outline-light"
-                        data-bs-dismiss="modal">
-                    Cancel
-                </button>
-
-                <a href="#"
-                   id="mContinue"
-                   class="btn-gold">
-                    Continue
-                    <i class="fas fa-arrow-right"></i>
-                </a>
-
-            </div>
-
-        </div>
-
-    </div>
-</div>
-
+<!-- LIVE CUSTOMER SEARCH -->
 <script>
 document.addEventListener("DOMContentLoaded", function () {
-
-    /* ======================================
-       CUSTOMER LIVE SEARCH
-    ====================================== */
 
     const searchInput = document.getElementById("customerSearch");
     const customerRows = document.querySelectorAll(
@@ -1021,146 +808,36 @@ document.addEventListener("DOMContentLoaded", function () {
     );
     const noResultRow = document.getElementById("noResultRow");
 
-    if (searchInput) {
+    if (!searchInput) {
+        return;
+    }
 
-        searchInput.addEventListener("input", function () {
+    searchInput.addEventListener("input", function () {
 
-            const query = this.value.trim().toLowerCase();
-            let visibleCount = 0;
+        const query = this.value.trim().toLowerCase();
+        let visibleCount = 0;
 
-            customerRows.forEach(function (row) {
+        customerRows.forEach(function (row) {
 
-                const searchableText = row.dataset.search || "";
-                const matches = searchableText.includes(query);
+            const searchableText = row.dataset.search || "";
+            const matches = searchableText.includes(query);
 
-                row.style.display = matches ? "" : "none";
+            row.style.display = matches ? "" : "none";
 
-                if (matches) {
-                    visibleCount++;
-                }
-            });
-
-            if (noResultRow) {
-                noResultRow.style.display =
-                    customerRows.length > 0 && visibleCount === 0
-                        ? ""
-                        : "none";
+            if (matches) {
+                visibleCount++;
             }
 
         });
-    }
 
-    /* ======================================
-       NEW RENTAL MODAL
-    ====================================== */
-
-    const modalElement = document.getElementById("newRentModal");
-
-    if (!modalElement) {
-        return;
-    }
-
-    // Move modal to body to avoid stacking issues.
-    if (modalElement.parentElement !== document.body) {
-        document.body.appendChild(modalElement);
-    }
-
-    // Check that Bootstrap 5 is loaded.
-    if (typeof bootstrap === "undefined" ||
-        typeof bootstrap.Modal === "undefined") {
-
-        console.error(
-            "Royal Rental: Bootstrap 5 Modal is not loaded."
-        );
-
-        return;
-    }
-
-    const rentalModal = bootstrap.Modal.getOrCreateInstance(
-        modalElement
-    );
-
-    const createUrl = "{% url 'create_rental' %}";
-
-    const setText = function (id, value) {
-        const element = document.getElementById(id);
-
-        if (element) {
-            element.textContent = value;
+        if (noResultRow) {
+            noResultRow.style.display =
+                customerRows.length > 0 && visibleCount === 0
+                    ? ""
+                    : "none";
         }
-    };
 
-    document.querySelectorAll(".btn-new-rent").forEach(
-        function (button) {
-
-            button.addEventListener("click", function () {
-
-                const data = this.dataset;
-
-                const name = data.name || "";
-                const phone = data.phone || "";
-
-                setText(
-                    "mAvatar",
-                    name.trim().charAt(0).toUpperCase() || "?"
-                );
-
-                setText("mName", name || "Unknown Customer");
-                setText("mPhone", phone || "—");
-                setText("mTotal", data.total || "0");
-                setText("mActive", data.active || "0");
-                setText("mReturned", data.returned || "0");
-                setText("mPending", data.pending || "0");
-
-                const lastRental = document.getElementById("mLast");
-
-                if (lastRental) {
-
-                    if (data.lastDate || data.lastSuit) {
-
-                        lastRental.textContent =
-                            "Most recent rental: " +
-                            (data.lastSuit || "Suit not specified") +
-                            (data.lastDate
-                                ? " (" + data.lastDate + ")"
-                                : "");
-
-                    } else {
-
-                        lastRental.textContent =
-                            "This customer has no previous rentals.";
-
-                    }
-                }
-
-                const warning = document.getElementById("mWarn");
-
-                if (warning) {
-                    warning.classList.toggle(
-                        "d-none",
-                        Number(data.active || 0) === 0
-                    );
-                }
-
-                // Preserve the existing Django URL and query parameters.
-                const params = new URLSearchParams();
-
-                params.set("customer_name", name);
-                params.set("customer_phone", phone);
-
-                const continueButton =
-                    document.getElementById("mContinue");
-
-                if (continueButton) {
-                    continueButton.href =
-                        createUrl + "?" + params.toString();
-                }
-
-                rentalModal.show();
-
-            });
-        }
-    );
+    });
 
 });
 </script>

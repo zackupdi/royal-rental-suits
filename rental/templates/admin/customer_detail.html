@@ -330,6 +330,7 @@
         </div>
     </div>
 
+    {% if not show_new_rent_form %}
     {% if latest_rental %}
     <div class="recent-rental">
         <strong style="color:var(--gold)"><i class="fa-solid fa-clock-rotate-left me-2"></i>Most Recent Rental</strong>
@@ -483,6 +484,7 @@
         </div>
         {% endif %}
     </div>
+    {% endif %}
 
     {% if show_new_rent_form %}
     <section class="rental-form-card mt-4" id="new-rental-form" aria-labelledby="new-rental-heading">

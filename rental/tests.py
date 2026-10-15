@@ -1831,6 +1831,7 @@ class AdminUserManagementTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Customer User")
         self.assertContains(response, "Rental History")
+        self.assertContains(response, "Complete Rental History")
         self.assertContains(response, rental.suit.suit_name)
         self.assertContains(response, "Hargeisa")
         self.assertContains(response, "Mogadishu")
@@ -1911,6 +1912,8 @@ class AdminUserManagementTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertIn("New Rental for", response.content.decode())
+        self.assertNotContains(response, "Complete Rental History")
+        self.assertNotContains(response, "Total Rentals")
         # Verify that the prefilled customer ID is displayed in the context
         self.assertEqual(response.context["prefill_customer_id"], customer.id)
 
