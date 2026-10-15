@@ -196,7 +196,7 @@ STORAGES = {
         } if not USE_CLOUDINARY else {},
     },
     "staticfiles": {
-        "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage",
+        "BACKEND": "whitenoise.storage.CompressedStaticFilesStorage",
     },
 }
 
